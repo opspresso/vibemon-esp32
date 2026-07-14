@@ -1,0 +1,39 @@
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# pytest
+__pycache__
+.pytest_cache
+
+# build
+build/
+builds/
+
+# JetBrains
+.idea/
+*.iml
+
+# backup files
+*.bak
+*.backup
+
+# local env files
+.env*.local
+.env
+
+# claude
+.claude/
+.prompt-*.md
+.prompt.md
+prompt-*.md
+prompt.md
+
+# WiFi credentials
+credentials.h
