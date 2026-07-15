@@ -40,9 +40,10 @@ See the [ESP32 Setup Guide](docs/esp32-setup.md) for Arduino IDE setup, provisio
 |-------|-------------|---------|
 | **State** | Current activity state | `working`, `idle`, `notification` |
 | **Project** | Active project directory | `vibemon-esp32` |
-| **Tool** | Currently executing tool | `Bash`, `Read`, `Edit` |
+| **Tool** | Currently executing tool, shown as the working status text | `Bash` → `Running`, `Read` → `Reading` |
 | **Model** | Active model | `Opus 4.5`, `Sonnet` |
 | **Memory** | Context window usage | `45%` |
+| **Usage** | 5-hour / weekly plan usage, with time until reset | `18% 24m`, `60% 3d` |
 
 ## States
 

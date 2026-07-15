@@ -35,6 +35,8 @@ char currentModel[32] = "";
 int currentMemory = 0;
 int currentUsage5h = 0;    // 5-hour session plan-usage % (account-global)
 int currentUsageWeek = 0;  // weekly plan-usage % (account-global)
+int currentUsage5hResetsIn = -1;    // minutes until 5-hour window resets (-1 = not received)
+int currentUsageWeekResetsIn = -1;  // minutes until weekly window resets (-1 = not received)
 unsigned long lastUpdate = 0;
 unsigned long lastBlink = 0;
 int animFrame = 0;

@@ -127,18 +127,29 @@ void drawInfoRow(int y, void (*iconFn)(TFT_eSPI&, int, int, uint16_t, int, uint1
   tft.setFont(nullptr);
 }
 
-// Helper: Draw a single-line metric row: [icon] [inline bar] [NN%]
+// Helper: Draw a single-line metric row: [icon] [inline bar] [NN% 24m]
 // Used for memory and plan-usage (5h / weekly); reuses drawMemoryBar.
-void drawMetricRow(int y, void (*iconFn)(TFT_eSPI&, int, int, uint16_t, int, uint16_t), int percent, uint16_t textColor, uint16_t bgColor) {
+// resetIn (minutes until the usage window resets, -1 = absent) is appended
+// next to the percentage; the bar fills the space the text leaves (matches
+// Desktop bubble's flex bar). Separator is a space: FreeSans9pt7b is
+// ASCII-only, so the Desktop's "·" is unavailable.
+void drawMetricRow(int y, void (*iconFn)(TFT_eSPI&, int, int, uint16_t, int, uint16_t), int percent, uint16_t textColor, uint16_t bgColor, int resetIn = -1) {
   iconFn(tft, METRIC_ICON_X, y + 2, textColor, 1, bgColor);
-  drawMemoryBar(tft, METRIC_BAR_X, y + 2, METRIC_BAR_W, METRIC_BAR_H, percent, bgColor);
   tft.setTextColor(textColor);
   tft.setFont(&fonts::FreeSans9pt7b);
   tft.setTextSize(1);
-  char valueText[5];
-  snprintf(valueText, sizeof(valueText), "%d%%", percent);
+  char valueText[16];
+  if (resetIn >= 0) {
+    char resetText[8];
+    formatMinutes(resetIn, resetText, sizeof(resetText));
+    snprintf(valueText, sizeof(valueText), "%d%% %s", percent, resetText);
+  } else {
+    snprintf(valueText, sizeof(valueText), "%d%%", percent);
+  }
   int w = tft.textWidth(valueText);
-  tft.setCursor(METRIC_TEXT_X + METRIC_TEXT_W - w, y);
+  int barWidth = METRIC_TEXT_RIGHT - w - METRIC_GAP - METRIC_BAR_X;
+  drawMemoryBar(tft, METRIC_BAR_X, y + 2, barWidth, METRIC_BAR_H, percent, bgColor);
+  tft.setCursor(METRIC_TEXT_RIGHT - w, y);
   tft.print(valueText);
   tft.setFont(nullptr);
 }
@@ -183,7 +194,7 @@ void drawStatusTextSection(uint16_t bgColor, uint16_t textColor) {
   tft.println(statusText);
 }
 
-// Draw project, tool, model, memory info rows
+// Draw project, model, memory info rows
 void drawInfoSection(uint16_t bgColor, uint16_t textColor) {
   // Clear info region when only info changed (not full redraw)
   if (dirtyInfo && !needsRedraw) {
@@ -194,27 +205,22 @@ void drawInfoSection(uint16_t bgColor, uint16_t textColor) {
     drawInfoRow(PROJECT_Y, drawFolderIcon, currentProject, textColor, bgColor);
   }
 
-  // Tool name (working state only)
-  if (strlen(currentTool) > 0 && currentState == STATE_WORKING) {
-    drawInfoRow(TOOL_Y, drawToolIcon, currentTool, textColor, bgColor);
-  }
-
   // Model name
   if (strlen(currentModel) > 0) {
     drawInfoRow(MODEL_Y, drawRobotIcon, currentModel, textColor, bgColor);
   }
 
-  // Metric rows (memory + plan usage) as single-line [icon] [bar] [NN%].
+  // Metric rows (memory + plan usage) as single-line [icon] [bar] [NN% 24m].
   // Hidden on start state; each row hidden when its value is 0.
   if (currentState != STATE_START) {
     if (currentMemory > 0) {
       drawMetricRow(MEMORY_Y, drawBrainIcon, currentMemory, textColor, bgColor);
     }
     if (currentUsage5h > 0) {
-      drawMetricRow(USAGE5H_Y, drawClockIcon, currentUsage5h, textColor, bgColor);
+      drawMetricRow(USAGE5H_Y, drawClockIcon, currentUsage5h, textColor, bgColor, currentUsage5hResetsIn);
     }
     if (currentUsageWeek > 0) {
-      drawMetricRow(USAGEWEEK_Y, drawCalendarIcon, currentUsageWeek, textColor, bgColor);
+      drawMetricRow(USAGEWEEK_Y, drawCalendarIcon, currentUsageWeek, textColor, bgColor, currentUsageWeekResetsIn);
     }
   }
 }

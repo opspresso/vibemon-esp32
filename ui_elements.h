@@ -80,6 +80,33 @@ void getStatusTextEnum(AppState state, char* buf, size_t bufSize) {
   buf[bufSize - 1] = '\0';
 }
 
+// Format minutes until a usage quota resets, compactly: "24m", "2h5m", "3d4h"
+// (matches Desktop bubble.html formatMinutes)
+void formatMinutes(int mins, char* buf, size_t bufSize) {
+  if (mins < 0) mins = 0;
+  if (mins < 60) {
+    snprintf(buf, bufSize, "%dm", mins);
+    return;
+  }
+  int hours = mins / 60;
+  int remMins = mins % 60;
+  if (hours < 24) {
+    if (remMins > 0) {
+      snprintf(buf, bufSize, "%dh%dm", hours, remMins);
+    } else {
+      snprintf(buf, bufSize, "%dh", hours);
+    }
+    return;
+  }
+  int days = hours / 24;
+  int remHours = hours % 24;
+  if (remHours > 0) {
+    snprintf(buf, bufSize, "%dd%dh", days, remHours);
+  } else {
+    snprintf(buf, bufSize, "%dd", days);
+  }
+}
+
 // =============================================================================
 // UI Icon Functions
 // =============================================================================
@@ -92,15 +119,6 @@ void drawFolderIcon(TFT_eSPI &tft, int x, int y, uint16_t color, int s = 1, uint
   tft.fillRect(x, y + 2*s, 10*s, 8*s, color);
   // Inner fold line (cut through with background color)
   tft.fillRect(x + s, y + 4*s, 8*s, s, bg);
-}
-
-// Draw tool/wrench icon - s=1: 10x10, s=2: 20x20 pixels
-void drawToolIcon(TFT_eSPI &tft, int x, int y, uint16_t color, int s = 1, uint16_t bg = 0x0000) {
-  // Wrench head (top)
-  tft.fillRect(x + 2*s, y, 6*s, 4*s, color);
-  tft.fillRect(x + 4*s, y, 2*s, s, bg);  // Notch
-  // Handle
-  tft.fillRect(x + 4*s, y + 4*s, 2*s, 6*s, color);
 }
 
 // Draw robot icon - s=1: 10x10, s=2: 20x20 pixels

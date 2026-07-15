@@ -277,6 +277,20 @@ bool processStatusData(JsonObject doc) {
     infoChanged = true;
   }
 
+  // Parse usage reset times (minutes until the usage window resets).
+  // Account-global like usage: NOT cleared on project change.
+  int usage5hResetsInVal = doc["usage5hResetsIn"] | -1;
+  if (usage5hResetsInVal >= 0 && usage5hResetsInVal != currentUsage5hResetsIn) {
+    currentUsage5hResetsIn = usage5hResetsInVal;
+    infoChanged = true;
+  }
+
+  int usageWeekResetsInVal = doc["usageWeekResetsIn"] | -1;
+  if (usageWeekResetsInVal >= 0 && usageWeekResetsInVal != currentUsageWeekResetsIn) {
+    currentUsageWeekResetsIn = usageWeekResetsInVal;
+    infoChanged = true;
+  }
+
   // Parse character (use isValidCharacter() for dynamic validation)
   const char* charInput = doc["character"] | "";
   if (strlen(charInput) > 0 && isValidCharacter(charInput) && strcmp(charInput, currentCharacter) != 0) {

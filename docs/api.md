@@ -19,6 +19,8 @@ The ESP32 HTTP server does not enforce payload size, rate limiting, or CORS rest
 | `memory` | - | Integer 0-100 (context-window usage) |
 | `usage5h` | - | Integer 0-100 (5-hour plan-usage window) |
 | `usageWeek` | - | Integer 0-100 (weekly plan-usage window) |
+| `usage5hResetsIn` | - | Integer ≥ 0 (minutes until the 5-hour window resets) |
+| `usageWeekResetsIn` | - | Integer ≥ 0 (minutes until the weekly window resets) |
 | `character` | - | `clawd`, `codex`, `kiro`, or `claw` (`daangni` is silently ignored) |
 
 > `character` is a visual rendering choice, typically selected by the agent bridge. It is not a general agent identity field.
@@ -60,6 +62,8 @@ curl -X POST http://DEVICE_IP/status \
 | `memory` | number | Context-window usage (0-100) |
 | `usage5h` | number | 5-hour plan-usage window (0-100) |
 | `usageWeek` | number | Weekly plan-usage window (0-100) |
+| `usage5hResetsIn` | number | Minutes until the 5-hour window resets (shown next to `usage5h`) |
+| `usageWeekResetsIn` | number | Minutes until the weekly window resets (shown next to `usageWeek`) |
 | `character` | string | `clawd`, `codex`, `kiro`, or `claw` (`daangni` is silently ignored) |
 
 > An unrecognized `state` value is silently treated as `idle` — no error is returned.
