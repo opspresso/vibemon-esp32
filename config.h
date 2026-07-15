@@ -7,7 +7,7 @@
 #define CONFIG_H
 
 // Version string
-#define VERSION "v1.12.1"
+#define VERSION "v2.0.3"
 
 // Screen size (layout uses 1.47" dimensions; 1.9" board offset handled in LGFX configure())
 #define SCREEN_WIDTH  172
@@ -19,13 +19,13 @@
 #define FLOAT_AMPLITUDE_X 3  // Floating animation amplitude X (pixels)
 #define FLOAT_AMPLITUDE_Y 5  // Floating animation amplitude Y (pixels)
 #define STATUS_TEXT_Y 150  // size 3 (24px) → bottom 174
-#define LOADING_Y     180  // dots after status text (gap 6px) → bottom ~188
-#define PROJECT_Y     200  // info rows: 24px spacing
-#define MODEL_Y       224
+#define LOADING_Y     188  // dots (r4 → 184..192), 10px gap below status text
+#define PROJECT_Y     206  // info rows: 22px spacing, 14px gap below dots
+#define MODEL_Y       228
 // Metric rows (single-line: icon + inline bar + NN% [+ reset time]): memory, 5h usage, weekly usage
-#define MEMORY_Y      248  // font ~14px → bottom 262
+#define MEMORY_Y      250  // font ~14px → bottom 264
 #define USAGE5H_Y     272
-#define USAGEWEEK_Y   296  // text bottom ~310
+#define USAGEWEEK_Y   294  // text bottom ~308
 #define METRIC_ICON_X    10  // pixel icon left
 #define METRIC_BAR_X     24  // inline bar left
 #define METRIC_TEXT_RIGHT 164  // right-aligned value text edge
