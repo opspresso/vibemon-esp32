@@ -189,8 +189,12 @@ InputResult processInput(const char* input) {
 }
 
 bool processStatusData(JsonObject doc) {
-  // Get incoming project
-  const char* incomingProject = doc["project"] | "";
+  // Get incoming project, truncated once to the stored size so every
+  // comparison (lock check, project change, list dedup) sees the same value
+  // the char buffers can hold — otherwise a >31-char project name never
+  // matches its own truncated stored copy and blocks itself after locking.
+  char incomingProject[sizeof(currentProject)];
+  safeCopyStr(incomingProject, (const char*)(doc["project"] | ""));
 
   // Add incoming project to list
   if (strlen(incomingProject) > 0) {
@@ -250,14 +254,13 @@ bool processStatusData(JsonObject doc) {
   }
 
   // Parse project - check for change and clear dependent fields
-  const char* newProject = doc["project"] | "";
-  if (strlen(newProject) > 0 && strcmp(newProject, currentProject) != 0) {
+  if (strlen(incomingProject) > 0 && strcmp(incomingProject, currentProject) != 0) {
     // Project changed - clear model/memory and trigger redraw
     currentModel[0] = '\0';
     currentMemory = 0;
     currentTool[0] = '\0';
     infoChanged = true;
-    safeCopyStr(currentProject, newProject);
+    safeCopyStr(currentProject, incomingProject);
   }
 
   // Parse tool

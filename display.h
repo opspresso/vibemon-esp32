@@ -211,17 +211,17 @@ void drawInfoSection(uint16_t bgColor, uint16_t textColor) {
   }
 
   // Metric rows (memory + plan usage) as single-line [icon] [bar] [NN% 24m].
-  // Hidden on start state; each row hidden when its value is 0.
-  // Usage rows are Claude-specific (5h/weekly plan limits), so only shown for "clawd".
+  // Hidden on start state; each row hidden when its value is 0. Usage rows
+  // show for any character (matching the desktop app) — only senders with
+  // plan usage populate the fields anyway.
   if (currentState != STATE_START) {
     if (currentMemory > 0) {
       drawMetricRow(MEMORY_Y, drawBrainIcon, currentMemory, textColor, bgColor);
     }
-    bool isClaude = strcmp(currentCharacter, "clawd") == 0;
-    if (isClaude && currentUsage5h > 0) {
+    if (currentUsage5h > 0) {
       drawMetricRow(USAGE5H_Y, drawClockIcon, currentUsage5h, textColor, bgColor, currentUsage5hResetsIn);
     }
-    if (isClaude && currentUsageWeek > 0) {
+    if (currentUsageWeek > 0) {
       drawMetricRow(USAGEWEEK_Y, drawCalendarIcon, currentUsageWeek, textColor, bgColor, currentUsageWeekResetsIn);
     }
   }

@@ -32,6 +32,7 @@ enum AppState {
 
 // Character colors (RGB565)
 #define COLOR_CLAUDE      0xDBAA  // #D97757 Claude orange (217,119,87)
+#define COLOR_VIBEMON     0xFFFF  // #FFFFFF Eye/accent overlay (matches app characters.json)
 #define COLOR_KIRO        0xFFFF  // #FFFFFF White ghost
 #define COLOR_CLAW        0xDA28  // #DD4444 Claw red (221,68,68)
 #define COLOR_CODEX       0x0D0F  // #10A37F Codex green (16,163,127)
@@ -104,6 +105,7 @@ extern int animFrame;
 // =============================================================================
 
 // Character image data (RGB565 format)
+#include "img_vibemon.h"
 #include "img_clawd.h"
 #include "img_kiro.h"
 #include "img_claw.h"
@@ -116,6 +118,10 @@ void drawImageToTFT(TFT_eSPI &tft, int offsetX, int offsetY, const uint16_t* img
 }
 
 // TFT draw functions for each character
+void drawVibemonImage(TFT_eSPI &tft, int x, int y) {
+  drawImageToTFT(tft, x, y, IMG_VIBEMON, IMG_VIBEMON_WIDTH, IMG_VIBEMON_HEIGHT, COLOR_TRANSPARENT_MARKER);
+}
+
 void drawClawdImage(TFT_eSPI &tft, int x, int y) {
   drawImageToTFT(tft, x, y, IMG_CLAWD, IMG_CLAWD_WIDTH, IMG_CLAWD_HEIGHT, COLOR_TRANSPARENT_MARKER);
 }
@@ -139,6 +145,10 @@ void drawImageWithTransparency(TFT_eSprite &sprite, const uint16_t* img, int wid
 }
 
 // Sprite draw functions for each character
+void drawVibemonImageToSprite(TFT_eSprite &sprite) {
+  drawImageWithTransparency(sprite, IMG_VIBEMON, IMG_VIBEMON_WIDTH, IMG_VIBEMON_HEIGHT, COLOR_TRANSPARENT_MARKER);
+}
+
 void drawClawdImageToSprite(TFT_eSprite &sprite) {
   drawImageWithTransparency(sprite, IMG_CLAWD, IMG_CLAWD_WIDTH, IMG_CLAWD_HEIGHT, COLOR_TRANSPARENT_MARKER);
 }
@@ -173,6 +183,20 @@ typedef struct {
 } CharacterGeometry;
 
 // Character definitions
+// vibemon is the cloud/app default character — bridges without their own
+// character (e.g. Codex) are normalized to it by the cloud API.
+// Geometry = app characters.json values / 2 (canvas px → 2px art units).
+const CharacterGeometry CHAR_VIBEMON = {
+  "vibemon",
+  COLOR_VIBEMON,
+  // Eyes (leftX, rightX, y, w, h)
+  22, 38, 26, 4, 6,
+  // Effect position (effectX, effectY)
+  48, 3,
+  // Draw functions
+  drawVibemonImage, drawVibemonImageToSprite
+};
+
 const CharacterGeometry CHAR_CLAWD = {
   "clawd",
   COLOR_CLAUDE,
@@ -220,6 +244,7 @@ const CharacterGeometry CHAR_CODEX = {
 // Character array for dynamic lookup
 // To add a new character, add to this array and define the CharacterGeometry above
 const CharacterGeometry* ALL_CHARACTERS[] = {
+  &CHAR_VIBEMON,
   &CHAR_CLAWD,
   &CHAR_KIRO,
   &CHAR_CLAW,
