@@ -190,9 +190,11 @@ void handleStatus() {
   if (server.hasArg("plain")) {
     // Use const reference to avoid String copy (heap allocation)
     const String& body = server.arg("plain");
-    bool applied = processInput(body.c_str());
-    if (applied) {
+    InputResult result = processInput(body.c_str());
+    if (result == INPUT_OK) {
       server.send(200, "application/json", "{\"success\":true}");
+    } else if (result == INPUT_ERR_PARSE) {
+      server.send(400, "application/json", "{\"error\":\"JSON parse error\"}");
     } else {
       server.send(200, "application/json", "{\"success\":false,\"blocked\":true}");
     }

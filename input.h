@@ -157,27 +157,35 @@ bool handleWebSocketMessage(const char* msgType, JsonObject doc) {
 // Main Input Processing
 // =============================================================================
 
-bool processInput(const char* input) {
+// Result codes, distinct so the HTTP handler can map them to responses
+// (parse error -> 400, blocked -> 200 {"blocked":true}).
+enum InputResult : int8_t {
+  INPUT_OK = 0,
+  INPUT_ERR_PARSE = 1,
+  INPUT_BLOCKED = 2
+};
+
+InputResult processInput(const char* input) {
   StaticJsonDocument<JSON_BUFFER_SIZE> doc;
   DeserializationError error = deserializeJson(doc, input);
 
   if (error) {
     Serial.println("{\"error\":\"JSON parse error\"}");
-    return false;
+    return INPUT_ERR_PARSE;
   }
 
   JsonObject obj = doc.as<JsonObject>();
 
   // Handle command (lock/unlock/reboot/status/lock-mode)
   const char* command = doc["command"] | "";
-  if (strlen(command) > 0 && handleCommand(command, obj)) return true;
+  if (strlen(command) > 0 && handleCommand(command, obj)) return INPUT_OK;
 
   // Handle WebSocket message types (server sends {type: "status", data: {...}})
   const char* msgType = doc["type"] | "";
-  if (strlen(msgType) > 0 && handleWebSocketMessage(msgType, obj)) return true;
+  if (strlen(msgType) > 0 && handleWebSocketMessage(msgType, obj)) return INPUT_OK;
 
   // Direct format: {state: "...", project: "...", ...}
-  return processStatusData(obj);
+  return processStatusData(obj) ? INPUT_OK : INPUT_BLOCKED;
 }
 
 bool processStatusData(JsonObject doc) {
