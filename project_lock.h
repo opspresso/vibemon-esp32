@@ -127,7 +127,10 @@ int parseLockMode(const char* modeStr) {
 // Check if locked to different project
 bool isLockedToDifferentProject(const char* project) {
   if (strlen(lockedProject) == 0) return false;  // Not locked
-  if (strlen(project) == 0) return false;  // No project specified
+  // While locked, a project-less update can't be attributed to the locked
+  // project — block it so it can't overwrite the locked project's state
+  // (the project label would keep showing the locked project).
+  if (strlen(project) == 0) return true;
   return strcmp(lockedProject, project) != 0;
 }
 

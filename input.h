@@ -196,10 +196,24 @@ bool processStatusData(JsonObject doc) {
       safeCopyStr(lockedProject, incomingProject);
     }
   } else if (lockMode == LOCK_MODE_ON_THINKING) {
-    // Lock on thinking state
+    // The lock follows the project that needs the screen:
+    // - thinking: a project starting a new turn takes the lock
+    // - alert/notification: needs the user's attention immediately, takes the
+    //   lock even while another project is busy (matches the desktop app's
+    //   priority focus states)
+    // - any other active state, once the locked project has settled (not in
+    //   an active state and quiet for LOCK_HYSTERESIS_MS): a project that
+    //   never sends thinking is not blocked forever
     const char* stateStr = doc["state"] | "";
-    if (strcmp(stateStr, "thinking") == 0 && strlen(incomingProject) > 0) {
-      safeCopyStr(lockedProject, incomingProject);
+    if (strlen(incomingProject) > 0 && strlen(stateStr) > 0) {
+      bool priority = strcmp(stateStr, "thinking") == 0 ||
+                      strcmp(stateStr, "alert") == 0 ||
+                      strcmp(stateStr, "notification") == 0;
+      bool lockedSettled = !isActiveState(currentState) &&
+                           (millis() - lastActivityTime >= LOCK_HYSTERESIS_MS);
+      if (priority || (lockedSettled && isActiveState(parseState(stateStr)))) {
+        safeCopyStr(lockedProject, incomingProject);
+      }
     }
   }
 

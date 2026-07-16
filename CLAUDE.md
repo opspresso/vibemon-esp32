@@ -40,6 +40,7 @@ Arduino IDE 2.x with the ESP32 board package (ESP32C6 Dev Module) and libraries:
 - **Metric rows**: memory (🧠), 5h usage (⏱️), weekly usage (📅) each render as a single line `[icon] [bar] [NN% 24m]` at the bottom; `usage5h`/`usageWeek` are plan-usage % (0-100) from statusline's `usage.json`; `usage5hResetsIn`/`usageWeekResetsIn` (minutes) are appended next to the usage percentage in compact form (`24m`, `2h5m`, `3d4h`), and the bar fills the width the text leaves
 - **Memory hidden on start**: Memory not displayed during `start` state
 - **Project change resets**: Model/memory cleared when project changes (usage is account-global, not reset)
+- **Project lock**: `first-project` locks permanently to the first project seen; `on-thinking` (default) moves the lock to a project that sends `thinking`, to `alert`/`notification` immediately (priority, matching the desktop app), or to any active state once the locked project has settled (not active and quiet for `LOCK_HYSTERESIS_MS`=4s). While locked, updates from other projects — and project-less updates — are blocked.
 - **Sparkle effect (start, working)**: Animated 4-point star sparkle
 - **Glasses (working)**: Frame-only glasses, lenses stay clear so the eyes underneath remain visible (EYE_GLASSES)
 - **Loading dots speed**: Thinking/planning/packing states use 3x slower animation than working state

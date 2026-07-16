@@ -57,6 +57,10 @@
 #define LOCK_MODE_FIRST_PROJECT 0
 #define LOCK_MODE_ON_THINKING 1
 #define MAX_PROJECTS 10
+// on-thinking mode: how long after the locked project's last accepted update
+// it still holds the lock against other projects' active states (mirrors the
+// desktop app's FOCUS_HYSTERESIS_MS)
+#define LOCK_HYSTERESIS_MS 4000
 
 // Board types (selected at compile time via BOARD_TYPE in credentials.h)
 #define BOARD_1_47  0   // ESP32-C6-LCD-1.47  (172x320, GPIO22 PWM backlight)
