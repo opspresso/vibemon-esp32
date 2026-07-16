@@ -62,7 +62,9 @@ bool dirtyInfo = true;
 unsigned long lastActivityTime = 0;
 
 // Serial input buffer (avoid String allocation)
-char serialBuffer[512];
+// Sized to JSON_BUFFER_SIZE so any payload the JSON parser can hold is also
+// accepted over Serial (nested WebSocket-format payloads exceed 512 bytes).
+char serialBuffer[JSON_BUFFER_SIZE];
 int serialBufferPos = 0;
 bool serialOverflow = false;
 
