@@ -57,7 +57,7 @@ See the [ESP32 Setup Guide](docs/esp32-setup.md) for Arduino IDE setup, provisio
 | `packing` | Gray | Context compacting |
 | `notification` | Yellow | User input needed |
 | `done` | Green | Tool completed |
-| `sleep` | Navy | 5min inactivity |
+| `sleep` | Navy | After 5min in idle |
 | `alert` | Red | Critical error/failure (triggers alert light if configured) |
 
 ## Characters
