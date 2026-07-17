@@ -144,7 +144,7 @@ const char CONFIG_PAGE[] = R"HTML(
 
       <div class="form-group">
         <label for="password">Password</label>
-        <input type="password" id="password" required placeholder="Enter WiFi password" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <input type="password" id="password" placeholder="Enter WiFi password (leave empty for open networks)" autocapitalize="none" autocorrect="off" spellcheck="false">
       </div>
 
       <div class="form-group">
