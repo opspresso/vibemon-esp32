@@ -541,8 +541,16 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
       // Reset backoff on successful connection
       wsReconnectDelay = WS_RECONNECT_INITIAL;
       webSocket.setReconnectInterval(wsReconnectDelay);
-      Serial.print("{\"websocket\":\"connected\",\"url\":\"");
-      Serial.print((char*)payload);
+      // Log the path without the query string -- the query carries the auth
+      // token (?token=...) and must not be echoed to serial.
+      {
+        char connectedPath[64];
+        safeCopyStr(connectedPath, payload ? (const char*)payload : "");
+        char* query = strchr(connectedPath, '?');
+        if (query) *query = '\0';
+        Serial.print("{\"websocket\":\"connected\",\"url\":\"");
+        Serial.print(connectedPath);
+      }
       Serial.print("\",\"heap\":");
       Serial.print(ESP.getFreeHeap());
       Serial.println("}");
