@@ -110,9 +110,13 @@ bool handleWebSocketMessage(const char* msgType, JsonObject doc) {
     return true;
   }
   if (strcmp(msgType, "error") == 0) {
+    // Escape like buildStatusJson: a quote or backslash in the server's
+    // message must not break the response JSON.
     const char* errMsg = doc["message"] | "unknown";
+    char escMsg[128];
+    jsonEscapeStr(errMsg, escMsg, sizeof(escMsg));
     Serial.print("{\"websocket\":\"error\",\"message\":\"");
-    Serial.print(errMsg);
+    Serial.print(escMsg);
     Serial.println("\"}");
     return true;
   }
