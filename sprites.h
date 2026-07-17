@@ -35,7 +35,7 @@ enum AppState {
 #define COLOR_VIBEMON     0xFFFF  // #FFFFFF Eye/accent overlay (matches app characters.json)
 #define COLOR_KIRO        0xFFFF  // #FFFFFF White ghost
 #define COLOR_CLAW        0xDA28  // #DD4444 Claw red (221,68,68)
-#define COLOR_CODEX       0x1928  // #1B2645 Codex navy visor (27,38,69)
+#define COLOR_CODEX       0x1928  // #1B2745 Codex navy visor (27,39,69), matches characters.json
 #define COLOR_EYE         0x0000  // #000000 Black
 #define COLOR_EFFECT_ALT  0xFD20  // #FFA500 Orange for white character effects
 
