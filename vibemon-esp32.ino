@@ -170,6 +170,14 @@ void loop() {
   // Check sleep timer (may set dirty flags via transitionToState)
   checkSleepTimer();
 
+#ifdef ALERT_PIN
+  // Drive the alert light from currentState here (not inside
+  // transitionToState) because several input paths assign currentState
+  // directly (input.h processInput, project_lock.h unlock) and would
+  // otherwise leave the pin stale.
+  digitalWrite(ALERT_PIN, (currentState == STATE_ALERT) ? HIGH : LOW);
+#endif
+
   // === RENDERING ===
 
   // Full screen redraw if state/info changed (centralized rendering)
