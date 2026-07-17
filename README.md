@@ -64,10 +64,11 @@ See the [ESP32 Setup Guide](docs/esp32-setup.md) for Arduino IDE setup, provisio
 
 | Character | Color | Auto-selected for |
 |-----------|-------|-------------------|
-| `vibemon` | Purple | Default; any bridge without its own character (e.g. Codex) |
+| `vibemon` | Purple | Default; any bridge without its own character |
 | `clawd` | Orange | Claude Code |
 | `kiro` | White | Kiro |
 | `claw` | Red | OpenClaw |
+| `codex` | Navy | Codex |
 
 ## HTTP API
 

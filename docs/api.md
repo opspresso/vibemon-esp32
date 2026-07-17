@@ -21,7 +21,7 @@ The ESP32 HTTP server does not enforce payload size, rate limiting, or CORS rest
 | `usageWeek` | - | Integer 0-100 (weekly plan-usage window) |
 | `usage5hResetsIn` | - | Integer ≥ 0 (minutes until the 5-hour window resets) |
 | `usageWeekResetsIn` | - | Integer ≥ 0 (minutes until the weekly window resets) |
-| `character` | - | `vibemon`, `clawd`, `kiro`, or `claw` (unknown names like `daangni` are silently ignored) |
+| `character` | - | `vibemon`, `clawd`, `kiro`, `claw`, or `codex` (unknown names like `daangni` are silently ignored) |
 
 > `character` is a visual rendering choice, typically selected by the agent bridge. It is not a general agent identity field.
 
@@ -70,7 +70,7 @@ curl -X POST http://DEVICE_IP/status \
 
 Agent bridges usually set `character` automatically:
 - `clawd` for Claude Code
-- `vibemon` for Codex
+- `codex` for Codex
 - `kiro` for Kiro
 - `claw` for OpenClaw
 
