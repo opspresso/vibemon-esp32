@@ -215,6 +215,7 @@ void handleHealth() {
 
 void handleLock() {
   char response[128];
+  char escLocked[64];
   if (server.hasArg("plain")) {
     StaticJsonDocument<128> doc;
     // Use const reference to avoid String copy
@@ -224,7 +225,8 @@ void handleLock() {
       const char* projectToLock = doc["project"] | currentProject;
       if (strlen(projectToLock) > 0) {
         lockProject(projectToLock);
-        snprintf(response, sizeof(response), "{\"success\":true,\"lockedProject\":\"%s\"}", lockedProject);
+        jsonEscapeStr(lockedProject, escLocked, sizeof(escLocked));
+        snprintf(response, sizeof(response), "{\"success\":true,\"lockedProject\":\"%s\"}", escLocked);
         server.send(200, "application/json", response);
         return;
       }
@@ -233,7 +235,8 @@ void handleLock() {
   // No body or no project - lock current project
   if (strlen(currentProject) > 0) {
     lockProject(currentProject);
-    snprintf(response, sizeof(response), "{\"success\":true,\"lockedProject\":\"%s\"}", lockedProject);
+    jsonEscapeStr(lockedProject, escLocked, sizeof(escLocked));
+    snprintf(response, sizeof(response), "{\"success\":true,\"lockedProject\":\"%s\"}", escLocked);
     server.send(200, "application/json", response);
   } else {
     server.send(400, "application/json", "{\"error\":\"No project to lock\"}");
@@ -248,9 +251,11 @@ void handleUnlock() {
 void handleLockModeGet() {
   char response[256];
   if (strlen(lockedProject) > 0) {
+    char escLocked[64];
+    jsonEscapeStr(lockedProject, escLocked, sizeof(escLocked));
     snprintf(response, sizeof(response),
       "{\"mode\":\"%s\",\"modes\":{\"first-project\":\"First Project\",\"on-thinking\":\"On Thinking\"},\"lockedProject\":\"%s\"}",
-      getLockModeString(), lockedProject);
+      getLockModeString(), escLocked);
   } else {
     snprintf(response, sizeof(response),
       "{\"mode\":\"%s\",\"modes\":{\"first-project\":\"First Project\",\"on-thinking\":\"On Thinking\"},\"lockedProject\":null}",
@@ -542,9 +547,11 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
       Serial.print(ESP.getFreeHeap());
       Serial.println("}");
 
-      // Send authentication message if token is configured
+      // Send authentication message if token is configured.
+      // 160 bytes: 26-byte JSON envelope + token (stored up to 127 chars) --
+      // a 128-byte buffer silently truncated long tokens into a malformed frame.
       if (strlen(wsToken) > 0) {
-        char authMsg[128];
+        char authMsg[160];
         snprintf(authMsg, sizeof(authMsg), "{\"type\":\"auth\",\"token\":\"%s\"}", wsToken);
         webSocket.sendTXT(authMsg);
         Serial.println("{\"websocket\":\"auth_sent\"}");
