@@ -6,6 +6,9 @@
 #ifndef PROJECT_LOCK_H
 #define PROJECT_LOCK_H
 
+// Defined in input.h (included after this header in the .ino)
+void jsonEscapeStr(const char* src, char* dest, size_t destSize);
+
 // =============================================================================
 // Project List Management
 // =============================================================================
@@ -79,8 +82,12 @@ void lockProject(const char* project) {
       dirtyInfo = true;
     }
 
+    // Escape like buildStatusJson: a quote or backslash in the project name
+    // must not break the serial JSON.
+    char escLocked[64];
+    jsonEscapeStr(lockedProject, escLocked, sizeof(escLocked));
     Serial.print("{\"lockedProject\":\"");
-    Serial.print(lockedProject);
+    Serial.print(escLocked);
     Serial.println("\",\"state\":\"idle\"}");
   }
 }
