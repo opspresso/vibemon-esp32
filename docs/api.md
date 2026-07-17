@@ -242,6 +242,26 @@ See [ESP32 Setup Guide](esp32-setup.md#reset-wifi-settings) for details.
 
 ---
 
+## Serial / WebSocket Commands
+
+The same actions available via HTTP can also be triggered over Serial (115200 baud, JSON payload ending in LF) or WebSocket, using a `command` field instead of a URL path.
+
+| Command | Fields | Equivalent to |
+|---------|--------|---------------|
+| `lock` | `project` (optional, defaults to current project) | `POST /lock` |
+| `unlock` | - | `POST /unlock` |
+| `status` | - | `GET /status` |
+| `lock-mode` | `mode` (optional; omitted = query current mode) | `GET`/`POST /lock-mode` |
+| `reboot` | - | `POST /reboot` (no `{"confirm":true}` required) |
+
+```bash
+echo '{"command":"lock","project":"my-project"}' > /dev/cu.usbmodem1101
+```
+
+> Responses are always printed to Serial as JSON, regardless of which channel the command arrived on — a command sent over WebSocket gets no reply over the WebSocket connection.
+
+---
+
 ## Provisioning Endpoints
 
 Available only while the device is in provisioning mode (AP `VibeMon-Setup`, IP `192.168.4.1`):

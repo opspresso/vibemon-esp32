@@ -221,6 +221,17 @@ The token is used for **authentication** when connecting to VibeMon WebSocket se
 
 **Priority:** Saved token in NVS > WS_TOKEN define
 
+### Custom WebSocket Server (Advanced)
+
+By default the firmware connects to VibeMon's hosted WebSocket service (`ws.vibemon.io`). To point at a different server, set these in `credentials.h`:
+
+```cpp
+#define WS_HOST "127.0.0.1"   // Server hostname or IP (no protocol prefix)
+#define WS_PORT 443           // Server port
+#define WS_PATH "/"           // WebSocket path
+#define WS_USE_SSL true       // true for wss://, false for ws://
+```
+
 ## Troubleshooting
 
 ### Captive Portal Doesn't Open
