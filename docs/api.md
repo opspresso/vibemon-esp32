@@ -13,9 +13,9 @@ The ESP32 HTTP server does not enforce payload size, rate limiting, or CORS rest
 | Field | Max Length | Format |
 |-------|------------|--------|
 | `state` | - | One of valid states (unrecognized values are silently treated as `idle`) |
-| `project` | 100 chars | String |
-| `tool` | 50 chars | String |
-| `model` | 50 chars | String |
+| `project` | 31 chars | String (truncated if longer) |
+| `tool` | 31 chars | String (truncated if longer) |
+| `model` | 31 chars | String (truncated if longer) |
 | `memory` | - | Integer 0-100 (context-window usage) |
 | `usage5h` | - | Integer 0-100 (5-hour plan-usage window) |
 | `usageWeek` | - | Integer 0-100 (weekly plan-usage window) |
@@ -64,7 +64,7 @@ curl -X POST http://DEVICE_IP/status \
 | `usageWeek` | number | Weekly plan-usage window (0-100) |
 | `usage5hResetsIn` | number | Minutes until the 5-hour window resets (shown next to `usage5h`) |
 | `usageWeekResetsIn` | number | Minutes until the weekly window resets (shown next to `usageWeek`) |
-| `character` | string | `vibemon`, `clawd`, `kiro`, or `claw` (unknown names like `daangni` are silently ignored) |
+| `character` | string | `vibemon`, `clawd`, `kiro`, `claw`, or `codex` (unknown names like `daangni` are silently ignored) |
 
 > An unrecognized `state` value is silently treated as `idle` — no error is returned.
 
@@ -80,6 +80,10 @@ Agent bridges usually set `character` automatically:
 ```
 
 > If blocked by project lock: `{"success": false, "blocked": true}`
+>
+> On invalid JSON: HTTP 400 with `{"error": "JSON parse error"}`
+>
+> On missing request body: HTTP 400 with `{"error": "no body"}`
 
 ### GET /status
 
@@ -126,6 +130,8 @@ curl -X POST http://DEVICE_IP/lock \
 ```
 
 > When locking a new project, the display transitions to `idle` state and clears `tool`, `model`, `memory`.
+>
+> If no project is given and no project is currently active: HTTP 400 with `{"error": "No project to lock"}`
 
 ### POST /unlock
 
@@ -172,7 +178,7 @@ curl -X POST http://DEVICE_IP/lock-mode \
 {"success": true, "mode": "first-project", "lockedProject": null}
 ```
 
-> Changing lock mode resets the current lock (`lockedProject` becomes null) and persists the new mode to Flash storage.
+> Every valid mode change request resets the current lock (`lockedProject` becomes null) and persists the mode to Flash storage — even if the mode value is unchanged from the current one.
 >
 > On an invalid `mode`, the response is HTTP 400 with `{"error": "Invalid mode. Valid modes: first-project, on-thinking"}` (no `success` field).
 
@@ -208,6 +214,8 @@ curl -X POST http://DEVICE_IP/reboot \
 {"success": true, "rebooting": true}
 ```
 
+> Without `{"confirm":true}` in the body: HTTP 400 with `{"error": "Requires {\"confirm\":true}"}`
+
 ### POST /wifi-reset
 
 Clear saved WiFi credentials and return to provisioning mode.
@@ -222,6 +230,8 @@ curl -X POST http://DEVICE_IP/wifi-reset \
 ```json
 {"success": true, "message": "WiFi credentials cleared. Rebooting..."}
 ```
+
+> Without `{"confirm":true}` in the body: HTTP 400 with `{"error": "Requires {\"confirm\":true}"}`
 
 **Behavior:**
 - Clears `wifiSSID`, `wifiPassword` from NVS (WebSocket token is preserved)

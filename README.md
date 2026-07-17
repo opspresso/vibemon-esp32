@@ -60,6 +60,8 @@ See the [ESP32 Setup Guide](docs/esp32-setup.md) for Arduino IDE setup, provisio
 | `sleep` | Navy | After 5min in idle |
 | `alert` | Red | Critical error/failure (triggers alert light if configured) |
 
+Active states (`thinking`, `planning`, `working`, `notification`, `packing`, `alert`) auto-return to `idle` after 5 minutes without an update.
+
 ## Characters
 
 | Character | Color | Auto-selected for |
