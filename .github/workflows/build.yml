@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: BOARD_1_47
+            board_type: 0
+          - board: BOARD_1_9
+            board_type: 1
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 core
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+      - name: Install libraries
+        run: arduino-cli lib install ArduinoJson LovyanGFX WebSockets
+
+      - name: Create credentials.h
+        run: cp credentials.h.example credentials.h
+
+      - name: Compile (${{ matrix.board }})
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32c6:PartitionScheme=huge_app \
+            --build-property "compiler.cpp.extra_flags=-DBOARD_TYPE=${{ matrix.board_type }}" \
+            .
