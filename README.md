@@ -138,7 +138,7 @@ See the [ESP32 Setup Guide](docs/esp32-setup.md#troubleshooting) for more.
 ## Related Projects
 
 - [vibemon-app](https://github.com/opspresso/vibemon-app) - Desktop app (Electron)
-- [vibemon](https://github.com/opspresso/vibemon) - Cloud dashboard & API ([vibemon.io](https://vibemon.io))
+- [vibemon-web](https://github.com/opspresso/vibemon-web) - Cloud dashboard & API ([vibemon.io](https://vibemon.io))
 - [vibemon-docs](https://github.com/opspresso/vibemon-docs) - Agent hook installation & setup guide ([vibemon.io/docs](https://vibemon.io/docs))
 - [vibemon-static](https://github.com/opspresso/vibemon-static) - Static assets & embeddable rendering engine ([static.vibemon.io](https://static.vibemon.io))
 
