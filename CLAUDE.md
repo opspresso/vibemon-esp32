@@ -35,7 +35,7 @@ Arduino IDE 2.x with the ESP32 board package (ESP32C6 Dev Module) and libraries:
 - **Animation**: `animFrame % N` approach (100ms tick)
 - **Floating**: Cosine/Sine wave offset (X: ±3px, Y: ±5px, ~3.2s cycle)
 - **Working text**: Tool-based fixed text via `getWorkingText(tool)` (Bash→Running, Read→Reading, Edit→Editing, Write→Writing, Grep/WebSearch→Searching, Glob→Scanning, WebFetch→Fetching, Task→Tasking, default→Working)
-- **JSON fields**: `{"state", "tool", "project", "model", "memory", "usage5h", "usageWeek", "usage5hResetsIn", "usageWeekResetsIn", "character"}` (`*ResetsIn` = minutes until the usage window resets)
+- **JSON fields**: `{"state", "tool", "project", "model", "memory", "usage5h", "usageWeek", "usage5hResetsIn", "usageWeekResetsIn", "character"}` (`*ResetsIn` = minutes until the usage window resets); the model-scoped weekly fields (`usageWeekModel*`) sent by newer bridges are deliberately ignored — the screen already fills its three metric rows
 - **Characters**: `vibemon` (purple robot, cloud/app default), `clawd` (orange), `kiro` (white ghost), `claw` (red), `codex` (navy visor) — `daangni` is desktop-only and silently ignored
 - **Metric rows**: memory (🧠), 5h usage (⏱️), weekly usage (📅) each render as a single line `[icon] [bar] [NN% 24m]` at the bottom; `usage5h`/`usageWeek` are plan-usage % (0-100) from statusline's `usage.json`; `usage5hResetsIn`/`usageWeekResetsIn` (minutes) are appended next to the usage percentage in compact form (`24m`, `2h5m`, `3d4h`), and the bar fills the width the text leaves
 - **Memory hidden on start**: Memory not displayed during `start` state
@@ -43,6 +43,7 @@ Arduino IDE 2.x with the ESP32 board package (ESP32C6 Dev Module) and libraries:
 - **Project lock**: `first-project` locks permanently to the first project seen; `on-thinking` (default) moves the lock to a project that sends `thinking`, to `alert`/`notification` immediately (priority, matching the desktop app), or to any active state once the locked project has settled (not active and quiet for `LOCK_HYSTERESIS_MS`=4s). While locked, updates from other projects — and project-less updates — are blocked. If the server deletes the locked project (WebSocket `{type:'delete'}`), the lock is cleared automatically.
 - **Sparkle effect (start, working)**: Animated 4-point star sparkle
 - **Glasses (working)**: Frame-only glasses, lenses stay clear so the eyes underneath remain visible (EYE_GLASSES)
+- **Eye-cover colors**: Per-character `eyeColor` (blink/happy stroke, default black) and `glassesColor` (glasses frame, default `#111111`) in `CharacterGeometry` — codex uses light `#ECF8FC` for both so overlays stay visible on its dark navy face (matches the app's characters.json)
 - **Loading dots speed**: Thinking/planning/packing states use 3x slower animation than working state
 - **Alert light**: Optional GPIO output for physical alert light; define `ALERT_PIN` in `credentials.h` to enable; HIGH during `alert` state, LOW otherwise; use GPIO2 (safe for both boards) — GPIO4 conflicts with 1.9" board MOSI
 - **Board selection**: Set `#define BOARD_TYPE BOARD_1_9` or `BOARD_1_47` in `credentials.h`; configures SPI pins, panel offset, and backlight at compile time; 1.9" backlight is GPIO15 direct (active-low: LOW=on, HIGH=off); 1.47" backlight is GPIO22 PWM

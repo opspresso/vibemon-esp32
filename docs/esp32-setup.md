@@ -268,7 +268,7 @@ By default the firmware connects to VibeMon's hosted WebSocket service (`ws.vibe
 3. Power cycle the device
 4. Manually erase NVS:
 ```bash
-esptool.py --port /dev/ttyUSB0 erase_region 0x9000 0x6000
+esptool.py --port /dev/ttyACM0 erase_region 0x9000 0x6000
 ```
 
 ## Technical Details

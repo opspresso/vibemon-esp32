@@ -68,6 +68,11 @@ curl -X POST http://DEVICE_IP/status \
 
 > An unrecognized `state` value is silently treated as `idle` — no error is returned.
 
+> The model-scoped weekly usage fields (`usageWeekModel`, `usageWeekModelResetsIn`,
+> `usageWeekModelLabel`) sent by newer bridges are ignored — the 172x320 screen
+> already fills its three metric rows, so the device deliberately renders only
+> `memory`, `usage5h`, and `usageWeek`.
+
 Agent bridges usually set `character` automatically:
 - `clawd` for Claude Code
 - `codex` for Codex
