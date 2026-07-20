@@ -37,6 +37,7 @@ enum AppState {
 #define COLOR_CLAW        0xDA28  // #DD4444 Claw red (221,68,68)
 #define COLOR_CODEX       0x1928  // #1B2745 Codex navy visor (27,39,69), matches characters.json
 #define COLOR_EYE         0x0000  // #000000 Black
+#define COLOR_EYE_LIGHT   0xEFDF  // #ECF8FC Light eyes/glasses for dark faces (codex, matches characters.json)
 #define COLOR_EFFECT_ALT  0xFD20  // #FFA500 Orange for white character effects
 
 // Transparent color marker for pushImage (magenta 0xF81F is common convention)
@@ -173,6 +174,10 @@ void drawCodexImageToSprite(TFT_eSprite &sprite) {
 typedef struct {
   const char* name;
   uint16_t color;
+  // Eye-cover overlay colors: blink/happy stroke and glasses frame.
+  // Dark-faced characters (codex) need light values to stay visible.
+  uint16_t eyeColor;
+  uint16_t glassesColor;
   // Eyes
   int eyeLeftX, eyeRightX, eyeY, eyeW, eyeH;
   // Effect position (sparkle, thought bubble, zzz, etc.)
@@ -189,6 +194,8 @@ typedef struct {
 const CharacterGeometry CHAR_VIBEMON = {
   "vibemon",
   COLOR_VIBEMON,
+  // Eye-cover colors (eyeColor, glassesColor)
+  COLOR_EYE, COLOR_SUNGLASSES_FRAME,
   // Eyes (leftX, rightX, y, w, h)
   22, 38, 26, 4, 6,
   // Effect position (effectX, effectY)
@@ -200,6 +207,8 @@ const CharacterGeometry CHAR_VIBEMON = {
 const CharacterGeometry CHAR_CLAWD = {
   "clawd",
   COLOR_CLAUDE,
+  // Eye-cover colors (eyeColor, glassesColor)
+  COLOR_EYE, COLOR_SUNGLASSES_FRAME,
   // Eyes (leftX, rightX, y, w, h)
   14, 44, 22, 6, 6,
   // Effect position (effectX, effectY)
@@ -211,6 +220,8 @@ const CharacterGeometry CHAR_CLAWD = {
 const CharacterGeometry CHAR_KIRO = {
   "kiro",
   COLOR_KIRO,
+  // Eye-cover colors (eyeColor, glassesColor)
+  COLOR_EYE, COLOR_SUNGLASSES_FRAME,
   // Eyes (leftX, rightX, y, w, h) - tall vertical eyes
   30, 39, 21, 5, 8,
   // Effect position (effectX, effectY)
@@ -222,6 +233,8 @@ const CharacterGeometry CHAR_KIRO = {
 const CharacterGeometry CHAR_CLAW = {
   "claw",
   COLOR_CLAW,
+  // Eye-cover colors (eyeColor, glassesColor)
+  COLOR_EYE, COLOR_SUNGLASSES_FRAME,
   // Eyes (leftX, rightX, y, w, h)
   21, 38, 16, 6, 6,
   // Effect position (effectX, effectY)
@@ -233,6 +246,8 @@ const CharacterGeometry CHAR_CLAW = {
 const CharacterGeometry CHAR_CODEX = {
   "codex",
   COLOR_CODEX,
+  // Eye-cover colors (eyeColor, glassesColor) — light on the dark navy face
+  COLOR_EYE_LIGHT, COLOR_EYE_LIGHT,
   // Eyes (leftX, rightX, y, w, h)
   21, 40, 35, 4, 6,
   // Effect position (effectX, effectY)
@@ -251,7 +266,7 @@ const CharacterGeometry* ALL_CHARACTERS[] = {
   &CHAR_CODEX
 };
 const int CHARACTER_COUNT = sizeof(ALL_CHARACTERS) / sizeof(ALL_CHARACTERS[0]);
-const CharacterGeometry* DEFAULT_CHARACTER = &CHAR_CLAWD;
+const CharacterGeometry* DEFAULT_CHARACTER = &CHAR_VIBEMON;
 
 // Get character geometry by name (const char* version - no String allocation)
 const CharacterGeometry* getCharacterByName(const char* name) {
@@ -347,7 +362,7 @@ void getEyeCoverPosition(int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, 
 
 // Draw sleep/blink eyes (closed eyes with body color background)
 template<typename T>
-void drawSleepEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false) {
+void drawSleepEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false, uint16_t eyeColor = COLOR_EYE) {
   int lensW, lensH, lensY, leftLensX, rightLensX;
   getEyeCoverPosition(leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, lensW, lensH, lensY, leftLensX, rightLensX);
 
@@ -358,17 +373,17 @@ void drawSleepEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, in
   // Draw closed eyes (horizontal lines in the middle)
   int closedEyeY = lensY + lensH / 2;
   int closedEyeH = 2 * SCALE;  // 2px thick line (scaled)
-  canvas.fillRect(leftLensX + SCALE, closedEyeY, lensW - (2 * SCALE), closedEyeH, COLOR_EYE);
-  canvas.fillRect(rightLensX + SCALE, closedEyeY, lensW - (2 * SCALE), closedEyeH, COLOR_EYE);
+  canvas.fillRect(leftLensX + SCALE, closedEyeY, lensW - (2 * SCALE), closedEyeH, eyeColor);
+  canvas.fillRect(rightLensX + SCALE, closedEyeY, lensW - (2 * SCALE), closedEyeH, eyeColor);
 }
 
-inline void drawSleepEyes(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false) {
-  drawSleepEyesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, bodyColor, isKiro);
+inline void drawSleepEyes(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false, uint16_t eyeColor = COLOR_EYE) {
+  drawSleepEyesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, bodyColor, isKiro, eyeColor);
 }
 
 // Draw happy eyes (> < style for done state)
 template<typename T>
-void drawHappyEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false) {
+void drawHappyEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false, uint16_t eyeColor = COLOR_EYE) {
   int lensW, lensH, lensY, leftLensX, rightLensX;
   getEyeCoverPosition(leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, lensW, lensH, lensY, leftLensX, rightLensX);
 
@@ -382,18 +397,18 @@ void drawHappyEyesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, in
   int rightCenterX = rightLensX + lensW / 2;
 
   // Draw > for left eye (pointing right)
-  canvas.fillRect(leftCenterX - (2 * SCALE), centerY - (2 * SCALE), 2 * SCALE, 2 * SCALE, COLOR_EYE);
-  canvas.fillRect(leftCenterX, centerY, 2 * SCALE, 2 * SCALE, COLOR_EYE);
-  canvas.fillRect(leftCenterX - (2 * SCALE), centerY + (2 * SCALE), 2 * SCALE, 2 * SCALE, COLOR_EYE);
+  canvas.fillRect(leftCenterX - (2 * SCALE), centerY - (2 * SCALE), 2 * SCALE, 2 * SCALE, eyeColor);
+  canvas.fillRect(leftCenterX, centerY, 2 * SCALE, 2 * SCALE, eyeColor);
+  canvas.fillRect(leftCenterX - (2 * SCALE), centerY + (2 * SCALE), 2 * SCALE, 2 * SCALE, eyeColor);
 
   // Draw < for right eye (pointing left)
-  canvas.fillRect(rightCenterX + SCALE, centerY - (2 * SCALE), 2 * SCALE, 2 * SCALE, COLOR_EYE);
-  canvas.fillRect(rightCenterX - SCALE, centerY, 2 * SCALE, 2 * SCALE, COLOR_EYE);
-  canvas.fillRect(rightCenterX + SCALE, centerY + (2 * SCALE), 2 * SCALE, 2 * SCALE, COLOR_EYE);
+  canvas.fillRect(rightCenterX + SCALE, centerY - (2 * SCALE), 2 * SCALE, 2 * SCALE, eyeColor);
+  canvas.fillRect(rightCenterX - SCALE, centerY, 2 * SCALE, 2 * SCALE, eyeColor);
+  canvas.fillRect(rightCenterX + SCALE, centerY + (2 * SCALE), 2 * SCALE, 2 * SCALE, eyeColor);
 }
 
-inline void drawHappyEyes(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false) {
-  drawHappyEyesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, bodyColor, isKiro);
+inline void drawHappyEyes(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, uint16_t bodyColor, bool isKiro = false, uint16_t eyeColor = COLOR_EYE) {
+  drawHappyEyesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, bodyColor, isKiro, eyeColor);
 }
 
 // Draw sunglasses (Matrix style)
@@ -437,31 +452,31 @@ inline void drawSunglasses(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY,
 
 // Draw glasses (frame only - lenses stay clear so the eyes underneath remain visible)
 template<typename T>
-void drawGlassesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, bool isKiro = false) {
+void drawGlassesT(T &canvas, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, bool isKiro = false, uint16_t frameColor = COLOR_SUNGLASSES_FRAME) {
   int lensW, lensH, lensY, leftLensX, rightLensX;
   getEyeCoverPosition(leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, lensW, lensH, lensY, leftLensX, rightLensX);
 
   // Frame - top
-  canvas.fillRect(leftLensX - SCALE, lensY - SCALE, lensW + (2 * SCALE), SCALE, COLOR_SUNGLASSES_FRAME);
-  canvas.fillRect(rightLensX - SCALE, lensY - SCALE, lensW + (2 * SCALE), SCALE, COLOR_SUNGLASSES_FRAME);
+  canvas.fillRect(leftLensX - SCALE, lensY - SCALE, lensW + (2 * SCALE), SCALE, frameColor);
+  canvas.fillRect(rightLensX - SCALE, lensY - SCALE, lensW + (2 * SCALE), SCALE, frameColor);
 
   // Frame - bottom
-  canvas.fillRect(leftLensX - SCALE, lensY + lensH, lensW + (2 * SCALE), SCALE, COLOR_SUNGLASSES_FRAME);
-  canvas.fillRect(rightLensX - SCALE, lensY + lensH, lensW + (2 * SCALE), SCALE, COLOR_SUNGLASSES_FRAME);
+  canvas.fillRect(leftLensX - SCALE, lensY + lensH, lensW + (2 * SCALE), SCALE, frameColor);
+  canvas.fillRect(rightLensX - SCALE, lensY + lensH, lensW + (2 * SCALE), SCALE, frameColor);
 
   // Frame - sides
-  canvas.fillRect(leftLensX - SCALE, lensY, SCALE, lensH, COLOR_SUNGLASSES_FRAME);
-  canvas.fillRect(leftLensX + lensW, lensY, SCALE, lensH, COLOR_SUNGLASSES_FRAME);
-  canvas.fillRect(rightLensX - SCALE, lensY, SCALE, lensH, COLOR_SUNGLASSES_FRAME);
-  canvas.fillRect(rightLensX + lensW, lensY, SCALE, lensH, COLOR_SUNGLASSES_FRAME);
+  canvas.fillRect(leftLensX - SCALE, lensY, SCALE, lensH, frameColor);
+  canvas.fillRect(leftLensX + lensW, lensY, SCALE, lensH, frameColor);
+  canvas.fillRect(rightLensX - SCALE, lensY, SCALE, lensH, frameColor);
+  canvas.fillRect(rightLensX + lensW, lensY, SCALE, lensH, frameColor);
 
   // Bridge (connects two lenses)
   int bridgeY = lensY + lensH / 2 - (2 * SCALE);
-  canvas.fillRect(leftLensX + lensW, bridgeY, rightLensX - leftLensX - lensW, SCALE, COLOR_SUNGLASSES_FRAME);
+  canvas.fillRect(leftLensX + lensW, bridgeY, rightLensX - leftLensX - lensW, SCALE, frameColor);
 }
 
-inline void drawGlasses(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, bool isKiro = false) {
-  drawGlassesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro);
+inline void drawGlasses(TFT_eSPI &tft, int leftEyeX, int rightEyeX, int eyeY, int ew, int eh, bool isKiro = false, uint16_t frameColor = COLOR_SUNGLASSES_FRAME) {
+  drawGlassesT(tft, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, frameColor);
 }
 
 // =============================================================================
@@ -593,7 +608,7 @@ inline void drawExclamationMark(TFT_eSPI &tft, int x, int y, int frame, uint16_t
  */
 
 // Draw eye type to TFT (normal, blink, happy, focused)
-void drawEyeType(TFT_eSPI &tft, int x, int y, EyeType eyeType, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawEyeType(TFT_eSPI &tft, int x, int y, EyeType eyeType, const CharacterGeometry* character = &CHAR_VIBEMON) {
   int leftEyeX = x + (character->eyeLeftX * SCALE);
   int rightEyeX = x + (character->eyeRightX * SCALE);
   int eyeY = y + (character->eyeY * SCALE);
@@ -606,13 +621,13 @@ void drawEyeType(TFT_eSPI &tft, int x, int y, EyeType eyeType, const CharacterGe
       drawSunglasses(tft, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro);
       break;
     case EYE_GLASSES:
-      drawGlasses(tft, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro);
+      drawGlasses(tft, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, character->glassesColor);
       break;
     case EYE_BLINK:
-      drawSleepEyes(tft, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro);
+      drawSleepEyes(tft, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro, character->eyeColor);
       break;
     case EYE_HAPPY:
-      drawHappyEyes(tft, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro);
+      drawHappyEyes(tft, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro, character->eyeColor);
       break;
     case EYE_NORMAL:
     default:
@@ -622,7 +637,7 @@ void drawEyeType(TFT_eSPI &tft, int x, int y, EyeType eyeType, const CharacterGe
 }
 
 // Draw effect type to TFT (sparkle, thinking, alert, zzz)
-void drawEffectType(TFT_eSPI &tft, int x, int y, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawEffectType(TFT_eSPI &tft, int x, int y, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_VIBEMON) {
   bool isKiro = (character == &CHAR_KIRO);
   uint16_t effectColor = isKiro ? COLOR_EFFECT_ALT : COLOR_TEXT_WHITE;
 
@@ -652,7 +667,7 @@ void drawEffectType(TFT_eSPI &tft, int x, int y, EffectType effectType, uint16_t
 }
 
 // Draw eye type to sprite (normal, blink, happy, focused)
-void drawEyeTypeToSprite(TFT_eSprite &sprite, EyeType eyeType, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawEyeTypeToSprite(TFT_eSprite &sprite, EyeType eyeType, const CharacterGeometry* character = &CHAR_VIBEMON) {
   int leftEyeX = character->eyeLeftX * SCALE;
   int rightEyeX = character->eyeRightX * SCALE;
   int eyeY = character->eyeY * SCALE;
@@ -665,13 +680,13 @@ void drawEyeTypeToSprite(TFT_eSprite &sprite, EyeType eyeType, const CharacterGe
       drawSunglassesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro);
       break;
     case EYE_GLASSES:
-      drawGlassesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro);
+      drawGlassesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, isKiro, character->glassesColor);
       break;
     case EYE_BLINK:
-      drawSleepEyesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro);
+      drawSleepEyesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro, character->eyeColor);
       break;
     case EYE_HAPPY:
-      drawHappyEyesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro);
+      drawHappyEyesT(sprite, leftEyeX, rightEyeX, eyeY, ew, eh, character->color, isKiro, character->eyeColor);
       break;
     case EYE_NORMAL:
     default:
@@ -681,7 +696,7 @@ void drawEyeTypeToSprite(TFT_eSprite &sprite, EyeType eyeType, const CharacterGe
 }
 
 // Draw effect type to sprite (sparkle, thinking, alert, zzz, exclamation)
-void drawEffectTypeToSprite(TFT_eSprite &sprite, EffectType effectType, uint16_t bgColor = 0, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawEffectTypeToSprite(TFT_eSprite &sprite, EffectType effectType, uint16_t bgColor = 0, const CharacterGeometry* character = &CHAR_VIBEMON) {
   bool isKiro = (character == &CHAR_KIRO);
   uint16_t effectColor = isKiro ? COLOR_EFFECT_ALT : COLOR_TEXT_WHITE;
 
@@ -715,7 +730,7 @@ void drawEffectTypeToSprite(TFT_eSprite &sprite, EffectType effectType, uint16_t
 // =============================================================================
 
 // Draw character to sprite buffer (128x128) — no flickering
-void drawCharacterToSprite(TFT_eSprite &sprite, EyeType eyeType, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawCharacterToSprite(TFT_eSprite &sprite, EyeType eyeType, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_VIBEMON) {
   sprite.fillSprite(bgColor);
   character->drawToSprite(sprite);
   drawEyeTypeToSprite(sprite, eyeType, character);
@@ -723,7 +738,7 @@ void drawCharacterToSprite(TFT_eSprite &sprite, EyeType eyeType, EffectType effe
 }
 
 // Draw character directly to TFT at specified position (128x128)
-void drawCharacter(TFT_eSPI &tft, int x, int y, EyeType eyeType, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_CLAWD) {
+void drawCharacter(TFT_eSPI &tft, int x, int y, EyeType eyeType, EffectType effectType, uint16_t bgColor, const CharacterGeometry* character = &CHAR_VIBEMON) {
   tft.fillRect(x, y, CHAR_WIDTH, CHAR_HEIGHT, bgColor);
   character->drawToTFT(tft, x, y);
   drawEyeType(tft, x, y, eyeType, character);
