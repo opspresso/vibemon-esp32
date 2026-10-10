@@ -6,6 +6,8 @@ See at a glance what your AI assistant is doing — thinking, working, or waitin
 
 ESP32 firmware for VibeMon. For the desktop (Electron) app, see [vibemon-app](https://github.com/opspresso/vibemon-app).
 
+The hosted WebSocket service is retired. This firmware receives status through local HTTP or USB serial. It does not poll the current Web monitoring API. Existing installations should disable `USE_WEBSOCKET` in their private `credentials.h` and reflash; the configuration example disables it by default.
+
 ## Supported Hardware
 
 Two ESP32-C6 LCD boards are supported, selected at compile time via `BOARD_TYPE` in `credentials.h`:
@@ -29,10 +31,10 @@ Two ESP32-C6 LCD boards are supported, selected at compile time via `BOARD_TYPE`
 1. Copy `credentials.h.example` to `credentials.h` and set `BOARD_TYPE` (ESP32-C6-LCD-1.47 or 1.9)
 2. Flash the firmware (`vibemon-esp32.ino`) with Arduino IDE
 3. Device creates WiFi AP: `VibeMon-Setup` (password: `vibemon123`)
-4. Connect and configure WiFi + WebSocket token via web interface
-5. Device connects and displays AI assistant status
+4. Connect and configure WiFi via the web interface
+5. Send status to the device over local HTTP or USB serial
 
-See the [ESP32 Setup Guide](docs/esp32-setup.md) for Arduino IDE setup, provisioning, and troubleshooting.
+See the [ESP32 Setup Guide](docs/arduino-setup.md) for Arduino IDE setup, provisioning, and troubleshooting.
 
 ## What It Monitors
 
@@ -120,7 +122,7 @@ python3 tools/rgb565_to_png.py kiro    # img_kiro.h -> images/img_kiro.png
 
 ## Documentation
 
-- [ESP32 Setup Guide](docs/esp32-setup.md) - Arduino IDE setup, WiFi provisioning, WebSocket token configuration
+- [ESP32 Setup Guide](docs/arduino-setup.md) - Arduino IDE setup, WiFi provisioning, and optional custom-server configuration
 - [API Reference](docs/api.md) - Complete HTTP API documentation
 
 For full documentation, visit **[vibemon.io/docs](https://vibemon.io/docs)**.
@@ -133,14 +135,14 @@ For full documentation, visit **[vibemon.io/docs](https://vibemon.io/docs)**.
 | WiFi connection fails | Check password, ensure 2.4GHz network |
 | Device won't enter setup mode | Send `POST /wifi-reset` with body `{"confirm":true}` to clear credentials |
 
-See the [ESP32 Setup Guide](docs/esp32-setup.md#troubleshooting) for more.
+See the [ESP32 Setup Guide](docs/arduino-setup.md#troubleshooting) for more.
 
 ## Related Projects
 
 - [vibemon-app](https://github.com/opspresso/vibemon-app) - Desktop app (Electron)
-- [vibemon-web](https://github.com/opspresso/vibemon-web) - Cloud dashboard & API ([vibemon.io](https://vibemon.io))
-- [vibemon-docs](https://github.com/opspresso/vibemon-docs) - Agent hook installation & setup guide ([vibemon.io/docs](https://vibemon.io/docs))
-- [vibemon-static](https://github.com/opspresso/vibemon-static) - Static assets & embeddable rendering engine ([static.vibemon.io](https://static.vibemon.io))
+- [VibeMon Web](https://vibemon.io) - Cloud dashboard and API
+- [Hook setup](https://vibemon.io/docs/setup) - Public installation guide
+- [Shared assets](https://github.com/opspresso/vibemon-app/blob/main/docs/distribution.md) - App-owned source and distribution
 
 ## License
 

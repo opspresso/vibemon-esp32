@@ -1,6 +1,6 @@
-# ESP32 WiFi & WebSocket Setup
+# ESP32 WiFi and local status setup
 
-VibeMon ESP32 devices support automatic WiFi and WebSocket token configuration through a captive portal web interface. No need to hardcode credentials in the firmware!
+Configure WiFi through the captive portal, then send status over local HTTP or USB serial. VibeMon no longer hosts a WebSocket service. The optional WebSocket client requires a separately managed compatible server; Web API read/write tokens do not restore the retired protocol.
 
 ## Quick Start
 
@@ -21,7 +21,7 @@ Install Arduino IDE 2.x, then install the ESP32 board package and required libra
    - Open **Tools → Manage Libraries...**.
    - Install these libraries:
      - `ArduinoJson` by Benoit Blanchon
-     - `WebSockets` by Markus Sattler
+     - `WebSockets` by Markus Sattler (only if enabling a custom WebSocket server)
      - `LovyanGFX` by lovyan03
 
 3. **Select the ESP32-C6 board and upload settings**
@@ -39,7 +39,7 @@ Install Arduino IDE 2.x, then install the ESP32 board package and required libra
 ```bash
 cp credentials.h.example credentials.h
 # Edit credentials.h: uncomment BOARD_TYPE for your board (BOARD_1_47 or BOARD_1_9)
-# Flash to ESP32 (WiFi and WebSocket enabled by default)
+# Flash to ESP32 (WiFi enabled; hosted WebSocket disabled)
 ```
 
 > **Arduino IDE:** Complete the setup above before uploading.
@@ -52,7 +52,7 @@ cp credentials.h.example credentials.h
 - Captive portal opens automatically (or go to `http://192.168.4.1`)
 - Scan and select your WiFi network
 - Enter WiFi password
-- (Optional) Enter VibeMon WebSocket token
+- Leave the legacy token field empty unless using your own compatible WebSocket server
 - Click "Save & Connect"
 
 4. **Done!**
@@ -203,8 +203,8 @@ curl http://DEVICE_IP/health
 
 ### What is the WebSocket Token?
 
-The token is used for **authentication** when connecting to VibeMon WebSocket servers:
-- Added to WebSocket URL: `wss://ws.vibemon.io/?token=YOUR_TOKEN`
+The token is used for **authentication** only when connecting to your own compatible WebSocket server:
+- Added to WebSocket URL: `wss://monitor.example.com/?token=YOUR_TOKEN`
 - Sent in auth message: `{"type":"auth","token":"YOUR_TOKEN"}`
 
 ### Setting the Token
@@ -223,10 +223,11 @@ The token is used for **authentication** when connecting to VibeMon WebSocket se
 
 ### Custom WebSocket Server (Advanced)
 
-By default the firmware connects to VibeMon's hosted WebSocket service (`ws.vibemon.io`). To point at a different server, set these in `credentials.h`:
+The example disables WebSocket. To use a separately managed compatible server, enable `USE_WEBSOCKET` and configure that server in `credentials.h`:
 
 ```cpp
-#define WS_HOST "127.0.0.1"   // Server hostname or IP (no protocol prefix)
+#define USE_WEBSOCKET
+#define WS_HOST "monitor.example.com" // Server hostname (no protocol prefix)
 #define WS_PORT 443           // Server port
 #define WS_PATH "/"           // WebSocket path
 #define WS_USE_SSL true       // true for wss://, false for ws://

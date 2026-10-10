@@ -243,7 +243,7 @@ curl -X POST http://DEVICE_IP/wifi-reset \
 - Device reboots automatically
 - Enters provisioning mode (creates `VibeMon-Setup` AP)
 
-See [ESP32 Setup Guide](esp32-setup.md#reset-wifi-settings) for details.
+See [ESP32 Setup Guide](arduino-setup.md#reset-wifi-settings) for details.
 
 ---
 

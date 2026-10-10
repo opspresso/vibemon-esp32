@@ -2,7 +2,7 @@
 
 ## Guides
 
-- **[ESP32 Setup Guide](esp32-setup.md)** - Arduino IDE setup, WiFi provisioning, and WebSocket token configuration
+- **[ESP32 Setup Guide](arduino-setup.md)** - Arduino IDE setup, WiFi provisioning, and WebSocket token configuration
 - **[HTTP API Reference](api.md)** - Complete API documentation for all endpoints
 
 ## Conventions
