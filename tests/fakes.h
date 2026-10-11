@@ -57,4 +57,3 @@ inline void configured(Store& store) {
   store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
   store.saved.readToken = "vm_" + std::string(60, 'a');
 }
-
