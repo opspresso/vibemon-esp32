@@ -9,7 +9,7 @@ import serial
 
 
 def exchange(port, command, timeout=8):
-    message = json.dumps(command, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
+    message = json.dumps({**command, "requestId": 2}, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
     if len(message) > 1024:
         raise ValueError("USB command exceeds 1024 bytes")
     connection = serial.Serial(baudrate=115200, timeout=0.2, write_timeout=2, exclusive=True)
@@ -17,11 +17,17 @@ def exchange(port, command, timeout=8):
     connection.rts = False
     connection.port = port
     with connection:
-        connection.write(message)
-        connection.flush()
+        # CH340 boards can reset on open despite inactive DTR/RTS. Probe readiness
+        # with an idempotent command; send a settings mutation exactly once.
         deadline = time.monotonic() + timeout
+        next_probe = 0
+        ready = False
         pending = bytearray()
         while time.monotonic() < deadline:
+            if not ready and time.monotonic() >= next_probe:
+                connection.write(b'{"command":"info","requestId":1}\n')
+                connection.flush()
+                next_probe = time.monotonic() + 0.5
             pending.extend(connection.read_until(b"\n", size=4096))
             if len(pending) > 4096:
                 raise ValueError("The device returned an oversized USB response")
@@ -31,8 +37,19 @@ def exchange(port, command, timeout=8):
                 try:
                     response = json.loads(line)
                 except ValueError:
-                    continue  # Boot messages are not command responses and may contain board identifiers.
-                if isinstance(response, dict) and isinstance(response.get("ok"), bool):
+                    continue  # Never echo boot messages or board identifiers.
+                if not isinstance(response, dict) or not isinstance(response.get("ok"), bool):
+                    continue
+                if not ready and response.get("requestId") == 1 and response["ok"]:
+                    if command == {"command": "info"}:
+                        response.pop("requestId")
+                        return response
+                    ready = True
+                    connection.write(message)
+                    connection.flush()
+                    deadline = time.monotonic() + timeout
+                elif ready and response.get("requestId") == 2:
+                    response.pop("requestId")
                     return response
     raise TimeoutError("No VibeMon response. Check the port, firmware boot and USB cable.")
 

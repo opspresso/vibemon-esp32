@@ -1,4 +1,5 @@
 #include "serial_console.h"
+#include "esp32_display.h"
 #include "../version.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -27,6 +28,7 @@ void SerialConsole::command() {
   if (deserializeJson(request, input_.data(), used_, DeserializationOption::NestingLimit(3))) {
     response["ok"] = false; response["error"] = "Invalid JSON command";
   } else {
+    if (request["requestId"].is<std::uint32_t>()) response["requestId"] = request["requestId"].as<std::uint32_t>();
     const auto name = request["command"].as<std::string>();
     if (name == "info") {
       const auto& workspace = controller_.workspace();
@@ -42,6 +44,8 @@ void SerialConsole::command() {
       response["items"] = workspace.catalog.items.size();
       response["hasSnapshot"] = workspace.hasSnapshot;
       response["tokenConfigured"] = workspace.tokenConfigured;
+      response["touchPresses"] = display_.touchPresses();
+      response["displayFrames"] = display_.completedFrames();
       response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
     } else if (name == "configure-wifi" || name == "configure-cloud") {
       const char* first = name == "configure-wifi" ? "ssid" : "origin";

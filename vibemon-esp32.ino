@@ -17,7 +17,7 @@ vibemon::EspWifi wifi;
 vibemon::EspCloud cloud;
 vibemon::Controller controller(settings, wifi, cloud);
 vibemon::DashboardUi ui(controller);
-vibemon::SerialConsole console(controller, ui);
+vibemon::SerialConsole console(controller, ui, display);
 bool ready = false;
 }
 
