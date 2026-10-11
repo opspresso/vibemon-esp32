@@ -1,4 +1,4 @@
-name: Build
+name: Verify firmware
 
 on:
   push:
@@ -6,37 +6,63 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  compile:
+  native:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - board: BOARD_1_47
-            board_type: 0
-          - board: BOARD_1_9
-            board_type: 1
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install arduino-cli
-        uses: arduino/setup-arduino-cli@v2
-
-      - name: Install ESP32 core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install pinned test dependencies
         run: |
-          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py
+      - name: Test domain, setup and real LVGL screens
+        run: build/venv/bin/python tools/check.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: touchscreen-verification
+          path: |
+            build/native/screenshots/*.png
+            build/native/Testing/Temporary/LastTest.log
 
-      - name: Install libraries
-        run: arduino-cli lib install ArduinoJson LovyanGFX WebSockets
-
-      - name: Create credentials.h
-        run: cp credentials.h.example credentials.h
-
-      - name: Compile (${{ matrix.board }})
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install pinned toolchain
         run: |
-          arduino-cli compile \
-            --fqbn esp32:esp32:esp32c6:PartitionScheme=huge_app \
-            --build-property "compiler.cpp.extra_flags=-DBOARD_TYPE=${{ matrix.board_type }}" \
-            .
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py --firmware
+      - name: Compile ESP32-4848S040
+        run: build/venv/bin/python tools/build_firmware.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vibemon-esp32-4848s040
+          if-no-files-found: error
+          path: |
+            build/firmware/vibemon-esp32.ino.bin
+            build/firmware/vibemon-esp32.ino.bootloader.bin
+            build/firmware/vibemon-esp32.ino.partitions.bin
+            build/firmware/boot_app0.bin
+            build/firmware/manifest.json
+            build/firmware/LICENSE
+            build/firmware/LICENSE-ESP-IDF
+            build/firmware/LICENSE-Arduino
+            build/firmware/OFL-NanumGothic.txt
