@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <esp_heap_caps.h>
+#include <esp_psram.h>
 #include "src/platform/esp32_display.h"
 #include "src/platform/esp32_services.h"
 #include "src/platform/serial_console.h"
@@ -24,7 +25,8 @@ bool ready = false;
 void setup() {
   Serial.begin(115200);
   Serial.printf("VibeMon Touch %s / ESP32-4848S040\n", VIBEMON_VERSION);
-  if (!psramFound() || ESP.getPsramSize() < 8 * 1024 * 1024) {
+  // Heap capacity excludes the instructions/rodata reserved by PSRAM XIP.
+  if (!psramFound() || esp_psram_get_size() < 8 * 1024 * 1024) {
     Serial.println("Startup failed: select 8 MB OPI PSRAM in the board profile.");
     return;
   }
