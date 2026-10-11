@@ -1,10 +1,15 @@
 #include "esp32_display.h"
 #include <Arduino.h>
+#include <esp_lcd_panel_rgb.h>
 
 namespace vibemon {
 bool EspDisplay::begin() {
   if (!board_.init() || !board_.getLCD()) return false;
   auto* lcd = board_.getLCD();
+  // 520 clocks/line × 510 lines/frame: 16 MHz yields about 60 Hz. The
+  // profile's 26 MHz scans at 98 Hz and competes with rendering/TLS for PSRAM.
+  auto* bus = static_cast<esp_panel::drivers::BusRGB*>(lcd->getBus());
+  if (!bus->configRGB_FreqHz(pixelClockHz_)) return false;
   if (!lcd->configFrameBufferNumber(2)) return false;
   frameReady_ = xSemaphoreCreateBinaryStatic(&frameReadyStorage_);
   if (!frameReady_) return false;
@@ -64,5 +69,12 @@ bool IRAM_ATTR EspDisplay::frameComplete(void* context) {
   BaseType_t awakened = pdFALSE;
   xSemaphoreGiveFromISR(self.frameReady_, &awakened);
   return awakened == pdTRUE;
+}
+
+bool EspDisplay::setPixelClock(std::uint32_t hz) {
+  if (hz != 8000000 && hz != 12000000 && hz != 16000000 && hz != 20000000 && hz != 26000000) return false;
+  if (!display_ || esp_lcd_rgb_panel_set_pclk(board_.getLCD()->getRefreshPanelHandle(), hz) != ESP_OK) return false;
+  pixelClockHz_ = hz;
+  return true;
 }
 }  // namespace vibemon

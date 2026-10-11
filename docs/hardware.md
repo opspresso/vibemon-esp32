@@ -12,7 +12,7 @@ The touchscreen target is the GUITION / Jingcai ESP32-4848S040: ESP32-S3, 16 MB 
 | GT911 SDA / SCL | 19 / 45 |
 | Backlight, active high | 38 |
 
-Use the maintained `BOARD_JINGCAI_ESP32_4848S040C_I_Y_3` display profile from ESP32_Display_Panel 1.0.4. Its ST7701 initialization sequence, RGB timing, bounce buffer and GT911 address handling form one hardware configuration. Do not substitute a generic ST7701 initialization sequence. The application does not operate the optional relays.
+Use the maintained `BOARD_JINGCAI_ESP32_4848S040C_I_Y_3` display profile from ESP32_Display_Panel 1.0.4. Its ST7701 initialization sequence, GPIO mapping, blanking intervals and GT911 address handling form the hardware configuration. The application overrides the pixel clock to 16 MHz: 520 clocks per line and 510 lines per frame produce about 60.3 Hz. The profile default of 26 MHz requests about 98 Hz and consumes 45.2 MB/s of framebuffer reads; 16 MHz reduces that scanout traffic to 27.8 MB/s, leaving more shared PSRAM bandwidth for rendering and HTTPS. Do not substitute a generic ST7701 initialization sequence. The application does not operate the optional relays.
 
 The dependency versions are recorded in [toolchain.lock.json](../toolchain.lock.json). Install libraries into the repository's ignored `build/arduino/libraries` directory; do not overwrite the user's Arduino sketchbook libraries.
 
@@ -20,6 +20,7 @@ The dependency versions are recorded in [toolchain.lock.json](../toolchain.lock.
 
 - [GUITION model list](https://www.guition.com/model-selection): memory, screen resolution and board family.
 - [Espressif board profile at v1.0.4](https://github.com/esp-arduino-libs/ESP32_Display_Panel/blob/v1.0.4/src/board/supported/jingcai/BOARD_JINGCAI_ESP32_4848S040C_I_Y_3.h): display initialization, pins, touch and backlight.
+- [ESP-IDF RGB framebuffer modes](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/api-reference/peripherals/lcd/rgb_lcd.html): framebuffer synchronization, PSRAM bandwidth and bounce-buffer constraints.
 - [Espressif Jingcai board guide](https://github.com/esp-arduino-libs/ESP32_Display_Panel/blob/v1.0.4/docs/board/board_jingcai.md): board selection and Arduino configuration.
 
 ## Device acceptance checks

@@ -46,7 +46,11 @@ void SerialConsole::command() {
       response["tokenConfigured"] = workspace.tokenConfigured;
       response["touchPresses"] = display_.touchPresses();
       response["displayFrames"] = display_.completedFrames();
+      response["displayClockHz"] = display_.pixelClock();
       response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
+    } else if (name == "display-clock") {
+      response["ok"] = request["hz"].is<std::uint32_t>() && display_.setPixelClock(request["hz"].as<std::uint32_t>());
+      if (!response["ok"].as<bool>()) response["error"] = "Use 8, 12, 16, 20 or 26 MHz for this diagnostic";
     } else if (name == "configure-wifi" || name == "configure-cloud") {
       const char* first = name == "configure-wifi" ? "ssid" : "origin";
       const char* secret = name == "configure-wifi" ? "password" : "token";

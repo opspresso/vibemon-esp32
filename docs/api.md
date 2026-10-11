@@ -33,11 +33,12 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, item and selection counts; no credentials or names |
+| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch press count, completed frames and requested pixel clock; no credentials or names |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |
 | `refresh` | None | Request a refresh, including an explicit retry after a rejected token. |
+| `display-clock` | `hz`: 8000000, 12000000, 16000000, 20000000 or 26000000 | Local display diagnosis only. Change at a frame boundary; reboot restores 16 MHz. Higher values may cause display corruption. |
 
 An optional unsigned 32-bit `requestId` is echoed in the response. The USB helper probes `info` after opening the port because CH340 adapters may reset the board. It waits for readiness before sending a settings command once, and ignores responses for older requests.
 
