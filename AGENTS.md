@@ -16,12 +16,12 @@ Use C++17-compatible application code, two-space indentation, `snake_case` file 
 
 ## Toolchain and checks
 
-Versions are pinned in `toolchain.lock.json`; development Python packages are pinned in `requirements-dev.txt`. `tools/setup.py` installs libraries in ignored `build/arduino/libraries`. Do not modify a user's sketchbook libraries or embed credentials in the sketch.
+Versions are pinned in `toolchain.lock.json`; development Python packages are pinned in `requirements-dev.txt`. `tools/setup.py` installs libraries in ignored `build/arduino/libraries`. Firmware builds use Arduino as an ESP-IDF component. `firmware/sdkconfig.defaults` controls RGB cache, DMA and flash-write behavior; do not replace this with Arduino’s prebuilt SDK. Keep the ESP-IDF checkout unmodified. Do not modify a user’s sketchbook libraries or embed credentials in the sketch.
 
 After setup, use the virtual environment's Python:
 
 - `python tools/check.py`: native C++ sanitizers, controller/settings tests, USB framing checks and LVGL screen renders.
-- `python tools/build_firmware.py`: compile the ESP32-S3 firmware and record image hashes. Pass `--arduino-cli` when it is not on PATH.
+- `python tools/build_firmware.py`: compile the ESP32-S3 firmware and record image hashes.
 - `python tools/flash_firmware.py --port PORT`: upload verified individual images. It preserves the NVS partition; never replace this with a merged-image upload for an existing installation.
 - `python tools/device.py --port PORT info`: query non-secret device diagnostics.
 

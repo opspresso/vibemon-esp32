@@ -14,6 +14,8 @@ The touchscreen target is the GUITION / Jingcai ESP32-4848S040: ESP32-S3, 16 MB 
 
 Use the maintained `BOARD_JINGCAI_ESP32_4848S040C_I_Y_3` display profile from ESP32_Display_Panel 1.0.4. Its ST7701 initialization sequence, GPIO mapping, blanking intervals and GT911 address handling form the hardware configuration. The application overrides the pixel clock to 16 MHz: 520 clocks per line and 510 lines per frame produce about 60.3 Hz. The profile default of 26 MHz requests about 98 Hz and consumes 45.2 MB/s of framebuffer reads; 16 MHz reduces that scanout traffic to 27.8 MB/s, leaving more shared PSRAM bandwidth for rendering and HTTPS. Do not substitute a generic ST7701 initialization sequence. The application does not operate the optional relays.
 
+The SDK must use a 64 KB data cache and 64-byte cache lines. Disable unconditional RGB DMA restart at VSYNC; the driver still recovers real underruns. Enable PSRAM instruction/read-only-data placement and cache-safe RGB interrupts so NVS writes do not interrupt scanout. These are SDK build settings, not sketch macros. The supported build uses `firmware/sdkconfig.defaults`; startup source guards reject an incompatible prebuilt SDK.
+
 The dependency versions are recorded in [toolchain.lock.json](../toolchain.lock.json). Install libraries into the repository's ignored `build/arduino/libraries` directory; do not overwrite the user's Arduino sketchbook libraries.
 
 ## Evidence

@@ -2,23 +2,23 @@
 
 ## Prepare the toolchain
 
-Use the versions in [toolchain.lock.json](../toolchain.lock.json). The build script verifies Arduino CLI, the ESP32 core and library versions. Libraries are installed under `build/arduino/libraries`; existing sketchbook libraries are not changed.
+Use the versions in [toolchain.lock.json](../toolchain.lock.json). Setup verifies Arduino CLI and installs the pinned Arduino source package, libraries and ESP-IDF tools. The build script verifies the SDK revision, library versions and required RGB memory settings. Libraries are installed under `build/arduino/libraries`; existing sketchbook libraries are not changed.
 
 ```sh
 python3 -m venv build/venv
 build/venv/bin/python -m pip install -r requirements-dev.txt
-python3 tools/setup.py --install-core
+python3 tools/setup.py --firmware
 build/venv/bin/python tools/check.py
 build/venv/bin/python tools/build_firmware.py
 ```
 
-`--install-core` installs the pinned ESP32 core in Arduino's data directory. Omit it when that version is already installed. On macOS, an Arduino IDE installation may provide the CLI at:
+`--firmware` installs the pinned Arduino package in Arduino’s data directory and prepares ESP-IDF and its Python environment under `build/`. Omit it when installing only the native-test libraries. Existing Arduino source files are copied into `build/sdk-components`; they are not edited. On macOS, an Arduino IDE installation may provide the CLI at:
 
 ```text
 /Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli
 ```
 
-Pass that path with `--arduino-cli`. On Windows use `build\venv\Scripts\python.exe` for the virtual environment. The supported build path is the CLI script; it supplies the shared LVGL configuration, verified assets and the exact board profile.
+Pass that path to setup with `--arduino-cli`. If needed, `--idf-python PATH` selects the Python used to create the isolated SDK environment. On Windows use `build\venv\Scripts\python.exe` for the virtual environment. Use `tools/build_firmware.py` to build. It supplies the shared LVGL configuration, verified assets and the exact board profile. It rebuilds ESP-IDF with the RGB cache and flash-write settings in `firmware/sdkconfig.defaults`. Arduino IDE/CLI compilation against its stock prebuilt SDK is rejected because those settings cannot be changed by sketch compiler flags.
 
 ## Upload to ESP32-4848S040
 

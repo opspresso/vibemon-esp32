@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,21 +34,21 @@ def verify_images(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
-    parser.add_argument("--arduino-cli", default=shutil.which("arduino-cli"))
     parser.add_argument("--baud", type=int, default=115200)
     args = parser.parse_args()
-    if not args.arduino_cli:
-        parser.error("Install arduino-cli, or provide its path with --arduino-cli")
     if args.baud not in (115200, 230400, 460800, 921600):
         parser.error("Choose a supported upload baud rate")
     directory = ROOT / "build/firmware"
     manifest = verify_images(directory)
-    platforms = json.loads(subprocess.check_output([args.arduino_cli, "core", "list", "--format", "json"], text=True))["platforms"]
-    if not any(platform["id"] == "esp32:esp32" and platform.get("installed_version") == manifest["toolchain"]["esp32_core"] for platform in platforms):
-        parser.error("Install the ESP32 core recorded in the build manifest")
-    fqbn = manifest["fqbn"] + ",UploadSpeed=" + str(args.baud)
-    subprocess.run([args.arduino_cli, "--config-file", str(ROOT / "build/arduino-cli.yaml"), "upload", "--port", args.port,
-                    "--fqbn", fqbn, "--input-dir", str(directory)], check=True)
+    if manifest.get("framework") != "esp-idf":
+        parser.error("Rebuild with the RGB-safe ESP-IDF toolchain")
+    from sdk_toolchain import load
+    environment, python = load(manifest["toolchain"])
+    command = [python, "-m", "esptool", "--chip", "esp32s3", "--port", args.port, "--baud", str(args.baud),
+               "write_flash", "--flash_mode", "dio", "--flash_size", "16MB", "--flash_freq", "80m"]
+    for filename, image in sorted(manifest["images"].items(), key=lambda pair: pair[1]["offset"]):
+        command.extend([hex(image["offset"]), str(directory / filename)])
+    subprocess.run(command, env=environment, check=True)
 
 
 if __name__ == "__main__":

@@ -7,5 +7,10 @@
     "ESP32_IO_Expander": "1.1.1",
     "esp-lib-utils": "0.2.3",
     "lvgl": "9.6.0"
-  }
+  },
+  "esp_idf": {
+    "version": "5.5.5",
+    "commit": "b774170ff46c393eeb5e495ea37936038d3f4f4f"
+  },
+  "arduino_license_sha256": "62e54861b30e953735dc187f036917c588665dbe3c5dd88449e34317608bbf5e"
 }

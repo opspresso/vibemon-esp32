@@ -2,6 +2,13 @@
 #include <Arduino.h>
 #include <esp_lcd_panel_rgb.h>
 
+#if CONFIG_ESP32S3_DATA_CACHE_SIZE < 65536 || CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE != 64 || CONFIG_LCD_RGB_RESTART_IN_VSYNC
+#error "Build VibeMon with tools/build_firmware.py: RGB requires the configured ESP-IDF cache and DMA settings."
+#endif
+#if !CONFIG_SPIRAM_FETCH_INSTRUCTIONS || !CONFIG_SPIRAM_RODATA || !CONFIG_LCD_RGB_ISR_IRAM_SAFE
+#error "RGB scanout must remain available during NVS writes; use the VibeMon ESP-IDF configuration."
+#endif
+
 namespace vibemon {
 bool EspDisplay::begin() {
   if (!board_.init() || !board_.getLCD()) return false;

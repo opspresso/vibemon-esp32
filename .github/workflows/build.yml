@@ -49,7 +49,7 @@ jobs:
         run: |
           python3 -m venv build/venv
           build/venv/bin/python -m pip install -r requirements-dev.txt
-          python3 tools/setup.py --install-core
+          python3 tools/setup.py --firmware
       - name: Compile ESP32-4848S040
         run: build/venv/bin/python tools/build_firmware.py
       - uses: actions/upload-artifact@v7
@@ -63,4 +63,6 @@ jobs:
             build/firmware/boot_app0.bin
             build/firmware/manifest.json
             build/firmware/LICENSE
+            build/firmware/LICENSE-ESP-IDF
+            build/firmware/LICENSE-Arduino
             build/firmware/OFL-NanumGothic.txt
