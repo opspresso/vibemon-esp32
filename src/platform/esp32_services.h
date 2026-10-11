@@ -45,7 +45,7 @@ class EspCloud final : public CloudPort {
   bool start(const CloudRequest& request) override;
   std::unique_ptr<CloudResult> take() override;
  private:
-  struct Job { std::uint32_t generation; char origin[272]; char token[64]; };
+  struct Job { std::uint32_t generation; char origin[MaxOriginBytes + 1]; char token[64]; };
   QueueHandle_t jobs_ = nullptr;
   QueueHandle_t results_ = nullptr;
   TaskHandle_t worker_ = nullptr;

@@ -27,6 +27,10 @@ int main() {
     std::string origin;
     CHECK(normalizeOrigin(" vibemon.io/ ", origin).ok && origin == "https://vibemon.io");
     CHECK(normalizeOrigin("https://DASH.example:8443", origin).ok && origin == "https://dash.example:8443");
+    CHECK(normalizeOrigin("HTTPS://DASH.EXAMPLE", origin).ok && origin == "https://dash.example");
+    const std::string longHost = std::string(63, 'a') + "." + std::string(63, 'b') + "." + std::string(63, 'c') + "." + std::string(61, 'd');
+    CHECK(normalizeOrigin(longHost + ":65535", origin).ok);
+    Config longOrigin; longOrigin.origin = origin; CHECK(validConfig(longOrigin));
     for (const char* value : {"http://vibemon.io", "https://user:token@vibemon.io", "https://vibemon.io/path", "https://vibemon.io?x=1", "https://vibemon.io#x", "https://-bad.io", "https://bad..io", "https://vibemon.io:0", "https://vibemon.io:65536", "https://vibemon.io\\evil"}) CHECK(!normalizeOrigin(value, origin).ok);
     CHECK(validateWifi("Workshop", "12345678").ok);
     CHECK(validateWifi(" Hidden ", "").ok);

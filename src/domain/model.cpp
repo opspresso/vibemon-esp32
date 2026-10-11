@@ -66,8 +66,10 @@ Validation normalizeOrigin(const std::string& input, std::string& output) {
   while (first < last && space(input[first])) ++first;
   while (last > first && space(input[last - 1])) --last;
   std::string value = input.substr(first, last - first);
-  if (value.empty() || value.size() > 253) return {false, "Enter your VibeMon server address."};
+  if (value.empty() || value.size() > MaxOriginBytes) return {false, "Enter your VibeMon server address."};
   if (value.find("://") == std::string::npos) value = "https://" + value;
+  for (char& c : value) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  if (value.size() > MaxOriginBytes) return {false, "The server address is too long."};
   if (value.compare(0, 8, "https://") != 0) return {false, "Use HTTPS to protect your read token."};
   if (value.back() == '/') value.pop_back();
   const auto authority = value.substr(8);
@@ -91,7 +93,6 @@ Validation normalizeOrigin(const std::string& input, std::string& output) {
     for (char c : port) valuePort = valuePort * 10 + static_cast<unsigned>(c - '0');
     if (!valuePort || valuePort > 65535) return {false, "HTTPS port must be 1 to 65535."};
   }
-  for (char& c : value) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
   output = value;
   return {true, {}};
 }
@@ -114,7 +115,7 @@ Validation validateToken(const std::string& token) {
 
 bool validConfig(const Config& config) {
   std::string origin;
-  if (!normalizeOrigin(config.origin, origin).ok || origin != config.origin || config.brightness < 10 || config.brightness > 100) return false;
+  if (!normalizeOrigin(config.origin, origin).ok || origin != config.origin) return false;
   if (config.ssid.empty() ? !config.wifiPassword.empty() : !validateWifi(config.ssid, config.wifiPassword).ok) return false;
   if (!config.readToken.empty() && !validateToken(config.readToken).ok) return false;
   for (const auto& selection : config.panels) {

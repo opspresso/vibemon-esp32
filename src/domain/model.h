@@ -12,12 +12,13 @@ constexpr std::size_t PanelCount = 4;
 constexpr std::size_t MaxSources = 128;
 constexpr std::size_t MaxMetrics = 32;
 constexpr std::size_t MaxResponseBytes = 1024 * 1024;
+constexpr std::size_t MaxOriginBytes = 272;
 constexpr std::uint32_t StaleAfterMs = 120000;
 constexpr std::uint32_t PollIntervalMs = 10000;
 
 enum class ItemKind { Resource, Account };
 enum class Health { Ok, Warning, Error, Unknown };
-enum class MetricDisplay { Number, Bar, Temperature };
+enum class MetricDisplay { Number, Bar };
 
 struct Selection {
   ItemKind kind = ItemKind::Resource;
@@ -33,7 +34,6 @@ struct Config {
   std::string readToken;
   std::array<Selection, PanelCount> panels{};
   bool panelsInitialized = false;
-  std::uint8_t brightness = 80;
 };
 
 struct Metric {
