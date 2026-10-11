@@ -1,0 +1,11 @@
+{
+  "arduino_cli": "1.5.1",
+  "esp32_core": "3.3.12",
+  "libraries": {
+    "ArduinoJson": "7.4.3",
+    "ESP32_Display_Panel": "1.0.4",
+    "ESP32_IO_Expander": "1.1.1",
+    "esp-lib-utils": "0.2.3",
+    "lvgl": "9.6.0"
+  }
+}
