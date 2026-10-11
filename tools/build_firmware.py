@@ -51,6 +51,8 @@ def main():
     if not binary.exists() or binary.stat().st_size > 8 * 1024 * 1024:
         raise ValueError("Firmware is missing or exceeds the 8 MB application partition")
     shutil.copyfile(ROOT / "build/firmware-obj/boot_app0.bin", output / "boot_app0.bin")
+    shutil.copyfile(ROOT / "LICENSE", output / "LICENSE")
+    shutil.copyfile(ROOT / "assets/OFL-NanumGothic.txt", output / "OFL-NanumGothic.txt")
     images = {}
     for offset, filename in [(0, "vibemon-esp32.ino.bootloader.bin"), (0x8000, "vibemon-esp32.ino.partitions.bin"), (0xe000, "boot_app0.bin"), (0x10000, binary.name)]:
         data = (output / filename).read_bytes()
