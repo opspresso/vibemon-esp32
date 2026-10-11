@@ -79,6 +79,7 @@ struct Validation {
 Validation normalizeOrigin(const std::string& input, std::string& output);
 Validation validateWifi(const std::string& ssid, const std::string& password);
 Validation validateToken(const std::string& token);
+bool validConfig(const Config& config);
 bool validSourceId(const std::string& id);
 bool validAccountId(const std::string& id);
 bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = false);

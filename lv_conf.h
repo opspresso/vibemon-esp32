@@ -1,4 +1,5 @@
 #pragma once
+#define LV_CONF_H
 
 #define LV_COLOR_FORMAT_DEFAULT LV_COLOR_FORMAT_RGB565
 #define LV_USE_OS LV_OS_NONE

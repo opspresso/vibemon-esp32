@@ -35,7 +35,7 @@ struct CloudRequest {
   std::string origin;
   std::string token;
 };
-enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Server };
+enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server };
 struct CloudResult {
   std::uint32_t generation = 0;
   CloudError error = CloudError::None;

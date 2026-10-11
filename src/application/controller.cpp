@@ -5,16 +5,6 @@
 
 namespace vibemon {
 namespace {
-bool validConfig(const Config& config) {
-  std::string origin;
-  if (!normalizeOrigin(config.origin, origin).ok || origin != config.origin || config.brightness < 10 || config.brightness > 100) return false;
-  if (!config.ssid.empty() && !validateWifi(config.ssid, config.wifiPassword).ok) return false;
-  if (!config.readToken.empty() && !validateToken(config.readToken).ok) return false;
-  for (const auto& selection : config.panels) {
-    if (!selection.id.empty() && !(selection.kind == ItemKind::Account ? validAccountId(selection.id) : validSourceId(selection.id))) return false;
-  }
-  return true;
-}
 bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
 }  // namespace
 
@@ -131,6 +121,7 @@ void Controller::failure(CloudError error, bool validating) {
     const char* message = error == CloudError::Tls ? "The server certificate could not be verified." :
         error == CloudError::InvalidResponse ? "The server returned an invalid workspace." :
         error == CloudError::TooLarge ? "The workspace exceeds the device's response or source limit." :
+        error == CloudError::Memory ? "Not enough memory to load the workspace. Restart this device." :
         error == CloudError::Server ? "The server is unavailable. Your last readings are shown." :
         "Could not reach the server. Your last readings are shown.";
     state(Connection::CloudUnavailable, message);

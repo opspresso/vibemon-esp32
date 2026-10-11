@@ -313,7 +313,7 @@ void DashboardUi::attachKeyboard() {
   lv_obj_set_style_radius(keyboard_, 7, LV_PART_ITEMS);
   lv_obj_set_style_text_color(keyboard_, lv_color_hex(Text), LV_PART_ITEMS);
   lv_obj_set_style_text_font(keyboard_, &lv_font_montserrat_16, LV_PART_ITEMS);
-  lv_obj_set_style_bg_color(keyboard_, lv_color_hex(Border), LV_PART_ITEMS | LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(keyboard_, lv_color_hex(Border), static_cast<lv_style_selector_t>(LV_PART_ITEMS) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED));
   lv_keyboard_set_map(keyboard_, LV_KEYBOARD_MODE_USER_1, TokenKeys, TokenControls);
   focusField(secretField_);
   widgets_["keyboard"] = keyboard_;

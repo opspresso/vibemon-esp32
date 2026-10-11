@@ -98,7 +98,7 @@ std::uint32_t age(std::int64_t now, std::int64_t then) {
 }
 }  // namespace
 
-Validation decodeCatalog(const std::string& body, Catalog& output, ArduinoJson::Allocator* allocator) {
+Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Allocator* allocator) {
   if (body.size() > MaxResponseBytes) return {false, "Workspace response exceeds the device limit."};
   JsonDocument filter;
   filter["serverTime"] = true;
@@ -107,7 +107,7 @@ Validation decodeCatalog(const std::string& body, Catalog& output, ArduinoJson::
   fields["agent"]["state"] = true;
   fields["agent"]["project"] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
-  const auto error = deserializeJson(document, body, DeserializationOption::Filter(filter), DeserializationOption::NestingLimit(12));
+  const auto error = deserializeJson(document, body.data(), body.size(), DeserializationOption::Filter(filter), DeserializationOption::NestingLimit(12));
   if (error) return {false, "The server returned an invalid or oversized workspace."};
   const auto sources = document["sources"].as<JsonArrayConst>();
   std::string serverTime;

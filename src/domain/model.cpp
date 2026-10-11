@@ -112,6 +112,17 @@ Validation validateToken(const std::string& token) {
   return {true, {}};
 }
 
+bool validConfig(const Config& config) {
+  std::string origin;
+  if (!normalizeOrigin(config.origin, origin).ok || origin != config.origin || config.brightness < 10 || config.brightness > 100) return false;
+  if (config.ssid.empty() ? !config.wifiPassword.empty() : !validateWifi(config.ssid, config.wifiPassword).ok) return false;
+  if (!config.readToken.empty() && !validateToken(config.readToken).ok) return false;
+  for (const auto& selection : config.panels) {
+    if (!selection.id.empty() && !(selection.kind == ItemKind::Account ? validAccountId(selection.id) : validSourceId(selection.id))) return false;
+  }
+  return true;
+}
+
 std::optional<std::int64_t> utcMilliseconds(const std::string& value) {
   if ((value.size() != 20 && value.size() != 24) || value[4] != '-' || value[7] != '-' ||
       value[10] != 'T' || value[13] != ':' || value[16] != ':' || value.back() != 'Z' ||

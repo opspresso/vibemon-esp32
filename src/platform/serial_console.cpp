@@ -1,0 +1,66 @@
+#include "serial_console.h"
+#include "../version.h"
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <algorithm>
+#include <esp_heap_caps.h>
+
+namespace vibemon {
+void SerialConsole::tick() {
+  // Bound work per loop so a serial sender cannot monopolize touch processing.
+  for (unsigned i = 0; i < 256 && Serial.available(); ++i) {
+    const char value = static_cast<char>(Serial.read());
+    if (value == '\n') {
+      if (overflow_) Serial.println("{\"ok\":false,\"error\":\"Command too long\"}");
+      else if (used_) command();
+      input_.fill(0); used_ = 0; overflow_ = false;
+    } else if (value != '\r') {
+      if (used_ + 1 < input_.size()) input_[used_++] = value;
+      else overflow_ = true;
+    }
+  }
+}
+
+void SerialConsole::command() {
+  JsonDocument request;
+  JsonDocument response;
+  if (deserializeJson(request, input_.data(), used_, DeserializationOption::NestingLimit(3))) {
+    response["ok"] = false; response["error"] = "Invalid JSON command";
+  } else {
+    const auto name = request["command"].as<std::string>();
+    if (name == "info") {
+      const auto& workspace = controller_.workspace();
+      response["ok"] = true;
+      response["version"] = VIBEMON_VERSION;
+      response["board"] = "ESP32-4848S040";
+      response["width"] = 480; response["height"] = 480;
+      response["internalHeapFree"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      response["internalHeapMinimum"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      response["psramFree"] = ESP.getFreePsram();
+      response["connection"] = static_cast<int>(workspace.connection);
+      response["page"] = static_cast<int>(ui_.page());
+      response["items"] = workspace.catalog.items.size();
+      response["hasSnapshot"] = workspace.hasSnapshot;
+      response["tokenConfigured"] = workspace.tokenConfigured;
+      response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
+    } else if (name == "configure-wifi" || name == "configure-cloud") {
+      const char* first = name == "configure-wifi" ? "ssid" : "origin";
+      const char* secret = name == "configure-wifi" ? "password" : "token";
+      if (!request[first].is<const char*>() || !request[secret].is<const char*>()) {
+        response["ok"] = false; response["error"] = "Missing setup fields";
+      } else {
+        const auto result = name == "configure-wifi" ? controller_.saveWifi(request[first].as<std::string>(), request[secret].as<std::string>()) :
+            controller_.saveCloud(request[first].as<std::string>(), request[secret].as<std::string>());
+        response["ok"] = result.ok;
+        if (result.ok) { response["queued"] = true; ui_.dashboard(); }
+        else response["error"] = result.message;
+      }
+    } else if (name == "dashboard") {
+      ui_.dashboard(); response["ok"] = true;
+    } else if (name == "refresh") {
+      controller_.refresh(); response["ok"] = true;
+    } else { response["ok"] = false; response["error"] = "Unknown command"; }
+  }
+  serializeJson(response, Serial); Serial.println();
+}
+}  // namespace vibemon
