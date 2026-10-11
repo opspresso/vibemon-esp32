@@ -1,479 +1,73 @@
-# ESP32 WiFi and local status setup
+# Build, upload and connect
 
-Configure WiFi through the captive portal, then send status over local HTTP or USB serial. VibeMon no longer hosts a WebSocket service. The optional WebSocket client requires a separately managed compatible server; Web API read/write tokens do not restore the retired protocol.
+## Prepare the toolchain
 
-## Quick Start
+Use the versions in [toolchain.lock.json](../toolchain.lock.json). The build script verifies Arduino CLI, the ESP32 core and library versions. Libraries are installed under `build/arduino/libraries`; existing sketchbook libraries are not changed.
 
-### Arduino IDE Setup
-
-Install Arduino IDE 2.x, then install the ESP32 board package and required libraries before opening `vibemon-esp32.ino`.
-
-1. **Install ESP32 board support**
-   - Open **Arduino IDE → Settings** (or **Preferences**).
-   - Add this URL to **Additional boards manager URLs**:
-     ```text
-     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-     ```
-   - Open **Tools → Board → Boards Manager...**.
-   - Search `esp32` and install **esp32 by Espressif Systems**.
-
-2. **Install required libraries**
-   - Open **Tools → Manage Libraries...**.
-   - Install these libraries:
-     - `ArduinoJson` by Benoit Blanchon
-     - `WebSockets` by Markus Sattler (only if enabling a custom WebSocket server)
-     - `LovyanGFX` by lovyan03
-
-3. **Select the ESP32-C6 board and upload settings**
-   - Open `vibemon-esp32.ino` in Arduino IDE.
-   - Select **Tools → Board → ESP32 Arduino → ESP32C6 Dev Module**.
-   - Select the serial port from **Tools → Port**.
-   - Set **Tools → Partition Scheme → Huge APP (3MB No OTA/1MB SPIFFS)**.
-   - Keep the other board options at their defaults unless your board vendor documents different values.
-
-> The firmware exceeds the default app partition size. VibeMon uses neither OTA nor a filesystem, so the Huge APP partition scheme is the recommended Arduino IDE setting.
-
-### First-Time Setup (Recommended)
-
-1. **Flash Firmware**
-```bash
-cp credentials.h.example credentials.h
-# Edit credentials.h: uncomment BOARD_TYPE for your board (BOARD_1_47 or BOARD_1_9)
-# Flash to ESP32 (WiFi enabled; hosted WebSocket disabled)
+```sh
+python3 -m venv build/venv
+build/venv/bin/python -m pip install -r requirements-dev.txt
+python3 tools/setup.py --install-core
+build/venv/bin/python tools/check.py
+build/venv/bin/python tools/build_firmware.py
 ```
 
-> **Arduino IDE:** Complete the setup above before uploading.
+`--install-core` installs the pinned ESP32 core in Arduino's data directory. Omit it when that version is already installed. On macOS, an Arduino IDE installation may provide the CLI at:
 
-2. **Connect to Setup Network**
-- SSID: `VibeMon-Setup`
-- Password: `vibemon123`
-
-3. **Configure via Web Interface**
-- Captive portal opens automatically (or go to `http://192.168.4.1`)
-- Scan and select your WiFi network
-- Enter WiFi password
-- Leave the legacy token field empty unless using your own compatible WebSocket server
-- Click "Save & Connect"
-
-4. **Done!**
-- Device reboots and connects to your WiFi
-- Settings persist across reboots
-
-## How It Works
-
-### Provisioning Mode
-
-When the device has no saved WiFi credentials, it automatically enters **Provisioning Mode**:
-
-```
-┌─────────────────────────────────────────┐
-│  No WiFi credentials detected           │
-│         ↓                               │
-│  Create Access Point                    │
-│  - SSID: VibeMon-Setup                  │
-│  - Password: vibemon123                 │
-│  - IP: 192.168.4.1                      │
-│         ↓                               │
-│  DNS Server (Captive Portal)            │
-│         ↓                               │
-│  User connects & configures             │
-│         ↓                               │
-│  Save to NVS Flash → Reboot             │
-│         ↓                               │
-│  Connect to configured WiFi             │
-└─────────────────────────────────────────┘
+```text
+/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli
 ```
 
-### Web Configuration Interface
+Pass that path with `--arduino-cli`. On Windows use `build\venv\Scripts\python.exe` for the virtual environment. The supported build path is the CLI script; it supplies the shared LVGL configuration, verified assets and the exact board profile.
 
-**Features:**
-- WiFi network scanning with signal strength
-- Security indicator for protected networks
-- Responsive design (works on phones & computers)
-- Optional WebSocket token configuration
-- Form validation and error handling
+## Upload to ESP32-4848S040
 
-**Fields:**
-1. **WiFi Network** - Dropdown list of scanned networks
-2. **Password** - WiFi password (required)
-3. **VibeMon Token** - WebSocket token (optional)
+1. Connect the board with a USB **data** cable.
+2. Run `arduino-cli board list` and identify its serial port.
+3. Preserve a factory backup before replacing existing firmware. Keep backups private: they may contain saved settings.
+4. Upload the verified build:
 
-### Data Storage
-
-Credentials are stored in ESP32's **NVS (Non-Volatile Storage)**:
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `wifiSSID` | String | WiFi network name |
-| `wifiPassword` | String | WiFi password |
-| `wsToken` | String | WebSocket authentication token |
-
-**Persistence:**
-- Survives reboots
-- Survives power cycles
-- Survives firmware updates (if not doing full erase)
-
-## Setup Options
-
-### Option 1: Provisioning Mode (Recommended)
-
-**Best for:** New devices, easy setup, changing WiFi networks
-
-```bash
-# 1. Copy credentials template
-cp credentials.h.example credentials.h
-
-# 2. Set BOARD_TYPE (uncomment BOARD_1_47 or BOARD_1_9)
-
-# 3. Flash firmware (USE_WIFI and USE_WEBSOCKET enabled by default)
-
-# 4. Power on device → Automatically enters provisioning mode
-
-# 5. Connect to VibeMon-Setup and configure via web
+```sh
+build/venv/bin/python tools/flash_firmware.py --port /dev/cu.usbserial-110
 ```
 
-### Option 2: Hardcoded Credentials
+Replace the example port with the discovered port, such as `COM5` on Windows. The default upload speed is 115200. A higher `--baud` is optional; use it only when sustained reads/writes are reliable on that cable and adapter.
 
-**Best for:** Production deployments, known WiFi networks
+The helper verifies all four images, their hashes, offsets and non-overlap with NVS. It uploads the individual bootloader, partition table, boot metadata and application images. **Do not flash the merged image when preserving settings**: it also contains blank data over the NVS area. The board profile enables 16 MB flash and 8 MB octal PSRAM; the application partition is 8 MB.
 
-```cpp
-// credentials.h
-#define USE_WIFI
-#define USE_WEBSOCKET
+If automatic bootloader entry fails, use the board's documented BOOT/RESET sequence, then retry the same port. Do not change LCD pins or reduce display timing to work around a serial transport error.
 
-#define WIFI_SSID "MyNetwork"
-#define WIFI_PASSWORD "MyPassword"
-#define WS_TOKEN "vbm-secret-token"  // Optional
+## Enter Wi-Fi and account settings
 
-#define BOARD_TYPE BOARD_1_47  // or BOARD_1_9
+On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter its password and press **Connect Wi-Fi**. An open network uses an empty password. **Hidden network** accepts a manually entered SSID. A failed connection leaves the saved configuration unchanged and shows a recovery path.
+
+Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty key field retains a saved key only when the server is unchanged.
+
+Tap a dashboard card to select its resource or account. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
+
+## Optional USB setup
+
+USB setup invokes the same application checks as the touchscreen. Passwords and keys are prompted without echo and are not passed as process arguments.
+
+```sh
+build/venv/bin/python tools/device.py --port /dev/cu.usbserial-110 wifi
+build/venv/bin/python tools/device.py --port /dev/cu.usbserial-110 cloud --origin https://vibemon.io
+build/venv/bin/python tools/device.py --port /dev/cu.usbserial-110 info
 ```
 
-These are used as **defaults** if no saved credentials exist.
-
-## LCD Display States
-
-### Provisioning Mode
-```
-┌────────────────────────┐
-│  Setup Mode            │
-│  SSID: VibeMon-Setup   │
-│  Password: vibemon123  │
-│  IP: 192.168.4.1       │
-│                        │
-│  [Character]           │
-└────────────────────────┘
-```
-
-### Normal Mode
-```
-┌────────────────────────┐
-│  WiFi: OK              │
-│  IP: 192.168.1.42      │
-│                        │
-│  [Character]           │
-│  Status: working       │
-└────────────────────────┘
-```
-
-## WiFi Management
-
-### Reset WiFi Settings
-
-Clear saved credentials and return to provisioning mode:
-
-```bash
-curl -X POST http://DEVICE_IP/wifi-reset \
-  -H "Content-Type: application/json" \
-  -d '{"confirm":true}'
-```
-
-Device will:
-1. Clear `wifiSSID`, `wifiPassword` from NVS (WebSocket token is preserved)
-2. Reboot automatically
-3. Enter provisioning mode
-
-### Check Connection
-
-```bash
-curl http://DEVICE_IP/health
-# Returns: {"status":"ok"}
-```
-
-## WebSocket Token Configuration
-
-### What is the WebSocket Token?
-
-The token is used for **authentication** only when connecting to your own compatible WebSocket server:
-- Added to WebSocket URL: `wss://monitor.example.com/?token=YOUR_TOKEN`
-- Sent in auth message: `{"type":"auth","token":"YOUR_TOKEN"}`
-
-### Setting the Token
-
-**Via Provisioning Interface:**
-1. Enter token in "VibeMon Token (Optional)" field
-2. Leave empty if not needed
-3. Token saved to NVS flash
-
-**Via credentials.h:**
-```cpp
-#define WS_TOKEN "your_access_token"
-```
-
-**Priority:** Saved token in NVS > WS_TOKEN define
-
-### Custom WebSocket Server (Advanced)
-
-The example disables WebSocket. To use a separately managed compatible server, enable `USE_WEBSOCKET` and configure that server in `credentials.h`:
-
-```cpp
-#define USE_WEBSOCKET
-#define WS_HOST "monitor.example.com" // Server hostname (no protocol prefix)
-#define WS_PORT 443           // Server port
-#define WS_PATH "/"           // WebSocket path
-#define WS_USE_SSL true       // true for wss://, false for ws://
-```
-
-## Troubleshooting
-
-### Captive Portal Doesn't Open
-
-**Solutions:**
-1. Manually navigate to `http://192.168.4.1`
-2. Disable mobile data on your phone
-3. Try a different device (iOS/Android/laptop)
-
-### WiFi Connection Fails
-
-**What happens:**
-1. Device attempts to connect with provided credentials
-2. If connection fails after 3 rounds of 20 attempts (60 total)
-3. Device enters provisioning mode directly (saved credentials are preserved for retry)
-
-**Check:**
-- Correct WiFi password
-- WiFi network uses 2.4GHz (ESP32 doesn't support 5GHz)
-- Router is powered on and in range
-
-### No Networks in Scan
-
-**Solutions:**
-1. Click "Scan Networks" again
-2. Move device closer to WiFi router
-3. Ensure WiFi router is broadcasting SSID
-
-### Device Won't Enter Provisioning Mode
-
-**Solutions:**
-1. Ensure `USE_WIFI` is defined in `credentials.h`
-2. Use `/wifi-reset` endpoint to clear credentials
-3. Power cycle the device
-4. Manually erase NVS:
-```bash
-esptool.py --port /dev/ttyACM0 erase_region 0x9000 0x6000
-```
-
-## Technical Details
-
-### API Endpoints
-
-**Provisioning Mode:**
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/*` | Any (catch-all) | Configuration page (HTML) |
-| `/scan` | GET | WiFi networks list (JSON) |
-| `/save` | POST | Save WiFi + token, reboot |
-
-**Normal Mode:**
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/status` | POST | Update device status |
-| `/status` | GET | Get current status |
-| `/health` | GET | Health check |
-| `/lock` | POST | Lock to a specific project |
-| `/unlock` | POST | Unlock project |
-| `/lock-mode` | GET | Get current lock mode |
-| `/lock-mode` | POST | Set lock mode |
-| `/reboot` | POST | Reboot device |
-| `/wifi-reset` | POST | Clear credentials, restart provisioning |
-
-See [API Reference](api.md) for full request/response details.
-
-### Signal Strength Indicators
-
-| Indicator | RSSI Range | Quality |
-|-----------|------------|---------|
-| ▰▰▰▰ | > -50 dBm | Excellent |
-| ▰▰▰▱ | -50 to -60 dBm | Good |
-| ▰▰▱▱ | -60 to -70 dBm | Fair |
-| ▰▱▱▱ | < -70 dBm | Weak |
-
-### Code Flow
-
-```cpp
-void setupWiFi() {
-  // Load WiFi credentials from NVS (fallback to credentials.h defines)
-  loadWiFiCredentials();
-
-  if (strlen(wifiSSID) == 0) {
-    // No credentials → Start provisioning
-    startProvisioningMode();
-    return;
-  }
-
-  // Try to connect (3 rounds × 20 attempts)
-  for (retry rounds) {
-    WiFi.begin(wifiSSID, wifiPassword);
-    // wait up to 20 attempts for WL_CONNECTED
-  }
-
-  if (still not connected after all retries) {
-    // Enter provisioning mode directly
-    // Saved credentials are preserved for retry
-    startProvisioningMode();
-    return;
-  }
-
-  server.begin();  // HTTP server only starts once WiFi connects
-}
-
-void setupWebSocket() {
-  // Load token from NVS only if not already loaded (or use WS_TOKEN define as fallback)
-  if (strlen(wsToken) == 0) {
-    loadWebSocketToken();
-  }
-
-  // Add token to WebSocket URL only if one is set
-  if (strlen(wsToken) > 0) {
-    snprintf(wsPath, sizeof(wsPath), "%s?token=%s", WS_PATH, wsToken);
-  } else {
-    safeCopyStr(wsPath, WS_PATH);
-  }
-
-  // Connect to WebSocket server (SSL is compile-time optional via WS_USE_SSL)
-#if WS_USE_SSL
-  webSocket.beginSSL(WS_HOST, WS_PORT, wsPath);
-#else
-  webSocket.begin(WS_HOST, WS_PORT, wsPath);
-#endif
-}
-```
-
-### Security Considerations
-
-**Security Measures:**
-- SSID values escaped to prevent JSON injection
-- Input validation on server side
-- Provisioning only active during setup (temporary)
-
-**Security Limitations:**
-- Default AP password (`vibemon123`) is known - configure quickly!
-- Configuration page uses HTTP (local only, acceptable for captive portal)
-- Credentials stored in NVS without encryption (ESP32 supports NVS encryption but not enabled by default)
-- WiFi password visible during provisioning
-
-**Recommendations:**
-1. Connect to provisioning AP quickly to minimize exposure
-2. Use strong WiFi password with WPA2/WPA3
-3. Use strong WebSocket tokens
-4. Consider enabling NVS encryption for production
-
-## Alert Light (Optional)
-
-Connect a physical alert light (e.g., warning beacon) to an available GPIO pin. The light turns ON when the device enters `alert` state and OFF when the state changes.
-
-### Wiring
-
-```
-ESP32 GPIO pin ──── Alert light (+)
-ESP32 GND      ──── Alert light (-)
-```
-
-> **Note:** ESP32-C6 GPIO output is 3.3V, max ~40mA. Ensure your light operates within these limits. For higher voltage lights (5V/12V/24V), use a relay module.
-
-### Configuration
-
-Add to `credentials.h`:
-
-```cpp
-#define ALERT_PIN 2
-```
-
-Any unused GPIO pin can be used. Recommended: **GPIO2** (safe for both boards).
-
-> **Pin conflicts by board:**
->
-> | Board | LCD pins in use (do NOT use for ALERT_PIN) |
-> |-------|---------------------------------------------|
-> | 1.47" | 6 (MOSI), 7 (SCK), 14 (CS), 15 (DC), 21 (RST), 22 (BL) |
-> | 1.9"  | 4 (MOSI), 5 (SCK), 6 (DC), 7 (CS), 14 (RST), 15 (BL) |
->
-> GPIO4 is safe on the 1.47" board but conflicts with 1.9" MOSI — do not use it if supporting both boards.
-
-If `ALERT_PIN` is not defined, the feature is disabled and no extra code is compiled.
-
-## Supported Hardware
-
-Two ESP32-C6 LCD boards are supported. Set `BOARD_TYPE` in `credentials.h` to match your hardware:
-
-```cpp
-#define BOARD_TYPE BOARD_1_47   // ESP32-C6-LCD-1.47 (default)
-#define BOARD_TYPE BOARD_1_9    // ESP32-C6-LCD-1.9
-```
-
-| Board | LCD | Resolution | Backlight | SPI Freq | SPI Pins (MOSI/SCK/DC/CS/RST) |
-|-------|-----|------------|-----------|----------|-------------------------------|
-| ESP32-C6-LCD-1.47 | ST7789V2 | 172×320 | GPIO22 PWM | 40MHz | 6/7/15/14/21 |
-| ESP32-C6-LCD-1.9  | ST7789V2 | 170×320 | GPIO15 direct (active-low) | 20MHz | 4/5/6/7/14 |
-
-### 1.9" Board Notes
-
-- Backlight uses **GPIO15 direct GPIO** (active-low: LOW=on, HIGH=off). In sleep state, backlight turns completely off.
-- SPI frequency: 20MHz (matching Waveshare demo; 1.47" board uses 40MHz).
-- Touch (CST816) and IMU (QMI8658) sensors are present on the board but not used by VibeMon firmware.
-
-## Advanced Configuration
-
-### Disable WiFi/WebSocket
-
-To disable features, edit `credentials.h`:
-
-```cpp
-// Disable WiFi
-// #define USE_WIFI
-
-// Disable WebSocket (WiFi still works)
-// #define USE_WEBSOCKET
-```
-
-### Custom Access Point Settings
-
-To change the provisioning AP name/password, edit `state.h`:
-
-```cpp
-const char* AP_SSID = "MyCustomSSID";
-const char* AP_PASSWORD = "MyCustomPassword";
-```
-
-### Multiple Devices
-
-Each device can be configured independently:
-1. Flash same firmware to multiple devices
-2. Each enters provisioning mode on first boot
-3. Configure each with same or different WiFi/tokens
-4. All work independently
-
-## Performance
-
-**Expected Timing:**
-- Boot to provisioning mode: < 5 seconds
-- WiFi scan: 3-8 seconds
-- Credential save + reboot: < 3 seconds
-- Connect to WiFi: 5-15 seconds
-- **Total setup time: < 30 seconds**
-
-## Related Documentation
-
-- [Main README](../README.md) - Project overview
-- [API Reference](api.md) - Complete HTTP API documentation
+Opening the USB port may reset a CH340 board. The helper waits for a ready response before submitting settings, so startup cannot silently discard the command. A queued response means verification is in progress. Inspect the screen or `info` for the final state. Close other serial monitors before using these commands.
+
+## Recover a connection
+
+| Screen state | Action |
+| --- | --- |
+| No networks | Scan again, or enter a hidden SSID. Check that the network supports 2.4 GHz. |
+| Wi-Fi unavailable | Check the password and signal, then choose Wi-Fi in device settings. |
+| Setting the clock / network time unavailable | Allow the network to reach an NTP server; HTTPS verification requires valid time. |
+| Token rejected | Retrieve or replace the token in Web Account, then enter it again. |
+| Read permission required | Use a read token. A write-only collector token cannot display the workspace. |
+| Server unavailable | Check the origin and connectivity. The last readings remain visible. |
+| Item unavailable | The selected source may have been removed. Tap the card to choose another; its selection is not silently replaced. |
+| Settings could not be saved | Retry the explicit save. The device does not report persistence success when NVS fails. |
+
+For a black screen or missing touch input, read the 115200-baud startup diagnostics and verify the exact [hardware profile](hardware.md). A successful upload alone does not prove LCD or touch operation.
