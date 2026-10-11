@@ -43,6 +43,7 @@ std::string shortConnection(Connection connection) {
     case Connection::ConnectingWifi: return "Connecting to Wi-Fi";
     case Connection::WifiUnavailable: return "Offline · last readings";
     case Connection::SettingClock: return "Setting the clock";
+    case Connection::ClockUnavailable: return "Check network time";
     case Connection::NeedCloud: return "Connect your workspace";
     case Connection::CheckingCloud: return "Loading your workspace";
     case Connection::Online: return "Workspace connected";
@@ -251,6 +252,7 @@ void DashboardUi::wifi() {
   clear(Page::Wifi); header("Connect Wi-Fi", [this] { dashboard(); });
   label(root_, "Choose a 2.4 GHz network.", 20, 72, 440, fonts_.normal(), Muted);
   scanMessage_ = label(root_, "Scanning nearby networks...", 20, 106, 440, fonts_.small(), Accent);
+  widgets_["scan-status"] = scanMessage_;
   list_ = lv_obj_create(root_); box(list_, 16, 137, 448, 260, Background, 0);
   lv_obj_set_scrollable(list_, true); lv_obj_set_scroll_dir(list_, LV_DIR_VER);
   widgets_["network-list"] = list_;
@@ -262,7 +264,7 @@ void DashboardUi::wifi() {
 void DashboardUi::updateNetworks() {
   const auto& networks = controller_.networks();
   const bool scanning = controller_.scanning();
-  setText(scanMessage_, scanning ? "Scanning nearby networks..." : networks.empty() ? "No networks found. Enter a network manually." : "Select your network to continue.");
+  setText(scanMessage_, scanning ? "Scanning nearby networks..." : controller_.scanFailed() ? "Scan failed. Try Scan again or enter a network." : networks.empty() ? "No networks found. Enter a network manually." : "Select your network to continue.");
   std::string signature;
   for (const auto& network : networks) signature += network.ssid + '\n' + std::to_string(network.signal) + '\n';
   if (signature == networkSignature_ && scanning == lastScanning_) return;
@@ -327,7 +329,7 @@ void DashboardUi::formStatus(const std::string& message, bool error) {
 }
 
 void DashboardUi::wifiForm(const std::string& ssid) {
-  clear(Page::WifiForm); header("Join your network", [this] { wifi(); });
+  clear(Page::WifiForm); header("Join your network", [this] { controller_.cancelSetup(); wifi(); });
   firstField_ = field("ssid", ssid, "Network name", 61, 32, false);
   secretField_ = field("wifi-password", "", "Password · blank for open networks", 113, 64, true);
   formMessage_ = label(root_, "Your password stays on this device.", 20, 164, 440, fonts_.small(), Muted);
@@ -341,7 +343,7 @@ void DashboardUi::wifiForm(const std::string& ssid) {
 }
 
 void DashboardUi::cloud() {
-  clear(Page::CloudForm); header("Connect VibeMon", [this] { settings(); });
+  clear(Page::CloudForm); header("Connect VibeMon", [this] { controller_.cancelSetup(); settings(); });
   firstField_ = field("server", controller_.workspace().origin, "https://vibemon.io", 61, MaxOriginBytes, false);
   secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps the saved key" : "Read token from vibemon.io/account", 113, 63, true);
   formMessage_ = label(root_, "Use a token with read permission.", 20, 164, 440, fonts_.small(), Muted);
@@ -384,13 +386,20 @@ void DashboardUi::updatePicker() {
   for (auto i = widgets_.begin(); i != widgets_.end();) { if (i->first.rfind("item-", 0) == 0 && i->first != "item-list") i = widgets_.erase(i); else ++i; }
   const auto& workspace = controller_.workspace();
   int rowIndex = 0;
+  int rowY = 0;
   for (const auto& item : workspace.catalog.items) {
     if ((filter_ == 1 && item.selection.kind != ItemKind::Resource) || (filter_ == 2 && item.selection.kind != ItemKind::Account)) continue;
-    auto* row = lv_button_create(list_); box(row, 0, rowIndex * 76, 448, 68, Surface, 12);
+    auto* row = lv_button_create(list_); box(row, 0, rowY, 448, 68, Surface, 12);
     const bool selected = workspace.panels[selectedPanel_] == item.selection;
     if (selected) { lv_obj_set_style_border_width(row, 1, 0); lv_obj_set_style_border_color(row, lv_color_hex(Accent), 0); }
-    label(row, item.name, 14, 11, 386, fonts_.normal());
-    label(row, item.category + (item.selection.kind == ItemKind::Account ? " · " + item.selection.id : " · resource"), 14, 39, 396, fonts_.small(), Muted);
+    auto* name = label(row, item.name, 14, 11, 386, fonts_.normal());
+    wrap(name); lv_obj_update_layout(name);
+    const int detailY = 19 + lv_obj_get_height(name);
+    auto* detail = label(row, item.category + " · " + item.selection.id, 14, detailY, 396, fonts_.small(), Muted);
+    wrap(detail); lv_obj_update_layout(detail);
+    const int height = std::max(68, detailY + static_cast<int>(lv_obj_get_height(detail)) + 12);
+    lv_obj_set_height(row, height);
+    rowY += height + 8;
     if (selected) label(row, LV_SYMBOL_OK, 411, 12, 24, fonts_.normal(), Accent);
     event(row, LV_EVENT_CLICKED, [this, selection = item.selection](lv_event_t*) {
       const auto result = controller_.select(selectedPanel_, selection);
@@ -423,7 +432,7 @@ void DashboardUi::update(std::uint32_t now) {
     if (workspace.connection == Connection::Online) { dashboard(); return; }
     formStatus(workspace.message, true);
   } else if (waitingCloud_ && changed) {
-    formStatus(workspace.message, workspace.connection == Connection::WifiUnavailable);
+    formStatus(workspace.message, workspace.connection == Connection::WifiUnavailable || workspace.connection == Connection::ClockUnavailable);
   }
   if (page_ == Page::Dashboard) {
     if (changed && !workspace.hasSnapshot && workspace.connection == Connection::NeedCloud) { cloud(); return; }

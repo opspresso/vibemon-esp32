@@ -47,6 +47,7 @@ Validation Controller::saveWifi(const std::string& ssid, const std::string& pass
   if (!checked.ok) return checked;
   pendingWifi_ = WifiCredentials{ssid, password};
   storageBlocked_ = false;
+  hadConnection_ = false;
   ++generation_;
   inFlight_ = false;
   workspace_.refreshing = false;
@@ -78,6 +79,7 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
 }
 
 Validation Controller::select(std::size_t panel, const Selection& selection) {
+  if (pendingCloud_) return {false, "Finish or cancel workspace setup before changing panels."};
   if (panel >= PanelCount) return {false, "Choose one of the four panels."};
   if (!selection.id.empty() && !workspace_.catalog.find(selection)) return {false, "This item is no longer in your workspace. Refresh the list."};
   if (config_.panelsInitialized && config_.panels[panel] == selection) return {true, {}};
@@ -94,14 +96,33 @@ Validation Controller::select(std::size_t panel, const Selection& selection) {
 void Controller::scanWifi() { wifi_.scan(); }
 
 void Controller::retryWifi() {
-  if (config_.ssid.empty()) { scanWifi(); return; }
   ++generation_;
   inFlight_ = false;
   workspace_.refreshing = false;
   pendingWifi_.reset();
   pendingCloud_.reset();
+  hadConnection_ = false;
+  if (config_.ssid.empty()) {
+    wifi_.disconnect();
+    state(Connection::NeedWifi, "Connect to a 2.4 GHz Wi-Fi network.");
+    scanWifi();
+    return;
+  }
   wifi_.connect(config_.ssid, config_.wifiPassword);
   state(Connection::ConnectingWifi, "Connecting to Wi-Fi...");
+}
+
+void Controller::cancelSetup() {
+  if (pendingWifi_) { retryWifi(); return; }
+  if (!pendingCloud_) return;
+  pendingCloud_.reset();
+  ++generation_;
+  inFlight_ = false;
+  workspace_.refreshing = false;
+  tokenRejected_ = false;
+  nextPoll_ = now_;
+  state(config_.readToken.empty() ? Connection::NeedCloud : Connection::CheckingCloud,
+        config_.readToken.empty() ? "Enter your server address and a read token." : "Restoring your saved workspace...");
 }
 
 void Controller::refresh() {
@@ -186,7 +207,8 @@ void Controller::tick(std::uint32_t now) {
     Config candidate = config_;
     candidate.ssid = pendingWifi_->ssid; candidate.wifiPassword = pendingWifi_->password;
     pendingWifi_.reset();
-    if (!settings_.save(candidate)) {
+    const bool changed = candidate.ssid != config_.ssid || candidate.wifiPassword != config_.wifiPassword;
+    if (changed && !settings_.save(candidate)) {
       storageBlocked_ = true;
       state(Connection::StorageError, "Wi-Fi connected, but settings could not be saved. Try again.");
       return;
@@ -195,9 +217,11 @@ void Controller::tick(std::uint32_t now) {
     updateConfigView();
   }
   if (wifi.ssid != config_.ssid) return;
-  if (!hadConnection_) { hadConnection_ = true; nextPoll_ = now; }
+  if (!hadConnection_) { hadConnection_ = true; nextPoll_ = clockStartedAt_ = now; }
   if (!wifi.clockReady) {
-    state(Connection::SettingClock, "Setting the clock for a secure connection...");
+    if (static_cast<std::uint32_t>(now - clockStartedAt_) >= 30000) {
+      state(Connection::ClockUnavailable, "Network time is unavailable. Check this network's internet access.");
+    } else state(Connection::SettingClock, "Setting the clock for a secure connection...");
     return;
   }
   if (auto result = cloud_.take()) {

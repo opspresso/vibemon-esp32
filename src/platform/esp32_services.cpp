@@ -112,7 +112,14 @@ void EspWifi::connect(const std::string& ssid, const std::string& password) {
   WiFi.disconnect(false, false);
 }
 
-void EspWifi::scan() { scanRequested_ = true; }
+void EspWifi::scan() { scanRequested_ = true; scanFailed_ = false; }
+
+void EspWifi::disconnect() {
+  ssid_.clear(); password_.clear();
+  disconnecting_ = joining_ = clockRequested_ = false;
+  link_ = WifiLink::Offline;
+  WiFi.disconnect(false, false);
+}
 
 WifiStatus EspWifi::status() const {
   WifiStatus result;
@@ -149,12 +156,13 @@ void EspWifi::tick(std::uint32_t now) {
     WiFi.scanDelete();
     const int result = WiFi.scanNetworks(true, true);
     scanning_ = result == WIFI_SCAN_RUNNING;
-    if (result == WIFI_SCAN_FAILED) networks_.clear();
+    scanFailed_ = result == WIFI_SCAN_FAILED;
   }
   if (scanning_) {
     const int count = WiFi.scanComplete();
     if (count == WIFI_SCAN_RUNNING) return;
     scanning_ = false;
+    if (count < 0) { scanFailed_ = true; WiFi.scanDelete(); return; }
     std::map<std::string, WifiNetwork> unique;
     for (int i = 0; i < count; ++i) {
       const std::string name = WiFi.SSID(i).c_str();

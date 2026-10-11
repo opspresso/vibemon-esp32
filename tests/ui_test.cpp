@@ -8,7 +8,7 @@
 namespace {
 std::uint32_t timeMs = 0;
 std::array<std::uint16_t, 480 * 480> pixels;
-std::array<std::uint16_t, 480 * 40> drawBuffer;
+std::array<std::uint16_t, 480 * 480> drawBuffer, secondBuffer;
 std::size_t flushes = 0;
 lv_point_t position{};
 bool pressed = false;
@@ -67,10 +67,9 @@ int main() {
     lv_tick_set_cb([] { return timeMs; });
     auto* display = lv_display_create(480, 480);
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
-    lv_display_set_buffers(display, drawBuffer.data(), nullptr, sizeof(drawBuffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
-    lv_display_set_flush_cb(display, [](lv_display_t* display, const lv_area_t* area, std::uint8_t* data) {
-      const auto width = area->x2 - area->x1 + 1;
-      for (int y = area->y1; y <= area->y2; ++y) std::memcpy(pixels.data() + y * 480 + area->x1, data + (y - area->y1) * width * 2, width * 2);
+    lv_display_set_buffers(display, drawBuffer.data(), secondBuffer.data(), sizeof(drawBuffer), LV_DISPLAY_RENDER_MODE_DIRECT);
+    lv_display_set_flush_cb(display, [](lv_display_t* display, const lv_area_t*, std::uint8_t* data) {
+      if (lv_display_flush_is_last(display)) std::memcpy(pixels.data(), data, sizeof(pixels));
       ++flushes; lv_display_flush_ready(display);
     });
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
@@ -105,6 +104,9 @@ int main() {
       CHECK(ui.page() == Page::CloudForm && !app.changingCloud()); screenshot("invalid-token");
       ui.wifi(); wifi.found = {{"Studio Wi-Fi", -45, true}, {"한글 네트워크", -60, true}, {"Guest", -75, false}};
       advance(ui, 300); screenshot("wifi-networks");
+      wifi.scanError = true; advance(ui, 300);
+      CHECK(std::string(lv_label_get_text(ui.widget("scan-status"))).find("Scan failed") == 0);
+      wifi.scanError = false; advance(ui, 300);
       tap(ui, "network-0"); CHECK(ui.page() == Page::WifiForm); screenshot("wifi-password");
       CHECK(std::string(lv_textarea_get_text(ui.widget("ssid"))) == "Studio Wi-Fi");
       tapAt(ui, 64, 280);
@@ -113,6 +115,7 @@ int main() {
       CHECK(app.changingWifi() && wifi.requested == "Studio Wi-Fi");
       wifi.current.link = WifiLink::Failed; app.tick(timeMs); advance(ui); screenshot("wifi-failed");
       CHECK(ui.page() == Page::WifiForm);
+      tap(ui, "back"); CHECK(!app.changingWifi() && wifi.requested == "Workshop");
       ui.dashboard(); advance(ui, 130000); screenshot("stale-dashboard");
     }
     lv_deinit();

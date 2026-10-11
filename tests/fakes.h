@@ -19,11 +19,14 @@ struct Wifi final : WifiPort {
   WifiStatus current;
   std::vector<WifiNetwork> found;
   int scans = 0, connects = 0;
+  bool scanError = false;
   std::string requested;
   void connect(const std::string& ssid, const std::string&) override { requested = ssid; current.link = WifiLink::Connecting; ++connects; }
+  void disconnect() override { requested.clear(); current = {}; }
   void scan() override { ++scans; }
   WifiStatus status() const override { return current; }
   bool scanning() const override { return false; }
+  bool scanFailed() const override { return scanError; }
   const std::vector<WifiNetwork>& networks() const override { return found; }
   void connected(const std::string& ssid = "Workshop", bool clock = true) { current = {WifiLink::Connected, clock, ssid, "192.0.2.1"}; }
 };

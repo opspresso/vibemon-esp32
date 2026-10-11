@@ -4,7 +4,7 @@
 
 namespace vibemon {
 
-enum class Connection { NeedWifi, ConnectingWifi, WifiUnavailable, SettingClock, NeedCloud, CheckingCloud, Online, CloudUnavailable, TokenRejected, StorageError };
+enum class Connection { NeedWifi, ConnectingWifi, WifiUnavailable, SettingClock, NeedCloud, CheckingCloud, Online, CloudUnavailable, TokenRejected, StorageError, ClockUnavailable };
 
 struct Workspace {
   Connection connection = Connection::NeedWifi;
@@ -30,10 +30,12 @@ class Controller {
   Validation select(std::size_t panel, const Selection& selection);
   void refresh();
   void retryWifi();
+  void cancelSetup();
   void scanWifi();
   const Workspace& workspace() const { return workspace_; }
   const std::vector<WifiNetwork>& networks() const { return wifi_.networks(); }
   bool scanning() const { return wifi_.scanning(); }
+  bool scanFailed() const { return wifi_.scanFailed(); }
   bool changingWifi() const { return pendingWifi_.has_value(); }
   bool changingCloud() const { return pendingCloud_.has_value(); }
 
@@ -50,6 +52,7 @@ class Controller {
   std::uint32_t generation_ = 1;
   std::uint32_t now_ = 0;
   std::uint32_t nextPoll_ = 0;
+  std::uint32_t clockStartedAt_ = 0;
   unsigned failures_ = 0;
   bool inFlight_ = false;
   bool tokenRejected_ = false;

@@ -24,9 +24,11 @@ class WifiPort {
  public:
   virtual ~WifiPort() = default;
   virtual void connect(const std::string& ssid, const std::string& password) = 0;
+  virtual void disconnect() = 0;
   virtual void scan() = 0;
   virtual WifiStatus status() const = 0;
   virtual bool scanning() const = 0;
+  virtual bool scanFailed() const = 0;
   virtual const std::vector<WifiNetwork>& networks() const = 0;
 };
 

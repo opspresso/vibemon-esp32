@@ -21,9 +21,11 @@ class EspWifi final : public WifiPort {
   void begin();
   void tick(std::uint32_t now);
   void connect(const std::string& ssid, const std::string& password) override;
+  void disconnect() override;
   void scan() override;
   WifiStatus status() const override;
-  bool scanning() const override { return scanning_; }
+  bool scanning() const override { return scanning_ || scanRequested_; }
+  bool scanFailed() const override { return scanFailed_; }
   const std::vector<WifiNetwork>& networks() const override { return networks_; }
  private:
   std::string ssid_;
@@ -36,6 +38,7 @@ class EspWifi final : public WifiPort {
   bool joining_ = false;
   bool scanning_ = false;
   bool scanRequested_ = false;
+  bool scanFailed_ = false;
   bool clockRequested_ = false;
 };
 

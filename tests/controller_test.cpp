@@ -92,6 +92,33 @@ int main() {
       app.tick(2); CHECK(cloud.requests.size() == 1);
       app.tick(9996); CHECK(cloud.requests.size() == 2);
     }
+    {
+      Store store; Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud); app.begin(0);
+      CHECK(app.saveWifi("Unverified", "test-password").ok);
+      app.cancelSetup();
+      CHECK(!app.changingWifi() && wifi.requested.empty() && store.writes == 0);
+      CHECK(app.workspace().connection == Connection::NeedWifi);
+    }
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      const auto writes = store.writes;
+      CHECK(app.saveWifi("Workshop", "test-password").ok);
+      wifi.connected(); app.tick(3); CHECK(store.writes == writes);
+      cloud.complete(catalog()); app.tick(4);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      CHECK(!app.select(0, {}).ok);
+      app.tick(5); app.cancelSetup(); cloud.complete(catalog("canceled-owner")); app.tick(6);
+      CHECK(!app.changingCloud() && store.saved.origin == "https://vibemon.io");
+      CHECK(!app.workspace().catalog.find({ItemKind::Resource, "canceled-owner"}));
+      CHECK(cloud.requests.back().origin == "https://vibemon.io");
+    }
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(0); wifi.connected("Workshop", false); app.tick(1); app.tick(30001);
+      CHECK(app.workspace().connection == Connection::ClockUnavailable && cloud.requests.empty());
+      wifi.connected(); app.tick(30002); CHECK(cloud.requests.size() == 1);
+    }
     std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery and timer rollover\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
