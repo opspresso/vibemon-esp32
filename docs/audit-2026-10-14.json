@@ -151,7 +151,7 @@
     },
     {
       "path": "docs/audit-2026-10-14.md",
-      "sha256": "974acb6844a0532e727bd3b125521b05c5dbab27249611f01b0cb444c6e46d29",
+      "sha256": "c22cfb9f2e961a82b785b8adcb0699cdab097849043b6827855e9fce1569a22a",
       "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
     },
     {
