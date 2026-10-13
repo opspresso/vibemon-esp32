@@ -166,7 +166,7 @@ void DashboardUi::dashboard() {
     for (std::size_t metric = 0; metric < 3; ++metric) {
       const int y = 67 + static_cast<int>(metric) * 28;
       card.labels[metric] = label(card.box, "", 14, y + 3, 101, fonts_.small(), Muted);
-      card.values[metric] = label(card.box, "", 114, y, 88, fonts_.normal());
+      card.values[metric] = label(card.box, "", 114, y + 3, 88, fonts_.small());
       lv_obj_set_style_text_align(card.values[metric], LV_TEXT_ALIGN_RIGHT, 0);
       card.bars[metric] = lv_bar_create(card.box);
       box(card.bars[metric], 14, y + 23, 188, 2, Border, 1);
@@ -213,7 +213,9 @@ void DashboardUi::updateCards(std::uint32_t now) {
       if (!available) { visible(card.bars[m], false); continue; }
       const auto& metric = item->metrics[m];
       setText(card.labels[m], metric.label);
-      setText(card.values[m], metricValue(metric) + (metric.value && !metric.unit.empty() ? (metric.unit == "%" ? "" : " ") + metric.unit : ""));
+      const bool hasValue = metric.value && std::isfinite(*metric.value);
+      const bool adjacentUnit = metric.unit.rfind("%", 0) == 0 || metric.unit.rfind("°", 0) == 0;
+      setText(card.values[m], metricValue(metric) + (hasValue && !metric.unit.empty() ? (adjacentUnit ? "" : " ") + metric.unit : ""));
       const bool bar = metric.display == MetricDisplay::Bar && metric.value && metric.maximum;
       visible(card.bars[m], bar);
       if (bar) {

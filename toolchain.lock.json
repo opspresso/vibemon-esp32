@@ -12,5 +12,7 @@
     "version": "5.5.5",
     "commit": "b774170ff46c393eeb5e495ea37936038d3f4f4f"
   },
-  "arduino_license_sha256": "62e54861b30e953735dc187f036917c588665dbe3c5dd88449e34317608bbf5e"
+  "arduino_license_sha256": "62e54861b30e953735dc187f036917c588665dbe3c5dd88449e34317608bbf5e",
+  "arduinojson_number_parser_sha256": "529424d6ac10c08d36311cc7927c8970ca41ae7b8745d66412bb4fbc5b3b5eb2",
+  "arduinojson_precise_parser_sha256": "37d74c1bfcadf89c889bf1487c0692462e07d0b42ed647c286abd1c7f5116b04"
 }

@@ -38,6 +38,7 @@ def main():
     if args.jobs < 1:
         parser.error('--jobs must be positive')
     lock = json.loads((ROOT / 'toolchain.lock.json').read_text())
+    subprocess.run([sys.executable, str(ROOT / 'tools/prepare_json.py')], check=True)
     subprocess.run([sys.executable, str(ROOT / 'tools/generate_contract.py')], check=True)
     environment, python = load(lock)
     for name, version in lock['libraries'].items():

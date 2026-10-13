@@ -21,6 +21,8 @@ Resources become `Stale` after 120 seconds without a receipt. Coding hooks repor
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
+Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes to fit the four-panel display. The stored measurements retain their original precision.
+
 ## Persistent settings
 
 The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key and four selections. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.

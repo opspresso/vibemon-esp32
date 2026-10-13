@@ -30,6 +30,8 @@ The board has 8 MB PSRAM. Two complete RGB565 framebuffers use PSRAM (900 KiB to
 
 HTTP bodies and JSON allocations have separate limits. A single request is active at a time. Wi-Fi association and scanning progress asynchronously. HTTPS runs outside the UI task; the UI loop yields every 5 ms. Flash writes occur for verified connection changes and changed selections, not periodic readings.
 
+Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_json.py` applies a hash-verified change to the isolated ArduinoJson numeric parser: decimal tokens use C++ `from_chars` rather than narrowing short mantissas to 32-bit floats. This preserves the Web value before formatting; for example, `1.005` remains the same double and displays as `1.01%`. The original and modified parser hashes are locked. User-installed libraries and the ESP-IDF checkout remain untouched.
+
 The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. The single application slot does not provide an OTA update service.
 
 ## Verification commands

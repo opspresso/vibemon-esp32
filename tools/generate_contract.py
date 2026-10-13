@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Compile the pinned App policy into a dependency-free C++ state table."""
 import json
-from pathlib import Path
 
 from sync_contract import ROOT, verify
 
@@ -24,6 +23,12 @@ def generate():
                   str(constants[transition["after"]] if transition else 0),
                   "true" if state.get("holdWhileReporting") else "false"]
         lines.append("  {" + ", ".join(fields) + "},")
+    lines += ["};", "struct UnitPrecision { const char* unit; int fractionDigits; };",
+              "inline constexpr UnitPrecision UnitPrecisions[] = {"]
+    for unit, digits in policy["measurements"]["unitFractionDigits"].items():
+        if not isinstance(digits, int) or isinstance(digits, bool) or not 0 <= digits <= 6:
+            raise ValueError("Invalid measurement precision")
+        lines.append("  {" + json.dumps(unit) + ", " + str(digits) + "},")
     lines += ["};", "}  // namespace vibemon::contract", ""]
     destination = ROOT / "build/generated/monitoring_policy.h"
     destination.parent.mkdir(parents=True, exist_ok=True)

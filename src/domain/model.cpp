@@ -1,6 +1,7 @@
 #include "model.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -202,10 +203,54 @@ std::string stateTone(const std::string& state) {
 }
 bool needsAttention(const std::string& state) { return attentionRank(state) != std::numeric_limits<unsigned>::max(); }
 
+namespace {
+std::string decimalValue(double value, int precision) {
+  // Round the shortest decimal representation, as Intl does. Multiplication by
+  // 100 first would turn 1.005 into 100.49999999999999 and round it incorrectly.
+  char buffer[64];
+  const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), std::abs(value));
+  std::string digits(buffer, converted.ptr);
+  int exponent = 0;
+  const auto exponentAt = digits.find('e');
+  if (exponentAt != std::string::npos) {
+    exponent = std::stoi(digits.substr(exponentAt + 1));
+    digits.resize(exponentAt);
+  }
+  const auto dot = digits.find('.');
+  const int decimalAt = static_cast<int>(dot == std::string::npos ? digits.size() : dot) + exponent;
+  if (dot != std::string::npos) digits.erase(dot, 1);
+  const int keep = decimalAt + precision;
+  if (keep < 0) digits = "0";
+  else if (static_cast<std::size_t>(keep) < digits.size()) {
+    const bool roundUp = digits[keep] >= '5';
+    digits.resize(keep);
+    if (roundUp) {
+      auto index = digits.size();
+      while (index && digits[index - 1] == '9') digits[--index] = '0';
+      if (index) ++digits[index - 1];
+      else digits.insert(0, "1");
+    }
+  } else digits.append(static_cast<std::size_t>(keep) - digits.size(), '0');
+  if (digits.size() <= static_cast<std::size_t>(precision)) digits.insert(0, precision + 1 - digits.size(), '0');
+  const auto integerSize = digits.size() - precision;
+  if (precision) {
+    digits.insert(integerSize, ".");
+    while (digits.back() == '0') digits.pop_back();
+    if (digits.back() == '.') digits.pop_back();
+  }
+  for (auto position = static_cast<int>(integerSize) - 3; position > 0; position -= 3) digits.insert(position, ",");
+  return std::signbit(value) ? "-" + digits : digits;
+}
+}  // namespace
+
 std::string metricValue(const Metric& metric) {
-  if (!metric.value || !std::isfinite(*metric.value)) return "--";
+  if (!metric.value || !std::isfinite(*metric.value)) return "—";
   const double value = *metric.value;
   char buffer[64];
+  for (const auto& precision : contract::UnitPrecisions) {
+    if (metric.unit != precision.unit) continue;
+    return decimalValue(value, precision.fractionDigits);
+  }
   if (std::abs(value) >= 1e9) std::snprintf(buffer, sizeof(buffer), "%.1fG", value / 1e9);
   else if (std::abs(value) >= 1e6) std::snprintf(buffer, sizeof(buffer), "%.1fM", value / 1e6);
   else if (std::abs(value) >= 10000) std::snprintf(buffer, sizeof(buffer), "%.1fk", value / 1e3);
@@ -216,7 +261,8 @@ std::string metricValue(const Metric& metric) {
 }
 
 std::string ageLabel(std::uint64_t milliseconds) {
-  if (milliseconds < 60000) return "Just now";
+  if (milliseconds < 15000) return "Just now";
+  if (milliseconds < 60000) return std::to_string(milliseconds / 1000) + "s ago";
   if (milliseconds < 3600000) return std::to_string(milliseconds / 60000) + "m ago";
   if (milliseconds < 86400000) return std::to_string(milliseconds / 3600000) + "h ago";
   return std::to_string(milliseconds / 86400000) + "d ago";

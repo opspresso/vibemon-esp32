@@ -32,6 +32,8 @@ def main():
     subprocess.run(cli + ["lib", "update-index"], check=True)
     for name, release in lock["libraries"].items():
         subprocess.run(cli + ["lib", "install", "--no-deps", name + "@" + release], check=True)
+    from prepare_json import prepare
+    prepare()
     print("Pinned libraries installed in build/arduino/libraries")
     if args.firmware:
         from sdk_toolchain import install

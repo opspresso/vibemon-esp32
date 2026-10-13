@@ -12,7 +12,7 @@ The 480×480 display follows your VibeMon workspace over HTTPS. Each card can sh
 4. Enter a token with **read** permission from [Account](https://vibemon.io/account). The device checks it before saving.
 5. Tap any of the four cards and choose a resource or coding account. Use the category buttons to narrow the list.
 
-The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing reports display `--`; lost connections retain the last readings with an explicit offline or stale status.
+The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing measurements display `—`; lost connections retain the last readings with an explicit connection status. Resources without recent reports become `Stale`. Coding accounts without recent events become neutral `Inactive`.
 
 ## What it supports
 

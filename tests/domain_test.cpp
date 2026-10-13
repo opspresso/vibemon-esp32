@@ -74,14 +74,21 @@ int main() {
     const auto at = malformed.find("\"gpu\":28.4");
     malformed.replace(at, std::string("\"gpu\":28.4").size(), "\"gpu\":\"unknown\"");
     CHECK(!decodeCatalog(malformed, catalog).ok && catalog.items.size() == before);
+    for (const auto& reading : {std::pair<const char*, double>{"1.005", 1.005}, {"0.1234567890123456", 0.1234567890123456}, {"999999.995", 999999.995}}) {
+      auto precise = sample();
+      precise.replace(precise.find("28.4"), 4, reading.first);
+      CHECK(decodeCatalog(precise, catalog).ok);
+      CHECK(catalog.find({ItemKind::Resource, "spark"})->metrics[1].value == reading.second);
+    }
     CHECK(!decodeCatalog("{\"sources\":[]}", catalog).ok);
     CHECK(!decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog).ok);
     CHECK(decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog).ok && catalog.items.empty());
     Metric metric;
-    CHECK(metricValue(metric) == "--");
+    CHECK(metricValue(metric) == "—");
     metric.value = 0; CHECK(metricValue(metric) == "0");
     metric.value = 12.4; CHECK(metricValue(metric) == "12.4");
     metric.value = 14200; CHECK(metricValue(metric) == "14.2k");
+    CHECK(ageLabel(14999) == "Just now" && ageLabel(15000) == "15s ago" && ageLabel(60000) == "1m ago");
     std::cout << "PASS domain: credential boundaries, Unicode, timestamps, account isolation, metric order, missing values, stale data and atomic snapshots\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

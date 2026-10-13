@@ -66,6 +66,14 @@ int main(int argc, char** argv) {
       }
       ++count;
     }
+    for (JsonObjectConst fixture : fixtures["measurements"].as<JsonArrayConst>()) {
+      Metric metric;
+      metric.unit = fixture["unit"].as<std::string>();
+      if (!fixture["value"].isNull()) metric.value = fixture["value"].as<double>();
+      const auto expected = fixture["expected"].as<std::string>();
+      const auto actual = metricValue(metric);
+      if (actual != expected) throw std::runtime_error("Measurement " + fixture["value"].as<std::string>() + " " + metric.unit + ": expected " + expected + ", got " + actual);
+    }
     std::cout << "PASS " << count << " shared App/Web/ESP32 monitoring cases through the actual JSON adapter\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
