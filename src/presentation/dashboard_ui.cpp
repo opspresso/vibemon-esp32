@@ -185,7 +185,7 @@ void DashboardUi::dashboard() {
 void DashboardUi::updateCards(std::uint32_t now) {
   const auto& workspace = controller_.workspace();
   if (setText(connection_, shortConnection(workspace.connection))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Green : Amber), 0);
-  const auto elapsed = static_cast<std::uint32_t>(now - workspace.receivedAtMs);
+  const auto elapsed = controller_.snapshotAgeMs(now);
   for (std::size_t index = 0; index < PanelCount; ++index) {
     auto& card = cards_[index];
     const auto& selection = workspace.panels[index];

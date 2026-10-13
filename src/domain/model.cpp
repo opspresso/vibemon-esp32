@@ -142,7 +142,7 @@ std::optional<std::int64_t> utcMilliseconds(const std::string& value) {
   return (((days * 24 + hour) * 60 + minute) * 60 + second) * 1000 + ms;
 }
 
-bool stale(const ReportState& item, std::uint32_t elapsedMs) {
+bool stale(const ReportState& item, std::uint64_t elapsedMs) {
   return item.reportedStale || static_cast<std::uint64_t>(item.ageMs) + elapsedMs >= StaleAfterMs;
 }
 
@@ -163,7 +163,7 @@ std::string healthState(Health health) {
     default: return "unknown";
   }
 }
-std::string reportState(const ReportState& item, bool agent, std::uint32_t elapsedMs) {
+std::string reportState(const ReportState& item, bool agent, std::uint64_t elapsedMs) {
   if (stale(item, elapsedMs)) return agent ? "inactive" : "stale";
   const auto health = healthState(item.health);
   if (!agent) return health;
@@ -181,7 +181,7 @@ std::string reportState(const ReportState& item, bool agent, std::uint32_t elaps
 }
 }  // namespace
 
-std::string monitorState(const Monitor& item, std::uint32_t elapsedMs) {
+std::string monitorState(const Monitor& item, std::uint64_t elapsedMs) {
   if (item.selection.kind != ItemKind::Account) return reportState(item, false, elapsedMs);
   std::string state = "inactive";
   // The adapter sorts newest first, with stable source-ID ties, as App and Web do.

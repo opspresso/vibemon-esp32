@@ -8,6 +8,8 @@ The response must contain `sources` and `serverTime`. Resources retain their met
 
 Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events rather than continuous heartbeats: after that boundary their status is neutral `Inactive`. Fresh errors and input requests remain actionable regardless of the original event's age. The device reevaluates each project's receipt and event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
 
+Report age starts from `serverTime` and advances with accumulated device uptime. The 32-bit platform clock wrapping after about 49.7 days does not reset an offline report's age. A newly accepted snapshot resets only the elapsed time since that snapshot.
+
 | Limit | Value |
 | --- | --- |
 | Reporting sources | 128 |

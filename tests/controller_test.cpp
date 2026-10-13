@@ -119,6 +119,30 @@ int main() {
       CHECK(app.workspace().connection == Connection::ClockUnavailable && cloud.requests.empty());
       wifi.connected(); app.tick(30002); CHECK(cloud.requests.size() == 1);
     }
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(0); wifi.connected(); app.tick(1);
+      auto fresh = catalog();
+      fresh.items[0].ageMs = 0; fresh.items[0].health = Health::Ok;
+      ReportState project; project.ageMs = 0; project.activity = "working"; project.health = Health::Ok;
+      fresh.items[1].projects = {project};
+      cloud.complete(fresh); app.tick(2);
+      CHECK(app.snapshotAgeMs(2) == 0);
+      wifi.current.link = WifiLink::Failed;
+      constexpr std::uint64_t day = 86400000;
+      for (std::uint64_t elapsed = day; elapsed <= 60 * day; elapsed += day) {
+        const auto now = static_cast<std::uint32_t>(elapsed + 2);
+        app.tick(now);
+        CHECK(app.snapshotAgeMs(now) == elapsed);
+        CHECK(app.snapshotAgeMs(now + 5) == elapsed + 5);
+        CHECK(monitorState(app.workspace().catalog.items[0], app.snapshotAgeMs(now)) == "stale");
+        CHECK(monitorState(app.workspace().catalog.items[1], app.snapshotAgeMs(now)) == "inactive");
+      }
+      const auto reconnected = static_cast<std::uint32_t>(60 * day + 3);
+      wifi.connected(); app.tick(reconnected); cloud.complete(fresh); app.tick(reconnected + 1);
+      CHECK(app.snapshotAgeMs(reconnected + 1) == 0);
+      CHECK(monitorState(app.workspace().catalog.items[0], app.snapshotAgeMs(reconnected + 1)) == "ok");
+    }
     std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery and timer rollover\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
