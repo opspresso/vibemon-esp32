@@ -1,0 +1,418 @@
+{
+  "reviewDate": "2026-10-14",
+  "implementationHead": "78fe6b8366f2366884fec825cfd8043315785630",
+  "trackedFiles": 82,
+  "scope": "All tracked files plus this authored report/inventory; symlink digests cover target bytes. Ignored build/dependency output excluded. Publication/device claims require separate evidence.",
+  "files": [
+    {
+      "path": ".coderabbit.yaml",
+      "sha256": "e44a60454d4f92feab31e01ebbd04ccdaeeedcae9ab84338bc8e6654e1590bdc",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "5ee9622cc4af2f3cdc4f936c807270ae2497711eb12cfc1ccd4ab6ae561615f7",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "sha256": "5650900bdb94d55f658ca2f685058b0bad9533fd04f86f65e9b365a3b12935f1",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".github/auto-merge.yml",
+      "sha256": "5d170e5e0c474f4d4f4d36715556b56f4fa9e4c79c7e8a0c844d423ce0201416",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".github/stale.yml",
+      "sha256": "9f92c3d0c0082e9409d62ddf4a7c4612acf8692dcf1b4bed33fdffbe43f153fe",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".github/workflows/build.yml",
+      "sha256": "2b43a8a9b61504c2b6cc2ebe825b5761715fb1e913c6149173bedd34f2a9784b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "0bf6e56ee54b8101537af475c44e80c375bc286ff1bf1207f4b69f5dd48dd94c",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": ".mergify.yml",
+      "sha256": "05e19d41571c344eb7c827e15429f8135ad671c433664f0fdb292e1fa2ab4467",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "c22578b98b3ec44dfb656ece1d1bb0fbd407fbe905af04dfc7c4e9c9f30692a8",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "c22578b98b3ec44dfb656ece1d1bb0fbd407fbe905af04dfc7c4e9c9f30692a8",
+      "boundary": "symlink target and referenced source reviewed",
+      "symlinkTarget": "AGENTS.md"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "f57e07f9d75199614014175da873bed932e077e6a1f4e7f636ebe9d7998abde5",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "59c1bfad7fb2ad12cf9a7bae7b44c85005ba781d47cb1e0a4d5a91ccd582bbfe",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "README.md",
+      "sha256": "75697608ef8894f9fcc6bcb60fc4695bca4f167ec8f379d4be97d96aec305a70",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "app-contract.json",
+      "sha256": "b5976074eba24c95427464b626ae504acc4dd5ee12ff0573d875b642fc741597",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "assets/MPL-2.0.txt",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "assets/NanumGothic-Regular.ttf",
+      "sha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "boundary": "format, visual or source provenance review"
+    },
+    {
+      "path": "assets/OFL-NanumGothic.txt",
+      "sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "assets/sources.json",
+      "sha256": "ddeaada7a44fa33dfe98670c33584e47a51d23538a273f4c4b1bf91095c2319a",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "assets/vibemon.png",
+      "sha256": "06ed8d2a108ba548da9ec5b2e75568e94e6dfc3e1d615375c839b24d76d0a7c0",
+      "boundary": "format, visual or source provenance review"
+    },
+    {
+      "path": "contracts/LICENSE-App.txt",
+      "sha256": "59c1bfad7fb2ad12cf9a7bae7b44c85005ba781d47cb1e0a4d5a91ccd582bbfe",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "contracts/cases.json",
+      "sha256": "e09368dbaaebbf6af151ea056b788344c3b00841ff99fa36dcf3ceaf6ff963f1",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "contracts/constants.json",
+      "sha256": "d5e69aeda494cc3d2df25ae90680efb860fbf22556e352d64ba6483feb6272c0",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "contracts/monitoring.json",
+      "sha256": "640ef663bad7d497a984a01643ef78c2a6d740f2f5b9b4a72657bdeea8ab6960",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "contracts/tokens.css",
+      "sha256": "bdd9662dbbe891dfcbf66c57fec0232c89b55e00450300427cc66546036388be",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "87c41acd9ad6c7bdf72b5f3de28eed6b777da90fd7f6e89949fbd1de2f223b5c",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/api.md",
+      "sha256": "5cc8888d100e4540bd8bcbc2ae823c50fd5c10fec7a11185940103b3a74e4200",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "1a25484fd6a130156e280ad8f377019c9fd2a680df94f8c42e4964d020429082",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/arduino-setup.md",
+      "sha256": "25c8fe01c700799aad2c72eac668b7dac8f2c681f92e64eae6e2b95c289404cb",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/audit-2026-10-14.json",
+      "boundary": "Git records this inventory digest"
+    },
+    {
+      "path": "docs/audit-2026-10-14.md",
+      "sha256": "974acb6844a0532e727bd3b125521b05c5dbab27249611f01b0cb444c6e46d29",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "docs/hardware.md",
+      "sha256": "fbbe72e2278ca20c0892195dccce9e9714c96e6c1b6a9e3dfb051a032670acf6",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/CMakeLists.txt",
+      "sha256": "d5248804ff4bbc379ff7001cadc762c16030378e5941e0c38d67d02b5acf87d8",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/components/esp_panel/CMakeLists.txt",
+      "sha256": "77f096ee793d501f5e5481d274f090567621f5f3a07b45d0c850697205a9bfdc",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/components/io_expander/CMakeLists.txt",
+      "sha256": "65fe88f80fde7f95b5690c4615df75d31b9debcf2036ebf58d4f9d8d3c13f15c",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/main/CMakeLists.txt",
+      "sha256": "0e06b939ec62b0948bbe0d8bb47ffe4d305950ee8fd5833231a0c2314fa734e9",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/main/main.cpp",
+      "sha256": "f2801f4525dd31bd12b10dc2a25744548e1a5bce47975ddaf570b7d6022b1022",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "firmware/sdkconfig.defaults",
+      "sha256": "c9b81a569a152a4a150949c18c6dd864f83d7f8a1356f42dbe62ab5fb177aac5",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "lv_conf.h",
+      "sha256": "a9a52fad706dfb8b31c04598f1d0de6675223996a64cefe4f291c525cf47018b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "partitions.csv",
+      "sha256": "3f5199210c2f47b33ab0da9eaf12d9ac1b1650648b9259a25c15e7c338b8b3fc",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "sha256": "097f419695236ee69de1a978194b68e6198393a94398ecb32c737a628b49af05",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/adapters/catalog_json.cpp",
+      "sha256": "d9619d76a3ba26fc03ddb5f253fefb495dafb4c27a321ff8c3e0f78935f7e3f2",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/adapters/catalog_json.h",
+      "sha256": "2d26be185779d656a8c3cb4e9e9685f2be23a5502a687ecdfccc0bf7c3a468c3",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/adapters/settings_json.cpp",
+      "sha256": "f754d6977f2e0490a7c6a49c317c0e95397decb96e6b3b3105eacbb9a6d9ef3b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/adapters/settings_json.h",
+      "sha256": "174fd2383e0cff082df679e70a986fc56480391b1053e332ab73dbfc747f4327",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/application/controller.cpp",
+      "sha256": "8996183e47a547c5707002e8e07d30d0eba6b6cf598663a983021644764667bb",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/application/controller.h",
+      "sha256": "013f5bf69fe4da200a21003e1a80e02fca0f40cbda607b16692a046356c0961e",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/application/ports.h",
+      "sha256": "c051d0ed723f23e87665593ddd7ff52043bf349bf18e06a1784c5013873e7ac0",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/domain/model.cpp",
+      "sha256": "8d92dce48e26bf53ade49183006fb4cc1235bfc5371debad5db66a31d1f7389a",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/domain/model.h",
+      "sha256": "a01640626d312effcb917f3c37bd9f9dc8ffe428044087cb20786ef9b0b4ae0d",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/esp32_display.cpp",
+      "sha256": "d242cf7eef164366873643b86a980998f19d7edc4ffa2d2beda2eea958942293",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/esp32_display.h",
+      "sha256": "c0ec22b8c93dc92239abab212be8232ba751023ee6bd4d9576a5c7bb7e32c24b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/esp32_services.cpp",
+      "sha256": "4f9e20b44099bde5e7b1abfc618384c5707792c2c7c3c69c2879cd762b4e669b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/esp32_services.h",
+      "sha256": "48b20ce007b282a2f24084d110c6e69c73b59b9dab963d95328c58d59cae6312",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/serial_console.cpp",
+      "sha256": "9e96d5a9a72899fcb3e1bf6d416a3fccf768c78411bf5b3986643355dc88db45",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/platform/serial_console.h",
+      "sha256": "15a76402d8fa1823f8dae7a946bf80c70da9a5294fe637a4ca311c7caf2947df",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/presentation/assets.cpp",
+      "sha256": "6b76018c55878740b6a2cc67c9f697d8948bd6dcf27f6d00493ed8a9149b0608",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/presentation/assets.h",
+      "sha256": "77b9cfcb01206cebcf99ecdec1807ea861bf7e9696ea4eec83fe163afe799b2a",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/presentation/dashboard_ui.cpp",
+      "sha256": "8e8c35d153fd09a8cb88fdf115404102424bd5e5a95b7c29cbf83ce3d79d7b41",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/presentation/dashboard_ui.h",
+      "sha256": "0a86cfae01c425daf03f97fd079fbee48542c8cbfbab7cbbd8e57524a9c81d56",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "src/version.h",
+      "sha256": "6576f3ee84cb0dce33d0f64202e129a41e94ff76aafc84f9de53596af4b1c993",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/catalog_check.cpp",
+      "sha256": "4dae84da7cd2d7febc07fc025e908b59e8642f83afcdc7c05ea00c5b93de5e5a",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/contract_test.cpp",
+      "sha256": "1046bdeeac0b6275af6c09b57bb767ad27b7eb85958995cefb8efa7804922836",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/controller_test.cpp",
+      "sha256": "3c2ddc4c41ff2340f946ffb1f3dcf907b9653a7729b04fe6d59e866706103292",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/domain_test.cpp",
+      "sha256": "86002fd5a800e39e459cbf1be5a979a608dab84bebddf7998023b83f63d77f93",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/fakes.h",
+      "sha256": "4fca975baa1371c8529e54d80aded8d96c0ce6428cb5dfea1ed12ec9c1ba1289",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/licenses_test.py",
+      "sha256": "f5ddb80732e61404e11f03c1b46664f7ae1d8c4aac26c1c9a27846f6d3b94dcd",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/settings_test.cpp",
+      "sha256": "32fdeb26f1c14b93e4dbf61cd44e409398ff9d098b12e0944b400bf53bf8c848",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/tools_test.py",
+      "sha256": "cd74957ee6fbadf441c3702200c6185c6239ddf7294266e2215a4cf4c3bdf22c",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tests/ui_test.cpp",
+      "sha256": "5d7726260ecfe7dadd36d5d2c9a68f12072d97e445873f6ef658769ee2deae47",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "toolchain.lock.json",
+      "sha256": "ebca406f6ea6fb9f55f6b555804aa7030c4a4c1ffad4ae2e8addeeb53e99747e",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/build_firmware.py",
+      "sha256": "e51f8b39806b96e152243bd4680ccabb0a7d4413eca33b23690575133b13ddc6",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/check.py",
+      "sha256": "39278911f9f2f11f80633ca25a82207af84c752aba222faf0b819f8d126a164e",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/collect_licenses.py",
+      "sha256": "edab9e8d79298c92cb5032f674950b54b63b21f77d1120a9f136a5cff73dfbfb",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/device.py",
+      "sha256": "116d6756594d519efb11348612fb83af3b0ad8d02624dcd6427e06b89f44a5e4",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/flash_firmware.py",
+      "sha256": "a54d16dc45b98bd955d935288c9cf8007e46127db4b7e523b2b9390490bcc5ec",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/generate_assets.py",
+      "sha256": "f974010c1ba5f7384ffdbdf500e072c927c13ed16641b44b76ff240e38b16acd",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/generate_contract.py",
+      "sha256": "a9acb988bbac6fff6d098300daeef5dc63058a556289344e17ce4056e088155d",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/prepare_json.py",
+      "sha256": "f036745ad19bf860948bc600b6f6b65cf428d4e44802208a415b1a43398705eb",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/sdk_toolchain.py",
+      "sha256": "09ab58aa5d58b05d5fd8f4529e6d367da8600e6389acf9a7ff155389257681e7",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/setup.py",
+      "sha256": "c4d1fdd30e165d32dbdc79f613eb28babe518d60dd92e47e1411bb440faff7a6",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "tools/sync_contract.py",
+      "sha256": "cd0686a10091c67655fc3136fb71fa0d21948b6cc82e0ad4259445f9f097f40b",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    },
+    {
+      "path": "vibemon-esp32.ino",
+      "sha256": "23e2febe6ecb80aa06f72ada6399b0c32a9c07e3f4cc9c7f69bca2b832d2bd6a",
+      "boundary": "source, callers and applicable validation; documents checked against current contract or explicit historical scope"
+    }
+  ]
+}
