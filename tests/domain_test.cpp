@@ -79,6 +79,15 @@ int main() {
     const auto at = malformed.find("\"gpu\":28.4");
     malformed.replace(at, std::string("\"gpu\":28.4").size(), "\"gpu\":\"unknown\"");
     CHECK(!decodeCatalog(malformed, catalog).ok && catalog.items.size() == before);
+    for (const char* invalid : {R"(First\nSecond)", R"(First\u0000Second)", R"(First\u007fSecond)", R"(\ud800)"}) {
+      auto badName = sample();
+      badName.replace(badName.find("DGX Spark"), 9, invalid);
+      CHECK(!decodeCatalog(badName, catalog).ok && catalog.items.size() == before);
+    }
+    auto unicodeName = sample();
+    unicodeName.replace(unicodeName.find("DGX Spark"), 9, "한글 🐱");
+    CHECK(decodeCatalog(unicodeName, catalog).ok);
+    CHECK(catalog.find({ItemKind::Resource, "spark"})->name == "한글 🐱");
     for (const auto& reading : {std::pair<const char*, double>{"1.005", 1.005}, {"0.1234567890123456", 0.1234567890123456}, {"999999.995", 999999.995}}) {
       auto precise = sample();
       precise.replace(precise.find("28.4"), 4, reading.first);
