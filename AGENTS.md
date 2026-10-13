@@ -12,7 +12,7 @@ VibeMon Touch targets the GUITION ESP32-4848S040: ESP32-S3, 480×480 ST7701 LCD 
 - `tests/`: portable regression tests and actual LVGL pointer/render tests.
 - `assets/`: product artwork and licensed font sources. `assets/sources.json` records provenance.
 
-`contracts/` is a generated snapshot pinned by `app-contract.json`. Change monitoring policy in public `vibemon-app`, then run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Both native and firmware builds verify the snapshot and generate the C++ policy in `build/generated`. Keep the shared behavioral cases intact; do not maintain separate state labels or priorities in firmware.
+`contracts/` is a generated snapshot pinned by `app-contract.json`. Change monitoring policy or product colors in public `vibemon-app`, then run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Both native and firmware builds verify the snapshot and generate the C++ policy and dark palette in `build/generated`. Keep the shared behavioral cases intact; do not maintain separate state labels, priorities or product colors in firmware.
 
 Use C++17-compatible application code, two-space indentation, `snake_case` file names and the `vibemon` namespace. Keep LVGL calls on the UI task. Network workers must not access UI objects. Keep secrets out of logs and public view models.
 

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstring>
+#include <cmath>
 
 namespace {
 std::uint32_t timeMs = 0;
@@ -13,6 +14,24 @@ std::size_t flushes = 0;
 lv_point_t position{};
 bool pressed = false;
 lv_indev_t* pointer = nullptr;
+
+double luminance(std::uint32_t color) {
+  // Verify contrast after the target panel's RGB565 quantization.
+  const double channels[] = {static_cast<double>(((color >> 19) & 31) * 255 / 31),
+                             static_cast<double>(((color >> 10) & 63) * 255 / 63),
+                             static_cast<double>(((color >> 3) & 31) * 255 / 31)};
+  const double weights[] = {0.2126, 0.7152, 0.0722};
+  double result = 0;
+  for (std::size_t i = 0; i < 3; ++i) {
+    const double value = channels[i] / 255;
+    result += weights[i] * (value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4));
+  }
+  return result;
+}
+double contrast(std::uint32_t first, std::uint32_t second) {
+  const auto a = luminance(first), b = luminance(second);
+  return (std::max(a, b) + 0.05) / (std::min(a, b) + 0.05);
+}
 
 void advance(DashboardUi& ui, std::uint32_t duration = 80) {
   for (std::uint32_t elapsed = 0; elapsed < duration; elapsed += 10) {
@@ -80,6 +99,13 @@ int main() {
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(demo()); app.tick(2);
       timeMs = 2;
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("dashboard");
+      for (const auto color : {design::Foreground, design::Muted, design::Good, design::Warning, design::Danger, design::Accent}) {
+        CHECK(contrast(color, design::Background) >= 4.5);
+        CHECK(contrast(color, design::Surface) >= 4.5);
+      }
+      CHECK(contrast(design::AccentForeground, design::Accent) >= 4.5);
+      const auto bg = design::Background;
+      CHECK(pixels.back() == (((bg >> 19) & 31) << 11 | ((bg >> 10) & 63) << 5 | ((bg >> 3) & 31)));
       CHECK(ui.page() == Page::Dashboard);
       for (std::size_t i = 0; i < PanelCount; ++i) {
         auto* panel = ui.widget("panel-" + std::to_string(i)); CHECK(panel);

@@ -2,6 +2,7 @@
 
 #include "../application/controller.h"
 #include "assets.h"
+#include "design_tokens.h"
 #include <functional>
 #include <map>
 #include <memory>
@@ -64,7 +65,7 @@ class DashboardUi {
   bool lastScanning_ = false;
   void clear(Page page);
   void header(const std::string& title, std::function<void()> back);
-  lv_obj_t* label(lv_obj_t* parent, const std::string& text, int x, int y, int width, const lv_font_t* font = nullptr, std::uint32_t color = 0xf4f6fc);
+  lv_obj_t* label(lv_obj_t* parent, const std::string& text, int x, int y, int width, const lv_font_t* font = nullptr, std::uint32_t color = design::Foreground);
   lv_obj_t* button(lv_obj_t* parent, const std::string& text, int x, int y, int width, int height, std::function<void()> clicked, bool primary = false);
   lv_obj_t* field(const std::string& id, const std::string& value, const std::string& placeholder, int y, int maxLength, bool password);
   void event(lv_obj_t* object, lv_event_code_t code, std::function<void(lv_event_t*)> callback, bool row = false);

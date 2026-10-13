@@ -1,8 +1,30 @@
 #!/usr/bin/env python3
 """Compile the pinned App policy into a dependency-free C++ state table."""
 import json
+import re
 
 from sync_contract import ROOT, verify
+
+
+def write_generated(name, output):
+    destination = ROOT / "build/generated" / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.exists() or destination.read_text() != output:
+        destination.write_text(output)
+
+
+def palette():
+    css = (ROOT / "contracts/tokens.css").read_text()
+    names = {"Background": "background", "Surface": "surface", "SurfaceRaised": "surface-raised",
+             "Border": "border", "Foreground": "foreground", "Muted": "muted", "Accent": "accent",
+             "AccentForeground": "accent-foreground", "Good": "good", "Warning": "warning", "Danger": "danger"}
+    lines = ["// Generated from the pinned App dark palette; do not edit.", "#pragma once", "#include <cstdint>", "namespace vibemon::design {"]
+    for name, token in names.items():
+        values = re.findall(r"--vm-" + re.escape(token) + r"\s*:\s*light-dark\(#[0-9a-fA-F]{6},\s*#([0-9a-fA-F]{6})\)\s*;", css)
+        if len(values) != 1:
+            raise ValueError("Expected one light-dark hex token: --vm-" + token)
+        lines.append("inline constexpr std::uint32_t " + name + " = 0x" + values[0] + ";")
+    return "\n".join([*lines, "}  // namespace vibemon::design", ""])
 
 
 def generate():
@@ -30,11 +52,8 @@ def generate():
             raise ValueError("Invalid measurement precision")
         lines.append("  {" + json.dumps(unit) + ", " + str(digits) + "},")
     lines += ["};", "}  // namespace vibemon::contract", ""]
-    destination = ROOT / "build/generated/monitoring_policy.h"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    output = "\n".join(lines)
-    if not destination.exists() or destination.read_text() != output:
-        destination.write_text(output)
+    write_generated("monitoring_policy.h", "\n".join(lines))
+    write_generated("design_tokens.h", palette())
 
 
 if __name__ == "__main__":

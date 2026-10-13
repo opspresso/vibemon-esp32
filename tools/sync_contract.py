@@ -13,6 +13,7 @@ SOURCES = {
     "constants.json": "src/shared/data/constants.json",
     "monitoring.json": "src/shared/data/monitoring.json",
     "cases.json": "src/shared/monitoring/cases.json",
+    "tokens.css": "src/shared/design/tokens.css",
 }
 
 
@@ -47,7 +48,8 @@ def main():
                     data = response.read(1024 * 1024 + 1)
             if len(data) > 1024 * 1024:
                 raise ValueError("Contract file exceeds its size limit")
-            json.loads(data)
+            if filename.endswith('.json'):
+                json.loads(data)
             payload[filename] = data
         (ROOT / "contracts").mkdir(exist_ok=True)
         for filename, data in payload.items():
