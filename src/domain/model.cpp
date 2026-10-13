@@ -181,6 +181,10 @@ std::string reportState(const ReportState& item, bool agent, std::uint64_t elaps
 }
 }  // namespace
 
+std::string projectState(const ReportState& item, std::uint64_t elapsedMs) {
+  return reportState(item, true, elapsedMs);
+}
+
 std::string monitorState(const Monitor& item, std::uint64_t elapsedMs) {
   if (item.selection.kind != ItemKind::Account) return reportState(item, false, elapsedMs);
   std::string state = "inactive";
@@ -204,6 +208,15 @@ std::string stateTone(const std::string& state) {
 bool needsAttention(const std::string& state) { return attentionRank(state) != std::numeric_limits<unsigned>::max(); }
 
 namespace {
+std::string groupInteger(std::string value) {
+  if (value.find('e') != std::string::npos) return value;
+  const auto dot = value.find('.');
+  const auto length = dot == std::string::npos ? value.size() : dot;
+  const int sign = !value.empty() && value.front() == '-' ? 1 : 0;
+  for (int at = static_cast<int>(length) - 3; at > sign; at -= 3) value.insert(at, ",");
+  return value;
+}
+
 std::string decimalValue(double value, int precision) {
   // Round the shortest decimal representation, as Intl does. Multiplication by
   // 100 first would turn 1.005 into 100.49999999999999 and round it incorrectly.
@@ -238,18 +251,22 @@ std::string decimalValue(double value, int precision) {
     while (digits.back() == '0') digits.pop_back();
     if (digits.back() == '.') digits.pop_back();
   }
-  for (auto position = static_cast<int>(integerSize) - 3; position > 0; position -= 3) digits.insert(position, ",");
-  return std::signbit(value) ? "-" + digits : digits;
+  return groupInteger(std::signbit(value) ? "-" + digits : digits);
 }
 }  // namespace
 
-std::string metricValue(const Metric& metric) {
+std::string metricValue(const Metric& metric, bool compact) {
   if (!metric.value || !std::isfinite(*metric.value)) return "—";
   const double value = *metric.value;
   char buffer[64];
   for (const auto& precision : contract::UnitPrecisions) {
     if (metric.unit != precision.unit) continue;
     return decimalValue(value, precision.fractionDigits);
+  }
+  if (!compact) {
+    const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
+        value != 0 && std::abs(value) < 0.001 ? std::chars_format::general : std::chars_format::fixed);
+    return groupInteger(std::string(buffer, converted.ptr));
   }
   if (std::abs(value) >= 1e9) std::snprintf(buffer, sizeof(buffer), "%.1fG", value / 1e9);
   else if (std::abs(value) >= 1e6) std::snprintf(buffer, sizeof(buffer), "%.1fM", value / 1e6);
@@ -258,6 +275,12 @@ std::string metricValue(const Metric& metric) {
   else if (std::abs(value) > 0 && std::abs(value) < 0.1) std::snprintf(buffer, sizeof(buffer), "%.2g", value);
   else std::snprintf(buffer, sizeof(buffer), "%.1f", value);
   return buffer;
+}
+
+std::string metricText(const Metric& metric, bool compact) {
+  const bool hasValue = metric.value && std::isfinite(*metric.value);
+  const bool adjacent = metric.unit.rfind("%", 0) == 0 || metric.unit.rfind("°", 0) == 0;
+  return metricValue(metric, compact) + (hasValue && !metric.unit.empty() ? (adjacent ? "" : " ") + metric.unit : "");
 }
 
 std::string ageLabel(std::uint64_t milliseconds) {

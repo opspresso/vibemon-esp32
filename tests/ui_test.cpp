@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 
 namespace {
 std::uint32_t timeMs = 0;
@@ -51,6 +52,11 @@ void tapAt(DashboardUi& ui, int x, int y) {
   position = {x, y}; pressed = true; lv_indev_read(pointer); advance(ui, 60);
   pressed = false; lv_indev_read(pointer); advance(ui, 80);
 }
+void swipeUp(DashboardUi& ui) {
+  position = {400, 360}; pressed = true; lv_indev_read(pointer); advance(ui, 40);
+  for (int y = 350; y >= 150; y -= 10) { position.y = y; lv_indev_read(pointer); advance(ui, 10); }
+  pressed = false; lv_indev_read(pointer); advance(ui, 300);
+}
 void screenshot(const std::string& name) {
   std::filesystem::create_directories("screenshots");
   std::ofstream file("screenshots/" + name + ".ppm", std::ios::binary);
@@ -59,6 +65,15 @@ void screenshot(const std::string& name) {
     const char rgb[] = {static_cast<char>(((pixel >> 11) & 31) * 255 / 31), static_cast<char>(((pixel >> 5) & 63) * 255 / 63), static_cast<char>((pixel & 31) * 255 / 31)};
     file.write(rgb, 3);
   }
+}
+void labels(lv_obj_t* parent, std::vector<lv_obj_t*>& result) {
+  if (lv_obj_check_type(parent, &lv_label_class)) result.push_back(parent);
+  for (std::uint32_t i = 0; i < lv_obj_get_child_count(parent); ++i) labels(lv_obj_get_child(parent, i), result);
+}
+lv_obj_t* findText(lv_obj_t* parent, const std::string& text) {
+  std::vector<lv_obj_t*> values; labels(parent, values);
+  for (auto* value : values) if (text == lv_label_get_text(value)) return value;
+  return nullptr;
 }
 Catalog demo() {
   Catalog value;
@@ -74,7 +89,9 @@ Catalog demo() {
   Monitor agent;
   agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "Codex";
   agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working";
-  agent.projects = {agent, agent};
+  agent.sourceId = "current"; agent.project = "web-console";
+  auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
+  agent.projects = {agent, review};
   agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100}, {"week", "Weekly", "%", 24, MetricDisplay::Bar, 0, 100}};
   value.items.push_back(agent);
   return value;
@@ -113,10 +130,11 @@ int main() {
       }
       // Once the fixed dashboard is drawn, repeated unchanged updates must not repaint it.
       advance(ui, 250); const auto stable = flushes; advance(ui, 1000); CHECK(flushes == stable);
-      tap(ui, "panel-3"); CHECK(ui.page() == Page::Picker); screenshot("picker");
+      tap(ui, "panel-3"); CHECK(ui.page() == Page::Details); screenshot("resource-details");
+      tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
-      tap(ui, "panel-0"); tap(ui, "clear-panel"); CHECK(app.workspace().panels[0].id.empty());
+      tap(ui, "panel-0"); tap(ui, "change-item"); tap(ui, "clear-panel"); CHECK(app.workspace().panels[0].id.empty());
       screenshot("empty-panel");
       tap(ui, "settings"); CHECK(ui.page() == Page::Settings); screenshot("settings");
       tap(ui, "cloud-settings"); CHECK(ui.page() == Page::CloudForm);
@@ -149,6 +167,56 @@ int main() {
       const auto inactiveColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
       const auto staleColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
       CHECK(!lv_color_eq(inactiveColor, staleColor));
+    }
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(timeMs); wifi.connected(); app.tick(timeMs);
+      auto catalog = demo();
+      auto& resource = catalog.items[0];
+      resource.name.clear(); for (int i = 0; i < 40; ++i) resource.name += "긴이름";
+      resource.statusMessage = "A long status explanation stays available with every reading.";
+      resource.metrics.clear();
+      std::string longLabel; for (int i = 0; i < 24; ++i) longLabel += "메트릭";
+      for (int i = 0; i < 32; ++i) resource.metrics.push_back({"metric" + std::to_string(i), longLabel + std::to_string(i), "requests/second!", 9007199254740991.0, MetricDisplay::Number, 0, {}});
+      cloud.complete(catalog); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("long-dashboard");
+      tap(ui, "panel-0"); CHECK(ui.page() == Page::Details);
+      auto* list = ui.widget("detail-list");
+      CHECK(findText(list, resource.name)); CHECK(findText(list, resource.statusMessage));
+      CHECK(findText(list, "9,007,199,254,740,991 requests/second!"));
+      screenshot("long-details");
+      std::vector<lv_obj_t*> text; labels(list, text);
+      CHECK(text.size() >= 68);
+      for (auto* value : text) {
+        CHECK(lv_label_get_long_mode(value) == LV_LABEL_LONG_MODE_WRAP);
+        CHECK(lv_obj_get_width(value) <= 416);
+        lv_area_t bounds; lv_obj_get_coords(value, &bounds);
+        CHECK(bounds.x1 >= 32 && bounds.x2 <= 447);
+        lv_point_t measured;
+        lv_text_get_size(&measured, lv_label_get_text(value), lv_obj_get_style_text_font(value, LV_PART_MAIN),
+            lv_obj_get_style_text_letter_space(value, LV_PART_MAIN), lv_obj_get_style_text_line_space(value, LV_PART_MAIN),
+            lv_obj_get_content_width(value), LV_TEXT_FLAG_NONE);
+        CHECK(measured.x <= lv_obj_get_content_width(value) && measured.y <= lv_obj_get_content_height(value));
+      }
+      swipeUp(ui); CHECK(lv_obj_get_scroll_y(list) > 0);
+      for (int wait = 0; wait < 3000 && lv_obj_is_scrolling(list); wait += 10) advance(ui, 10);
+      CHECK(!lv_obj_is_scrolling(list));
+      lv_obj_scroll_to_y(list, lv_obj_get_scroll_y(list) + lv_obj_get_scroll_bottom(list), LV_ANIM_OFF);
+      advance(ui); screenshot("long-details-end");
+      auto* last = findText(list, longLabel + "31"); CHECK(last);
+      lv_area_t bounds; lv_obj_get_coords(last, &bounds); CHECK(bounds.y1 >= 70 && bounds.y2 < 404);
+      const auto offset = lv_obj_get_scroll_y(list);
+      app.refresh(); app.tick(++timeMs); catalog.items[0].metrics.back().value = 0;
+      cloud.complete(catalog); app.tick(++timeMs); advance(ui);
+      CHECK(findText(list, "0 requests/second!")); CHECK(lv_obj_get_scroll_y(list) == offset);
+      advance(ui, 300); const auto stable = flushes; advance(ui, 1000); CHECK(flushes == stable);
+      tap(ui, "back"); tap(ui, "panel-1");
+      list = ui.widget("detail-list");
+      CHECK(findText(list, "web-console") && findText(list, "release-review"));
+      CHECK(findText(list, "Working") && findText(list, "Needs input"));
+      screenshot("account-details");
+      lv_obj_scroll_to_view_recursive(findText(list, "Needs input"), LV_ANIM_OFF); advance(ui);
+      screenshot("account-details-end");
     }
     lv_deinit();
     std::cout << "PASS real LVGL UI: four cards, touch selection, category filtering, persistence, setup forms, Unicode, missing values, offline display and idle redraw budget\n";

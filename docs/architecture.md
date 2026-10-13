@@ -24,6 +24,8 @@ To update the contract, run `python tools/sync_contract.py --revision FULL_APP_C
 
 The worker passes owned results through a one-entry queue. It never calls LVGL. The UI task applies complete snapshots and updates changed labels/bars. A picker retains its position while background readings change; explicit refresh rebuilds its list. Settings input is not rebuilt by polling.
 
+Touch uses the dark variant of App's pinned product palette. `tools/generate_contract.py` produces the C++ colors directly from `contracts/tokens.css`; native tests check text contrast after RGB565 quantization. Populated cards open scrollable details with all metrics and reporting projects. Long names and units wrap, while updates reuse the existing rows and preserve scroll position. **Change item** opens the panel selector; empty cards open it directly.
+
 ## Memory and timing
 
 The board has 8 MB PSRAM. Two complete RGB565 framebuffers use PSRAM (900 KiB total). LVGL draws changed areas into the back buffer and swaps it only after rendering. The RGB completion interrupt gates reuse of the previous front buffer; LVGL then synchronizes changed areas between them. Two internal 10-line bounce buffers feed scanout. The 2 MB Unicode font is embedded in flash. ESP-IDF copies instructions and read-only data, including that font, into PSRAM at boot so flash writes do not stall external memory access. Small bounded glyph caches render Korean/Latin names on demand. Drivers are initialized before application allocation is directed to PSRAM, preserving internal memory for capability-specific DMA, stacks and Wi-Fi allocations.
@@ -42,6 +44,7 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Custom metric order, missing values, multiple accounts and stale reports.
 - Verified saves, rejected keys, delayed replies, account changes, offline retention and timer rollover.
 - Four touch cards, category selection, setup forms, actual keyboard input and masking.
+- Long Korean names, 32 metrics, complete values and units, touch scrolling, per-project states and scroll retention during a reading update.
 - The idle redraw budget: unchanged readings do not repaint the dashboard.
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 

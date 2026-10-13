@@ -16,14 +16,14 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Metrics per source | 32 |
 | HTTP response body | 1 MiB |
 | JSON allocation budget | 512 KiB |
-| Visible metrics per card | First 3, following the Web order |
+| Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
 | Report stale boundary | 120 seconds since the server received it |
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
-Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes to fit the four-panel display. The stored measurements retain their original precision.
+Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
 ## Persistent settings
 
@@ -50,6 +50,6 @@ An optional unsigned 32-bit `requestId` is echoed in the response. The USB helpe
 
 A setup response with `queued: true` is not proof that connection or storage succeeded. Use the screen or a subsequent `info` response.
 
-Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings.
+Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings, `6` details.
 
 Use [tools/device.py](../tools/device.py) to prompt for secrets safely rather than including credentials in shell commands.

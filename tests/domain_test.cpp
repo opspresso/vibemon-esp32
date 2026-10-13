@@ -63,6 +63,7 @@ int main() {
     CHECK(!stale(*resource, 114999) && stale(*resource, 115000));
     const auto* account = catalog.find({ItemKind::Account, "codex:work"});
     CHECK(account && account->project == "api" && account->projects.size() == 2 && account->metrics[0].value == 43);
+    CHECK(account->projects[0].project == "api" && account->projects[1].project == "web");
     CHECK(account->metrics[1].value == 0);
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
     CHECK(stateLabel(monitorState(*account, 300000)) == "Inactive");
@@ -92,6 +93,7 @@ int main() {
     metric.value = 0; CHECK(metricValue(metric) == "0");
     metric.value = 12.4; CHECK(metricValue(metric) == "12.4");
     metric.value = 14200; CHECK(metricValue(metric) == "14.2k");
+    CHECK(metricValue(metric, false) == "14,200");
     CHECK(ageLabel(14999) == "Just now" && ageLabel(15000) == "15s ago" && ageLabel(60000) == "1m ago");
     std::cout << "PASS domain: credential boundaries, Unicode, timestamps, account isolation, metric order, missing values, stale data and atomic snapshots\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

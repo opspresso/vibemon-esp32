@@ -50,6 +50,7 @@ struct Metric {
 struct ReportState {
   std::string sourceId;
   std::string activity;
+  std::string project;
   Health health = Health::Unknown;
   bool reportedStale = false;
   std::uint32_t ageMs = StaleAfterMs;
@@ -61,7 +62,7 @@ struct Monitor : ReportState {
   Selection selection;
   std::string name;
   std::string category;
-  std::string project;
+  std::string statusMessage;
   // Every project retains its own clock so offline aging cannot hide live requests.
   std::vector<ReportState> projects;
   std::vector<Metric> metrics;
@@ -93,10 +94,12 @@ bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = 
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
 bool stale(const ReportState& item, std::uint64_t elapsedMs);
 std::string monitorState(const Monitor& item, std::uint64_t elapsedMs);
+std::string projectState(const ReportState& item, std::uint64_t elapsedMs);
 std::string stateLabel(const std::string& state);
 std::string stateTone(const std::string& state);
 bool needsAttention(const std::string& state);
-std::string metricValue(const Metric& metric);
+std::string metricValue(const Metric& metric, bool compact = true);
+std::string metricText(const Metric& metric, bool compact = true);
 std::string ageLabel(std::uint64_t milliseconds);
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog);
 

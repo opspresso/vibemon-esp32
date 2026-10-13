@@ -103,7 +103,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
   JsonDocument filter;
   filter["serverTime"] = true;
   auto fields = filter["sources"][0].to<JsonObject>();
-  for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account"}) fields[name] = true;
+  for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account", "statusMessage"}) fields[name] = true;
   fields["agent"]["state"] = true;
   fields["agent"]["project"] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
@@ -156,6 +156,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
       accounts.emplace(item.selection.id, candidate.items.size());
     } else if (kind == "resource" || kind == "host" || kind == "cluster") {
       item.selection = {ItemKind::Resource, id};
+      if (!source["statusMessage"].isNull() && !text(source["statusMessage"], item.statusMessage, 640, true)) return {false, "A resource status message is invalid."};
       if (!source["resourceType"].isNull()) {
         if (!text(source["resourceType"], item.category, 256)) return {false, "A resource type is invalid."};
       } else item.category = kind == "cluster" ? "Kubernetes" : source["memoryType"] == "unified" ? "DGX Spark" : "Host";
