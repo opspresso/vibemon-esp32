@@ -54,7 +54,8 @@ Catalog demo() {
   }
   Monitor agent;
   agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "Codex";
-  agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working"; agent.projectCount = 2;
+  agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working";
+  agent.projects = {agent, agent};
   agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100}, {"week", "Weekly", "%", 24, MetricDisplay::Bar, 0, 100}};
   value.items.push_back(agent);
   return value;
@@ -117,6 +118,11 @@ int main() {
       CHECK(ui.page() == Page::WifiForm);
       tap(ui, "back"); CHECK(!app.changingWifi() && wifi.requested == "Workshop");
       ui.dashboard(); advance(ui, 130000); screenshot("stale-dashboard");
+      const auto* accountStatus = lv_label_get_text(ui.widget("panel-status-3"));
+      CHECK(std::string(accountStatus) == "Inactive · 2 projects");
+      const auto inactiveColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
+      const auto staleColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
+      CHECK(!lv_color_eq(inactiveColor, staleColor));
     }
     lv_deinit();
     std::cout << "PASS real LVGL UI: four cards, touch selection, category filtering, persistence, setup forms, Unicode, missing values, offline display and idle redraw budget\n";

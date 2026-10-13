@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():
+    subprocess.run([sys.executable, str(ROOT / "tools/generate_contract.py")], check=True)
     subprocess.run([sys.executable, str(ROOT / "tools/generate_assets.py")], check=True)
     subprocess.run(["cmake", "-S", str(ROOT), "-B", str(ROOT / "build/native"), "-G", "Ninja"], check=True)
     subprocess.run(["cmake", "--build", str(ROOT / "build/native"), "-j", "4"], check=True)

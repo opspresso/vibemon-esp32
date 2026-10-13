@@ -53,18 +53,12 @@ std::string shortConnection(Connection connection) {
   }
   return "Not connected";
 }
-std::uint32_t healthColor(const Monitor& item, bool isStale) {
-  if (isStale || item.health == Health::Warning || item.activity == "notification") return Amber;
-  if (item.health == Health::Error || item.activity == "alert") return Red;
-  return item.health == Health::Ok ? Green : Muted;
-}
-std::string healthText(const Monitor& item) {
-  switch (item.health) {
-    case Health::Ok: return "Healthy";
-    case Health::Warning: return "Attention";
-    case Health::Error: return "Error";
-    default: return "Unknown";
-  }
+std::uint32_t statusColor(const std::string& state) {
+  const auto tone = stateTone(state);
+  if (tone == "warning") return Amber;
+  if (tone == "danger") return Red;
+  if (tone == "good") return Green;
+  return tone == "active" ? Accent : Muted;
 }
 }  // namespace
 
@@ -182,6 +176,7 @@ void DashboardUi::dashboard() {
       lv_obj_set_style_radius(card.bars[metric], 1, LV_PART_INDICATOR);
     }
     card.footer = label(card.box, "", 14, 152, 190, fonts_.small(), Muted);
+    widgets_["panel-status-" + std::to_string(i)] = card.footer;
   }
   label(root_, "A little more aware.", 16, 463, 448, &lv_font_montserrat_12, Muted);
   updateCards(lv_tick_get());
@@ -200,14 +195,15 @@ void DashboardUi::updateCards(std::uint32_t now) {
       setText(card.category, "PANEL " + std::to_string(index + 1));
       setText(card.empty, selection.id.empty() ? "+\nChoose an item" : "Item unavailable\nTap to choose another");
       setText(card.footer, selection.id.empty() ? "Resource or account" : "Selection kept for reconnect");
+      if (card.accent != Muted) { lv_obj_set_style_text_color(card.footer, lv_color_hex(Muted), 0); card.accent = Muted; }
     } else {
-      const bool isStale = stale(*item, elapsed);
+      const auto state = monitorState(*item, elapsed);
       setText(card.category, item->category);
       setText(card.name, item->name);
-      const auto color = healthColor(*item, isStale);
-      const auto caption = isStale ? "No report · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed) :
-          item->selection.kind == ItemKind::Account ? activityLabel(*item, elapsed) + " · " + std::to_string(item->projectCount) + (item->projectCount == 1 ? " project" : " projects") :
-          healthText(*item) + " · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed);
+      const auto color = statusColor(state);
+      const auto caption = stateLabel(state) + " · " + (item->selection.kind == ItemKind::Account ?
+          std::to_string(item->projects.size()) + (item->projects.size() == 1 ? " project" : " projects") :
+          ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed));
       setText(card.footer, caption);
       if (card.accent != color) { lv_obj_set_style_text_color(card.footer, lv_color_hex(color), 0); card.accent = color; }
     }

@@ -1,0 +1,9 @@
+{
+  "repository": "opspresso/vibemon-app",
+  "revision": "238f894044ace61f8030d46e776f361e046ce3bb",
+  "files": {
+    "constants.json": "07e2ea7f0299d305ab58eecf72583af296deff6f8578b0732c2dc54aa940e0d7",
+    "monitoring.json": "c5b0e820268d911d4bcab788f020f6ab92fc4495a7426ae54e88489f5b4f4d38",
+    "cases.json": "8c49f9bfdbce456256a2b3c53699be2e6062460d4e7e23692d82f579b0b0324c"
+  }
+}

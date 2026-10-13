@@ -62,11 +62,11 @@ int main() {
     CHECK(!resource->metrics[2].value);
     CHECK(!stale(*resource, 114999) && stale(*resource, 115000));
     const auto* account = catalog.find({ItemKind::Account, "codex:work"});
-    CHECK(account && account->project == "api" && account->projectCount == 2 && account->metrics[0].value == 43);
+    CHECK(account && account->project == "api" && account->projects.size() == 2 && account->metrics[0].value == 43);
     CHECK(account->metrics[1].value == 0);
-    CHECK(activityLabel(*account, 0) == "Working");
-    CHECK(activityLabel(*account, 300000) == "Idle");
-    CHECK(activityLabel(*account, 600000) == "Resting");
+    CHECK(stateLabel(monitorState(*account, 0)) == "Working");
+    CHECK(stateLabel(monitorState(*account, 300000)) == "Inactive");
+    CHECK(!needsAttention(monitorState(*account, 300000)));
     auto panels = defaultPanels(catalog);
     CHECK(panels[0].kind == ItemKind::Resource && panels[1].kind == ItemKind::Account && panels[2].id == "codex:work" && panels[3].id.empty());
     const auto before = catalog.items.size();

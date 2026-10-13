@@ -4,7 +4,9 @@
 
 The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. Tokens are never placed in URLs.
 
-The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`; the newest observation supplies account measurements and activity. A provider can have multiple accounts. Older project reports cannot replace a newer account observation.
+The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
+
+Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events rather than continuous heartbeats: after that boundary their status is neutral `Inactive`. Fresh errors and input requests remain actionable regardless of the original event's age. The device reevaluates each project's receipt and event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
 
 | Limit | Value |
 | --- | --- |

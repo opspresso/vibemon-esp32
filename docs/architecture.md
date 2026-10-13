@@ -18,6 +18,10 @@ flowchart LR
 
 Domain types have no Arduino or LVGL dependency. The controller owns connection verification, four stable selections, persistence and request generations. An older in-flight reply cannot restore a previous account after a configuration change. JSON and hardware libraries remain outside the application boundary.
 
+`app-contract.json` pins public App policy, timing constants and behavioral fixtures by commit and SHA-256. `tools/generate_contract.py` verifies those bytes and emits a C++ state table in `build/generated`. The JSON adapter retains bounded per-project state and sorts it before the domain aggregates account status. Both App and ESP32 run the same contract cases, including exact freshness boundaries, offline aging, attention priority and account isolation. Web consumes the same App snapshot.
+
+To update the contract, run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Add `--app-dir ../vibemon-app` to read that exact commit locally. Never edit files in `contracts/`; change their App source and sync. Native and firmware builds verify the pinned snapshot without requiring App or Web access.
+
 The worker passes owned results through a one-entry queue. It never calls LVGL. The UI task applies complete snapshots and updates changed labels/bars. A picker retains its position while background readings change; explicit refresh rebuilds its list. Settings input is not rebuilt by polling.
 
 ## Memory and timing

@@ -141,23 +141,66 @@ std::optional<std::int64_t> utcMilliseconds(const std::string& value) {
   return (((days * 24 + hour) * 60 + minute) * 60 + second) * 1000 + ms;
 }
 
-bool stale(const Monitor& item, std::uint32_t elapsedMs) {
+bool stale(const ReportState& item, std::uint32_t elapsedMs) {
   return item.reportedStale || static_cast<std::uint64_t>(item.ageMs) + elapsedMs >= StaleAfterMs;
 }
 
-std::string activityLabel(const Monitor& item, std::uint32_t elapsedMs) {
+namespace {
+const contract::StateRule* stateRule(const std::string& state) {
+  for (const auto& rule : contract::States) if (state == rule.id) return &rule;
+  return nullptr;
+}
+unsigned attentionRank(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule && rule->attentionRank ? rule->attentionRank : std::numeric_limits<unsigned>::max();
+}
+std::string healthState(Health health) {
+  switch (health) {
+    case Health::Ok: return "ok";
+    case Health::Warning: return "warning";
+    case Health::Error: return "error";
+    default: return "unknown";
+  }
+}
+std::string reportState(const ReportState& item, bool agent, std::uint32_t elapsedMs) {
+  if (stale(item, elapsedMs)) return agent ? "inactive" : "stale";
+  const auto health = healthState(item.health);
+  if (!agent) return health;
   std::string state = item.activity;
-  const std::uint64_t age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
-  const bool active = state == "thinking" || state == "planning" || state == "working" || state == "notification" || state == "packing" || state == "alert";
-  const auto idleAfter = state == "start" || state == "done" ? 60000 : active ? 300000 : state == "idle" ? 0 : -1;
-  if (idleAfter >= 0 && age >= static_cast<std::uint64_t>(idleAfter + 300000)) state = "sleep";
-  else if (idleAfter >= 0 && age >= static_cast<std::uint64_t>(idleAfter)) state = "idle";
-  if (state == "notification") return "Needs input";
-  if (state == "sleep") return "Resting";
-  if (state.empty()) return "Unknown";
-  if (state[0] >= 'a' && state[0] <= 'z') state[0] = static_cast<char>(state[0] - 'a' + 'A');
+  auto age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
+  auto* rule = stateRule(state);
+  if (!rule || !rule->holdWhileReporting) {
+    while (rule && rule->afterMs && age >= rule->afterMs) {
+      age -= rule->afterMs;
+      state = rule->next;
+      rule = stateRule(state);
+    }
+  }
+  return attentionRank(health) < attentionRank(state) ? health : state;
+}
+}  // namespace
+
+std::string monitorState(const Monitor& item, std::uint32_t elapsedMs) {
+  if (item.selection.kind != ItemKind::Account) return reportState(item, false, elapsedMs);
+  std::string state = "inactive";
+  // The adapter sorts newest first, with stable source-ID ties, as App and Web do.
+  for (const auto& project : item.projects) {
+    const auto current = reportState(project, true, elapsedMs);
+    if (current == "inactive") continue;
+    if (state == "inactive" || attentionRank(current) < attentionRank(state)) state = current;
+  }
   return state;
 }
+
+std::string stateLabel(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule ? rule->label : state;
+}
+std::string stateTone(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule ? rule->tone : "neutral";
+}
+bool needsAttention(const std::string& state) { return attentionRank(state) != std::numeric_limits<unsigned>::max(); }
 
 std::string metricValue(const Metric& metric) {
   if (!metric.value || !std::isfinite(*metric.value)) return "--";
