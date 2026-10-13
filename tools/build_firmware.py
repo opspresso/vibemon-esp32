@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from sdk_toolchain import ROOT, IDF, load
+from collect_licenses import collect
 
 
 def configuration(base, overrides, arduino_kconfig):
@@ -80,9 +81,10 @@ def main():
         shutil.copyfile(source, output / destination)
     binary = images['vibemon-esp32.ino.bin']
     description = json.loads((build / 'project_description.json').read_text())
+    notices = collect(ROOT, description, lock)
     manifest = {'board': 'ESP32-4848S040', 'version': description['project_version'], 'framework': 'esp-idf', 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                 'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
-                'sha256': binary['sha256'], 'firmwareBytes': binary['size'], 'images': images, 'toolchain': lock,
+                'sha256': binary['sha256'], 'firmwareBytes': binary['size'], 'images': images, 'toolchain': lock, 'notices': notices,
                 'display': {'pixelClockHz': 16000000, 'dataCacheBytes': 65536, 'cacheLineBytes': 64,
                             'forcedVsyncRestart': False, 'psramInstructionsAndRodata': True, 'cacheSafeInterrupts': True}}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

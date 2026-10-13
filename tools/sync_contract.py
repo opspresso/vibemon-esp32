@@ -14,6 +14,7 @@ SOURCES = {
     "monitoring.json": "src/shared/data/monitoring.json",
     "cases.json": "src/shared/monitoring/cases.json",
     "tokens.css": "src/shared/design/tokens.css",
+    "LICENSE-App.txt": "LICENSE",
 }
 
 

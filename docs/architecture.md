@@ -49,3 +49,9 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 
 `tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 8 MB application limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
+
+## Distribution notices
+
+Firmware artifacts include `licenses/index.json` and the files it hashes. `tools/collect_licenses.py` collects notices from the pinned libraries, configured ESP-IDF components and compiler runtimes, plus leading copyright/license comments from compiled source files. Component distributions may contain optional code eliminated during linking; the index identifies the source package rather than claiming that every component remains in the binary.
+
+The bundle explicitly includes Nanum Gothic, the Montserrat and Font Awesome 5 fonts used by LVGL, App artwork/policy licensing, and the SDK's public CA source bundle with its [MPL 2.0 license](https://www.mozilla.org/en-US/MPL/2.0/). The CA source and its conversion licensing are described by [curl's CA extraction project](https://curl.se/docs/caextract.html). Notice collection does not change certificate trust. The firmware manifest records the notice index hash, and CI uploads the whole notice directory. Unrelated files and symlink escapes in that generated directory stop regeneration instead of being overwritten.

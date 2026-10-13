@@ -16,5 +16,11 @@
     "source": "https://raw.githubusercontent.com/opspresso/vibemon-app/83c1864766572366b83c488ca8d3ea9a364da583/assets/web/icon-32.png",
     "sha256": "06ed8d2a108ba548da9ec5b2e75568e94e6dfc3e1d615375c839b24d76d0a7c0",
     "license": "MIT"
+  },
+  {
+    "file": "MPL-2.0.txt",
+    "source": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+    "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+    "license": "MPL-2.0"
   }
 ]
