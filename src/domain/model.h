@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "monitoring_policy.h"
 
 namespace vibemon {
 
@@ -13,7 +14,7 @@ constexpr std::size_t MaxSources = 128;
 constexpr std::size_t MaxMetrics = 32;
 constexpr std::size_t MaxResponseBytes = 1024 * 1024;
 constexpr std::size_t MaxOriginBytes = 272;
-constexpr std::uint32_t StaleAfterMs = 120000;
+constexpr std::uint32_t StaleAfterMs = contract::StaleAfterMs;
 constexpr std::uint32_t PollIntervalMs = 10000;
 
 enum class ItemKind { Resource, Account };
@@ -46,17 +47,24 @@ struct Metric {
   std::optional<double> maximum;
 };
 
-struct Monitor {
-  Selection selection;
-  std::string name;
-  std::string category;
+struct ReportState {
+  std::string sourceId;
   std::string activity;
   std::string project;
   Health health = Health::Unknown;
   bool reportedStale = false;
   std::uint32_t ageMs = StaleAfterMs;
   std::uint32_t activityAgeMs = 0;
-  std::uint16_t projectCount = 0;
+  std::int64_t observedAtMs = 0;
+};
+
+struct Monitor : ReportState {
+  Selection selection;
+  std::string name;
+  std::string category;
+  std::string statusMessage;
+  // Every project retains its own clock so offline aging cannot hide live requests.
+  std::vector<ReportState> projects;
   std::vector<Metric> metrics;
 };
 
@@ -84,9 +92,14 @@ bool validSourceId(const std::string& id);
 bool validAccountId(const std::string& id);
 bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = false);
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
-bool stale(const Monitor& item, std::uint32_t elapsedMs);
-std::string activityLabel(const Monitor& item, std::uint32_t elapsedMs);
-std::string metricValue(const Metric& metric);
+bool stale(const ReportState& item, std::uint64_t elapsedMs);
+std::string monitorState(const Monitor& item, std::uint64_t elapsedMs);
+std::string projectState(const ReportState& item, std::uint64_t elapsedMs);
+std::string stateLabel(const std::string& state);
+std::string stateTone(const std::string& state);
+bool needsAttention(const std::string& state);
+std::string metricValue(const Metric& metric, bool compact = true);
+std::string metricText(const Metric& metric, bool compact = true);
 std::string ageLabel(std::uint64_t milliseconds);
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog);
 

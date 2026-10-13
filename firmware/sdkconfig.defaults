@@ -24,3 +24,6 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="../partitions.csv"
 # CONFIG_BT_ENABLED is not set
+# The product uses its own screens; do not compile LVGL sample applications.
+# CONFIG_LV_BUILD_EXAMPLES is not set
+# CONFIG_LV_BUILD_DEMOS is not set

@@ -103,7 +103,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
   JsonDocument filter;
   filter["serverTime"] = true;
   auto fields = filter["sources"][0].to<JsonObject>();
-  for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account"}) fields[name] = true;
+  for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account", "statusMessage"}) fields[name] = true;
   fields["agent"]["state"] = true;
   fields["agent"]["project"] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
@@ -118,7 +118,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
   Catalog candidate;
   candidate.items.reserve(sources.size());
   std::set<std::string> seenSources;
-  std::map<std::string, std::pair<std::size_t, std::int64_t>> accounts;
+  std::map<std::string, std::size_t> accounts;
   for (JsonObjectConst source : sources) {
     Monitor item;
     std::string kind, id, observedAt, receivedAt, health;
@@ -129,6 +129,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
     const auto observed = utcMilliseconds(observedAt), received = utcMilliseconds(receivedAt);
     if (!observed || !received) return {false, "A source contains invalid timestamps."};
     item.ageMs = age(*now, *received); item.activityAgeMs = age(*now, *observed);
+    item.sourceId = id; item.observedAtMs = *observed;
     item.reportedStale = source["stale"].as<bool>();
     if (health == "ok") item.health = Health::Ok;
     else if (health == "warning") item.health = Health::Warning;
@@ -141,20 +142,21 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
           !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return {false, "A coding account contains invalid fields."};
       item.selection = {ItemKind::Account, provider + ":" + accountId};
       item.category = provider;
-      item.projectCount = 1;
+      item.projects.push_back(item);
       if (!presetMetrics(source, kind, item)) return {false, "A coding account contains invalid measurements."};
       auto previous = accounts.find(item.selection.id);
       if (previous != accounts.end()) {
-        auto& current = candidate.items[previous->second.first];
-        item.projectCount = static_cast<std::uint16_t>(current.projectCount + 1);
-        if (*observed > previous->second.second) {
-          current = std::move(item); previous->second.second = *observed;
-        } else ++current.projectCount;
+        auto& current = candidate.items[previous->second];
+        auto projects = std::move(current.projects);
+        projects.push_back(item);
+        if (item.observedAtMs > current.observedAtMs || (item.observedAtMs == current.observedAtMs && item.sourceId < current.sourceId)) current = std::move(item);
+        current.projects = std::move(projects);
         continue;
       }
-      accounts.emplace(item.selection.id, std::make_pair(candidate.items.size(), *observed));
+      accounts.emplace(item.selection.id, candidate.items.size());
     } else if (kind == "resource" || kind == "host" || kind == "cluster") {
       item.selection = {ItemKind::Resource, id};
+      if (!source["statusMessage"].isNull() && !text(source["statusMessage"], item.statusMessage, 640, true)) return {false, "A resource status message is invalid."};
       if (!source["resourceType"].isNull()) {
         if (!text(source["resourceType"], item.category, 256)) return {false, "A resource type is invalid."};
       } else item.category = kind == "cluster" ? "Kubernetes" : source["memoryType"] == "unified" ? "DGX Spark" : "Host";
@@ -164,6 +166,9 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
     } else return {false, "The server returned an unsupported source kind."};
     candidate.items.push_back(std::move(item));
   }
+  for (auto& item : candidate.items) std::sort(item.projects.begin(), item.projects.end(), [](const ReportState& a, const ReportState& b) {
+    return a.observedAtMs == b.observedAtMs ? a.sourceId < b.sourceId : a.observedAtMs > b.observedAtMs;
+  });
   std::sort(candidate.items.begin(), candidate.items.end(), [](const Monitor& a, const Monitor& b) {
     if (a.selection.kind != b.selection.kind) return a.selection.kind < b.selection.kind;
     return a.name == b.name ? a.selection.id < b.selection.id : a.name < b.name;

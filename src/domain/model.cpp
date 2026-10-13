@@ -1,6 +1,7 @@
 #include "model.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -141,28 +142,132 @@ std::optional<std::int64_t> utcMilliseconds(const std::string& value) {
   return (((days * 24 + hour) * 60 + minute) * 60 + second) * 1000 + ms;
 }
 
-bool stale(const Monitor& item, std::uint32_t elapsedMs) {
+bool stale(const ReportState& item, std::uint64_t elapsedMs) {
   return item.reportedStale || static_cast<std::uint64_t>(item.ageMs) + elapsedMs >= StaleAfterMs;
 }
 
-std::string activityLabel(const Monitor& item, std::uint32_t elapsedMs) {
+namespace {
+const contract::StateRule* stateRule(const std::string& state) {
+  for (const auto& rule : contract::States) if (state == rule.id) return &rule;
+  return nullptr;
+}
+unsigned attentionRank(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule && rule->attentionRank ? rule->attentionRank : std::numeric_limits<unsigned>::max();
+}
+std::string healthState(Health health) {
+  switch (health) {
+    case Health::Ok: return "ok";
+    case Health::Warning: return "warning";
+    case Health::Error: return "error";
+    default: return "unknown";
+  }
+}
+std::string reportState(const ReportState& item, bool agent, std::uint64_t elapsedMs) {
+  if (stale(item, elapsedMs)) return agent ? "inactive" : "stale";
+  const auto health = healthState(item.health);
+  if (!agent) return health;
   std::string state = item.activity;
-  const std::uint64_t age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
-  const bool active = state == "thinking" || state == "planning" || state == "working" || state == "notification" || state == "packing" || state == "alert";
-  const auto idleAfter = state == "start" || state == "done" ? 60000 : active ? 300000 : state == "idle" ? 0 : -1;
-  if (idleAfter >= 0 && age >= static_cast<std::uint64_t>(idleAfter + 300000)) state = "sleep";
-  else if (idleAfter >= 0 && age >= static_cast<std::uint64_t>(idleAfter)) state = "idle";
-  if (state == "notification") return "Needs input";
-  if (state == "sleep") return "Resting";
-  if (state.empty()) return "Unknown";
-  if (state[0] >= 'a' && state[0] <= 'z') state[0] = static_cast<char>(state[0] - 'a' + 'A');
+  auto age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
+  auto* rule = stateRule(state);
+  if (!rule || !rule->holdWhileReporting) {
+    while (rule && rule->afterMs && age >= rule->afterMs) {
+      age -= rule->afterMs;
+      state = rule->next;
+      rule = stateRule(state);
+    }
+  }
+  return attentionRank(health) < attentionRank(state) ? health : state;
+}
+}  // namespace
+
+std::string projectState(const ReportState& item, std::uint64_t elapsedMs) {
+  return reportState(item, true, elapsedMs);
+}
+
+std::string monitorState(const Monitor& item, std::uint64_t elapsedMs) {
+  if (item.selection.kind != ItemKind::Account) return reportState(item, false, elapsedMs);
+  std::string state = "inactive";
+  // The adapter sorts newest first, with stable source-ID ties, as App and Web do.
+  for (const auto& project : item.projects) {
+    const auto current = reportState(project, true, elapsedMs);
+    if (current == "inactive") continue;
+    if (state == "inactive" || attentionRank(current) < attentionRank(state)) state = current;
+  }
   return state;
 }
 
-std::string metricValue(const Metric& metric) {
-  if (!metric.value || !std::isfinite(*metric.value)) return "--";
+std::string stateLabel(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule ? rule->label : state;
+}
+std::string stateTone(const std::string& state) {
+  const auto* rule = stateRule(state);
+  return rule ? rule->tone : "neutral";
+}
+bool needsAttention(const std::string& state) { return attentionRank(state) != std::numeric_limits<unsigned>::max(); }
+
+namespace {
+std::string groupInteger(std::string value) {
+  if (value.find('e') != std::string::npos) return value;
+  const auto dot = value.find('.');
+  const auto length = dot == std::string::npos ? value.size() : dot;
+  const int sign = !value.empty() && value.front() == '-' ? 1 : 0;
+  for (int at = static_cast<int>(length) - 3; at > sign; at -= 3) value.insert(at, ",");
+  return value;
+}
+
+std::string decimalValue(double value, int precision) {
+  // Round the shortest decimal representation, as Intl does. Multiplication by
+  // 100 first would turn 1.005 into 100.49999999999999 and round it incorrectly.
+  char buffer[64];
+  const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), std::abs(value));
+  std::string digits(buffer, converted.ptr);
+  int exponent = 0;
+  const auto exponentAt = digits.find('e');
+  if (exponentAt != std::string::npos) {
+    exponent = std::stoi(digits.substr(exponentAt + 1));
+    digits.resize(exponentAt);
+  }
+  const auto dot = digits.find('.');
+  const int decimalAt = static_cast<int>(dot == std::string::npos ? digits.size() : dot) + exponent;
+  if (dot != std::string::npos) digits.erase(dot, 1);
+  const int keep = decimalAt + precision;
+  if (keep < 0) digits = "0";
+  else if (static_cast<std::size_t>(keep) < digits.size()) {
+    const bool roundUp = digits[keep] >= '5';
+    digits.resize(keep);
+    if (roundUp) {
+      auto index = digits.size();
+      while (index && digits[index - 1] == '9') digits[--index] = '0';
+      if (index) ++digits[index - 1];
+      else digits.insert(0, "1");
+    }
+  } else digits.append(static_cast<std::size_t>(keep) - digits.size(), '0');
+  if (digits.size() <= static_cast<std::size_t>(precision)) digits.insert(0, precision + 1 - digits.size(), '0');
+  const auto integerSize = digits.size() - precision;
+  if (precision) {
+    digits.insert(integerSize, ".");
+    while (digits.back() == '0') digits.pop_back();
+    if (digits.back() == '.') digits.pop_back();
+  }
+  return groupInteger(std::signbit(value) ? "-" + digits : digits);
+}
+}  // namespace
+
+std::string metricValue(const Metric& metric, bool compact) {
+  if (!metric.value || !std::isfinite(*metric.value)) return "—";
   const double value = *metric.value;
   char buffer[64];
+  for (const auto& precision : contract::UnitPrecisions) {
+    if (metric.unit != precision.unit) continue;
+    return decimalValue(value, precision.fractionDigits);
+  }
+  if (!compact) {
+    const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
+        value != 0 && std::abs(value) < 0.001 ? std::chars_format::general : std::chars_format::fixed);
+    return groupInteger(std::string(buffer, converted.ptr));
+  }
   if (std::abs(value) >= 1e9) std::snprintf(buffer, sizeof(buffer), "%.1fG", value / 1e9);
   else if (std::abs(value) >= 1e6) std::snprintf(buffer, sizeof(buffer), "%.1fM", value / 1e6);
   else if (std::abs(value) >= 10000) std::snprintf(buffer, sizeof(buffer), "%.1fk", value / 1e3);
@@ -172,8 +277,15 @@ std::string metricValue(const Metric& metric) {
   return buffer;
 }
 
+std::string metricText(const Metric& metric, bool compact) {
+  const bool hasValue = metric.value && std::isfinite(*metric.value);
+  const bool adjacent = metric.unit.rfind("%", 0) == 0 || metric.unit.rfind("°", 0) == 0;
+  return metricValue(metric, compact) + (hasValue && !metric.unit.empty() ? (adjacent ? "" : " ") + metric.unit : "");
+}
+
 std::string ageLabel(std::uint64_t milliseconds) {
-  if (milliseconds < 60000) return "Just now";
+  if (milliseconds < 15000) return "Just now";
+  if (milliseconds < 60000) return std::to_string(milliseconds / 1000) + "s ago";
   if (milliseconds < 3600000) return std::to_string(milliseconds / 60000) + "m ago";
   if (milliseconds < 86400000) return std::to_string(milliseconds / 3600000) + "h ago";
   return std::to_string(milliseconds / 86400000) + "d ago";

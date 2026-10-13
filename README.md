@@ -2,7 +2,7 @@
 
 A four-panel resource and coding-account monitor for the **GUITION ESP32-4848S040** touchscreen.
 
-The 480×480 display follows your VibeMon workspace over HTTPS. Each card can show a resource or a coding account. Tap a card to change it. Wi-Fi, server address, read token and panel selections persist across restarts.
+The 480×480 display follows your VibeMon workspace over HTTPS. Each card can show a resource or a coding account. Tap it to read details, then use **Change item** to choose another source. Wi-Fi, server address, read token and panel selections persist across restarts.
 
 ## Set up the device
 
@@ -10,15 +10,15 @@ The 480×480 display follows your VibeMon workspace over HTTPS. Each card can sh
 2. On the screen, select a **2.4 GHz Wi-Fi** network and enter its password. Use **Hidden network** to enter a name manually.
 3. Enter `https://vibemon.io` or your own HTTPS VibeMon origin.
 4. Enter a token with **read** permission from [Account](https://vibemon.io/account). The device checks it before saving.
-5. Tap any of the four cards and choose a resource or coding account. Use the category buttons to narrow the list.
+5. Tap an empty card, or open a populated card and select **Change item**. Choose a resource or coding account; category buttons narrow the list.
 
-The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing reports display `--`; lost connections retain the last readings with an explicit offline or stale status.
+The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing measurements display `—`; lost connections retain the last readings with an explicit connection status. Resources without recent reports become `Stale`. Coding accounts without recent events become neutral `Inactive`.
 
 ## What it supports
 
 - Custom resources, Kubernetes clusters, DGX Spark and other host metrics.
 - Multiple Codex, Claude, Kiro or other provider accounts, grouped by provider and account ID.
-- Resource metric labels, units, ranges and order from Web. Each card shows the first three metrics.
+- Resource metric labels, units, ranges and order from Web. Cards show the first three metrics; scrollable details show all readings, full names, units, status messages and reporting projects.
 - On-screen Wi-Fi scanning, password input and a large read-token keypad.
 - Korean and Latin names, without downloading fonts at runtime.
 - Optional USB setup for pasting a long key; secrets are prompted and never echoed.
@@ -49,6 +49,7 @@ Version 3 targets the four-inch ESP32-S3 board. It replaces the C6 single-charac
 - [Board and pin assignments](docs/hardware.md)
 - [Data, security and USB contracts](docs/api.md)
 - [Architecture and verification](docs/architecture.md)
+- [2026-10-14 audit](docs/audit-2026-10-14.md)
 - [VibeMon Desktop](https://github.com/opspresso/vibemon-app) · [VibeMon Web](https://vibemon.io)
 
 MIT. The bundled Nanum Gothic font has its own [SIL Open Font License](assets/OFL-NanumGothic.txt).

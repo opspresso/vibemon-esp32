@@ -4,7 +4,11 @@
 
 The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. Tokens are never placed in URLs.
 
-The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`; the newest observation supplies account measurements and activity. A provider can have multiple accounts. Older project reports cannot replace a newer account observation.
+The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
+
+Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events rather than continuous heartbeats: after that boundary their status is neutral `Inactive`. Fresh errors and input requests remain actionable regardless of the original event's age. The device reevaluates each project's receipt and event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
+
+Report age starts from `serverTime` and advances with accumulated device uptime. The 32-bit platform clock wrapping after about 49.7 days does not reset an offline report's age. A newly accepted snapshot resets only the elapsed time since that snapshot.
 
 | Limit | Value |
 | --- | --- |
@@ -12,12 +16,14 @@ The response must contain `sources` and `serverTime`. Resources retain their met
 | Metrics per source | 32 |
 | HTTP response body | 1 MiB |
 | JSON allocation budget | 512 KiB |
-| Visible metrics per card | First 3, following the Web order |
+| Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
 | Report stale boundary | 120 seconds since the server received it |
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
+
+Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
 ## Persistent settings
 
@@ -44,6 +50,6 @@ An optional unsigned 32-bit `requestId` is echoed in the response. The USB helpe
 
 A setup response with `queued: true` is not proof that connection or storage succeeded. Use the screen or a subsequent `info` response.
 
-Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings.
+Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings, `6` details.
 
 Use [tools/device.py](../tools/device.py) to prompt for secrets safely rather than including credentials in shell commands.

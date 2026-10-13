@@ -18,13 +18,21 @@ flowchart LR
 
 Domain types have no Arduino or LVGL dependency. The controller owns connection verification, four stable selections, persistence and request generations. An older in-flight reply cannot restore a previous account after a configuration change. JSON and hardware libraries remain outside the application boundary.
 
+`app-contract.json` pins public App policy, timing constants and behavioral fixtures by commit and SHA-256. `tools/generate_contract.py` verifies those bytes and emits a C++ state table in `build/generated`. The JSON adapter retains bounded per-project state and sorts it before the domain aggregates account status. Both App and ESP32 run the same contract cases, including exact freshness boundaries, offline aging, attention priority and account isolation. Web consumes the same App snapshot.
+
+To update the contract, run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Add `--app-dir ../vibemon-app` to read that exact commit locally. Never edit files in `contracts/`; change their App source and sync. Native and firmware builds verify the pinned snapshot without requiring App or Web access.
+
 The worker passes owned results through a one-entry queue. It never calls LVGL. The UI task applies complete snapshots and updates changed labels/bars. A picker retains its position while background readings change; explicit refresh rebuilds its list. Settings input is not rebuilt by polling.
+
+Touch uses the dark variant of App's pinned product palette. `tools/generate_contract.py` produces the C++ colors directly from `contracts/tokens.css`; native tests check text contrast after RGB565 quantization. Populated cards open scrollable details with all metrics and reporting projects. Long names and units wrap, while updates reuse the existing rows and preserve scroll position. **Change item** opens the panel selector; empty cards open it directly.
 
 ## Memory and timing
 
 The board has 8 MB PSRAM. Two complete RGB565 framebuffers use PSRAM (900 KiB total). LVGL draws changed areas into the back buffer and swaps it only after rendering. The RGB completion interrupt gates reuse of the previous front buffer; LVGL then synchronizes changed areas between them. Two internal 10-line bounce buffers feed scanout. The 2 MB Unicode font is embedded in flash. ESP-IDF copies instructions and read-only data, including that font, into PSRAM at boot so flash writes do not stall external memory access. Small bounded glyph caches render Korean/Latin names on demand. Drivers are initialized before application allocation is directed to PSRAM, preserving internal memory for capability-specific DMA, stacks and Wi-Fi allocations.
 
 HTTP bodies and JSON allocations have separate limits. A single request is active at a time. Wi-Fi association and scanning progress asynchronously. HTTPS runs outside the UI task; the UI loop yields every 5 ms. Flash writes occur for verified connection changes and changed selections, not periodic readings.
+
+Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_json.py` applies a hash-verified change to the isolated ArduinoJson numeric parser: decimal tokens use C++ `from_chars` rather than narrowing short mantissas to 32-bit floats. This preserves the Web value before formatting; for example, `1.005` remains the same double and displays as `1.01%`. The original and modified parser hashes are locked. User-installed libraries and the ESP-IDF checkout remain untouched.
 
 The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. The single application slot does not provide an OTA update service.
 
@@ -36,7 +44,14 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Custom metric order, missing values, multiple accounts and stale reports.
 - Verified saves, rejected keys, delayed replies, account changes, offline retention and timer rollover.
 - Four touch cards, category selection, setup forms, actual keyboard input and masking.
+- Long Korean names, 32 metrics, complete values and units, touch scrolling, per-project states and scroll retention during a reading update.
 - The idle redraw budget: unchanged readings do not repaint the dashboard.
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 
 `tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 8 MB application limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
+
+## Distribution notices
+
+Firmware artifacts include `licenses/index.json` and the files it hashes. `tools/collect_licenses.py` collects notices from the pinned libraries, configured ESP-IDF components and compiler runtimes, plus leading copyright/license comments from compiled source files. Component distributions may contain optional code eliminated during linking; the index identifies the source package rather than claiming that every component remains in the binary.
+
+The bundle explicitly includes Nanum Gothic, the Montserrat and Font Awesome 5 fonts used by LVGL, App artwork/policy licensing, and the SDK's public CA source bundle with its [MPL 2.0 license](https://www.mozilla.org/en-US/MPL/2.0/). The CA source and its conversion licensing are described by [curl's CA extraction project](https://curl.se/docs/caextract.html). Notice collection does not change certificate trust. The firmware manifest records the notice index hash, and CI uploads the whole notice directory. Unrelated files and symlink escapes in that generated directory stop regeneration instead of being overwritten.

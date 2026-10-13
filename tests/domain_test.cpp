@@ -62,11 +62,16 @@ int main() {
     CHECK(!resource->metrics[2].value);
     CHECK(!stale(*resource, 114999) && stale(*resource, 115000));
     const auto* account = catalog.find({ItemKind::Account, "codex:work"});
-    CHECK(account && account->project == "api" && account->projectCount == 2 && account->metrics[0].value == 43);
+    CHECK(account && account->project == "api" && account->projects.size() == 2 && account->metrics[0].value == 43);
+    CHECK(account->projects[0].project == "api" && account->projects[1].project == "web");
     CHECK(account->metrics[1].value == 0);
-    CHECK(activityLabel(*account, 0) == "Working");
-    CHECK(activityLabel(*account, 300000) == "Idle");
-    CHECK(activityLabel(*account, 600000) == "Resting");
+    CHECK(stateLabel(monitorState(*account, 0)) == "Working");
+    CHECK(stateLabel(monitorState(*account, 300000)) == "Inactive");
+    CHECK(!needsAttention(monitorState(*account, 300000)));
+    std::uint64_t rolloverAge = 1;
+    rolloverAge <<= 32;
+    CHECK(stale(*resource, rolloverAge));
+    CHECK(monitorState(*account, rolloverAge) == "inactive");
     auto panels = defaultPanels(catalog);
     CHECK(panels[0].kind == ItemKind::Resource && panels[1].kind == ItemKind::Account && panels[2].id == "codex:work" && panels[3].id.empty());
     const auto before = catalog.items.size();
@@ -74,14 +79,31 @@ int main() {
     const auto at = malformed.find("\"gpu\":28.4");
     malformed.replace(at, std::string("\"gpu\":28.4").size(), "\"gpu\":\"unknown\"");
     CHECK(!decodeCatalog(malformed, catalog).ok && catalog.items.size() == before);
+    for (const char* invalid : {R"(First\nSecond)", R"(First\u0000Second)", R"(First\u007fSecond)", R"(\ud800)"}) {
+      auto badName = sample();
+      badName.replace(badName.find("DGX Spark"), 9, invalid);
+      CHECK(!decodeCatalog(badName, catalog).ok && catalog.items.size() == before);
+    }
+    auto unicodeName = sample();
+    unicodeName.replace(unicodeName.find("DGX Spark"), 9, "한글 🐱");
+    CHECK(decodeCatalog(unicodeName, catalog).ok);
+    CHECK(catalog.find({ItemKind::Resource, "spark"})->name == "한글 🐱");
+    for (const auto& reading : {std::pair<const char*, double>{"1.005", 1.005}, {"0.1234567890123456", 0.1234567890123456}, {"999999.995", 999999.995}}) {
+      auto precise = sample();
+      precise.replace(precise.find("28.4"), 4, reading.first);
+      CHECK(decodeCatalog(precise, catalog).ok);
+      CHECK(catalog.find({ItemKind::Resource, "spark"})->metrics[1].value == reading.second);
+    }
     CHECK(!decodeCatalog("{\"sources\":[]}", catalog).ok);
     CHECK(!decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog).ok);
     CHECK(decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog).ok && catalog.items.empty());
     Metric metric;
-    CHECK(metricValue(metric) == "--");
+    CHECK(metricValue(metric) == "—");
     metric.value = 0; CHECK(metricValue(metric) == "0");
     metric.value = 12.4; CHECK(metricValue(metric) == "12.4");
     metric.value = 14200; CHECK(metricValue(metric) == "14.2k");
+    CHECK(metricValue(metric, false) == "14,200");
+    CHECK(ageLabel(14999) == "Just now" && ageLabel(15000) == "15s ago" && ageLabel(60000) == "1m ago");
     std::cout << "PASS domain: credential boundaries, Unicode, timestamps, account isolation, metric order, missing values, stale data and atomic snapshots\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

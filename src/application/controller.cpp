@@ -180,7 +180,7 @@ void Controller::accept(CloudResult& result) {
   config_ = std::move(candidate);
   pendingCloud_.reset();
   workspace_.catalog = std::move(result.catalog);
-  workspace_.receivedAtMs = now_;
+  workspace_.snapshotAgeMs = 0;
   workspace_.hasSnapshot = true;
   updateConfigView();
   failures_ = 0;
@@ -190,6 +190,9 @@ void Controller::accept(CloudResult& result) {
 }
 
 void Controller::tick(std::uint32_t now) {
+  // Accumulate each loop's unsigned delta so an offline snapshot cannot become
+  // fresh again when the platform's 32-bit millisecond clock wraps.
+  if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
   const auto wifi = wifi_.status();
   if (wifi.link != WifiLink::Connected) {

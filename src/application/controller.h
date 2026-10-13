@@ -15,7 +15,7 @@ struct Workspace {
   bool refreshing = false;
   bool hasSnapshot = false;
   std::uint32_t revision = 0;
-  std::uint32_t receivedAtMs = 0;
+  std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};
   Catalog catalog;
 };
@@ -33,6 +33,9 @@ class Controller {
   void cancelSetup();
   void scanWifi();
   const Workspace& workspace() const { return workspace_; }
+  std::uint64_t snapshotAgeMs(std::uint32_t now) const {
+    return workspace_.snapshotAgeMs + static_cast<std::uint32_t>(now - now_);
+  }
   const std::vector<WifiNetwork>& networks() const { return wifi_.networks(); }
   bool scanning() const { return wifi_.scanning(); }
   bool scanFailed() const { return wifi_.scanFailed(); }

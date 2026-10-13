@@ -2,13 +2,14 @@
 
 #include "../application/controller.h"
 #include "assets.h"
+#include "design_tokens.h"
 #include <functional>
 #include <map>
 #include <memory>
 
 namespace vibemon {
 
-enum class Page { Dashboard, Wifi, WifiForm, CloudForm, Picker, Settings };
+enum class Page { Dashboard, Wifi, WifiForm, CloudForm, Picker, Settings, Details };
 
 // LVGL objects belong exclusively to the UI task. Network workers publish results through Controller ports.
 class DashboardUi {
@@ -22,6 +23,7 @@ class DashboardUi {
   void cloud();
   void settings();
   void picker(std::size_t panel);
+  void details(std::size_t panel);
   Page page() const { return page_; }
   lv_obj_t* widget(const std::string& name) const;
 
@@ -38,6 +40,7 @@ class DashboardUi {
     std::array<lv_obj_t*, 3> bars{};
     std::uint32_t accent = 0;
   };
+  struct DetailRow { std::string key; lv_obj_t* name; lv_obj_t* value; };
   Controller& controller_;
   Fonts fonts_;
   Page page_ = Page::Dashboard;
@@ -49,6 +52,14 @@ class DashboardUi {
   lv_obj_t* keyboard_ = nullptr;
   lv_obj_t* list_ = nullptr;
   lv_obj_t* scanMessage_ = nullptr;
+  lv_obj_t* detailName_ = nullptr;
+  lv_obj_t* detailCategory_ = nullptr;
+  lv_obj_t* detailStatus_ = nullptr;
+  lv_obj_t* detailMessage_ = nullptr;
+  lv_obj_t* detailReadings_ = nullptr;
+  lv_obj_t* detailProjects_ = nullptr;
+  std::vector<DetailRow> detailMetrics_;
+  std::vector<DetailRow> detailMembers_;
   std::array<Card, PanelCount> cards_{};
   std::vector<std::unique_ptr<Handler>> handlers_;
   std::vector<std::unique_ptr<Handler>> rowHandlers_;
@@ -64,7 +75,7 @@ class DashboardUi {
   bool lastScanning_ = false;
   void clear(Page page);
   void header(const std::string& title, std::function<void()> back);
-  lv_obj_t* label(lv_obj_t* parent, const std::string& text, int x, int y, int width, const lv_font_t* font = nullptr, std::uint32_t color = 0xf4f6fc);
+  lv_obj_t* label(lv_obj_t* parent, const std::string& text, int x, int y, int width, const lv_font_t* font = nullptr, std::uint32_t color = design::Foreground);
   lv_obj_t* button(lv_obj_t* parent, const std::string& text, int x, int y, int width, int height, std::function<void()> clicked, bool primary = false);
   lv_obj_t* field(const std::string& id, const std::string& value, const std::string& placeholder, int y, int maxLength, bool password);
   void event(lv_obj_t* object, lv_event_code_t code, std::function<void(lv_event_t*)> callback, bool row = false);
@@ -72,6 +83,8 @@ class DashboardUi {
   void focusField(lv_obj_t* input);
   void wifiForm(const std::string& ssid);
   void updateCards(std::uint32_t now);
+  void updateDetails(std::uint32_t now);
+  lv_obj_t* detailLabel(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t color);
   void updateNetworks();
   void updatePicker();
   void formStatus(const std::string& message, bool error = false);

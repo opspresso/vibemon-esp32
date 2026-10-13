@@ -6,15 +6,7 @@
 
 namespace vibemon {
 namespace {
-constexpr std::uint32_t Background = 0x101724;
-constexpr std::uint32_t Surface = 0x1a2435;
-constexpr std::uint32_t Border = 0x2c394e;
-constexpr std::uint32_t Text = 0xf4f6fc;
-constexpr std::uint32_t Muted = 0xa5b2c8;
-constexpr std::uint32_t Accent = 0xb8a8ff;
-constexpr std::uint32_t Green = 0x6bdbba;
-constexpr std::uint32_t Amber = 0xf4c276;
-constexpr std::uint32_t Red = 0xff8fa6;
+using namespace design;
 const char* const TokenKeys[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n", "a", "b", "c", "d", "e", "f", "\n", "vm_", LV_SYMBOL_LEFT, LV_SYMBOL_RIGHT, LV_SYMBOL_BACKSPACE, LV_SYMBOL_OK, ""};
 constexpr auto Key = static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_NO_REPEAT | 1);
 constexpr auto WideKey = static_cast<lv_buttonmatrix_ctrl_t>(2);
@@ -53,18 +45,12 @@ std::string shortConnection(Connection connection) {
   }
   return "Not connected";
 }
-std::uint32_t healthColor(const Monitor& item, bool isStale) {
-  if (isStale || item.health == Health::Warning || item.activity == "notification") return Amber;
-  if (item.health == Health::Error || item.activity == "alert") return Red;
-  return item.health == Health::Ok ? Green : Muted;
-}
-std::string healthText(const Monitor& item) {
-  switch (item.health) {
-    case Health::Ok: return "Healthy";
-    case Health::Warning: return "Attention";
-    case Health::Error: return "Error";
-    default: return "Unknown";
-  }
+std::uint32_t statusColor(const std::string& state) {
+  const auto tone = stateTone(state);
+  if (tone == "warning") return Warning;
+  if (tone == "danger") return Danger;
+  if (tone == "good") return Good;
+  return tone == "active" ? Accent : Muted;
 }
 }  // namespace
 
@@ -93,10 +79,12 @@ void DashboardUi::clear(Page page) {
   handlers_.clear(); rowHandlers_.clear(); widgets_.clear();
   cards_ = {};
   connection_ = formMessage_ = firstField_ = secretField_ = keyboard_ = list_ = scanMessage_ = nullptr;
+  detailName_ = detailCategory_ = detailStatus_ = detailMessage_ = detailReadings_ = detailProjects_ = nullptr;
+  detailMetrics_.clear(); detailMembers_.clear();
   waitingWifi_ = waitingCloud_ = pendingPickerRefresh_ = false;
   page_ = page;
   box(root_, 0, 0, 480, 480, Background, 0);
-  lv_obj_set_style_text_color(root_, lv_color_hex(Text), 0);
+  lv_obj_set_style_text_color(root_, lv_color_hex(Foreground), 0);
   lv_obj_set_style_text_font(root_, fonts_.normal(), 0);
   lastRevision_ = controller_.workspace().revision;
 }
@@ -126,8 +114,8 @@ lv_obj_t* DashboardUi::label(lv_obj_t* parent, const std::string& text, int x, i
 lv_obj_t* DashboardUi::button(lv_obj_t* parent, const std::string& text, int x, int y, int width, int height, std::function<void()> clicked, bool primary) {
   auto* object = lv_button_create(parent);
   box(object, x, y, width, height, primary ? Accent : Surface, 12);
-  lv_obj_set_style_bg_color(object, lv_color_hex(primary ? 0x9e87f5 : 0x2a3650), LV_STATE_PRESSED);
-  auto* caption = label(object, text, 8, 0, width - 16, fonts_.normal(), primary ? Background : Text);
+  lv_obj_set_style_bg_color(object, primary ? lv_color_mix(lv_color_hex(Accent), lv_color_hex(Background), LV_OPA_90) : lv_color_hex(SurfaceRaised), LV_STATE_PRESSED);
+  auto* caption = label(object, text, 8, 0, width - 16, fonts_.normal(), primary ? AccentForeground : Foreground);
   lv_obj_align(caption, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_text_align(caption, LV_TEXT_ALIGN_CENTER, 0);
   event(object, LV_EVENT_CLICKED, [clicked = std::move(clicked)](lv_event_t*) { clicked(); });
@@ -149,10 +137,10 @@ void DashboardUi::dashboard() {
   clear(Page::Dashboard);
   auto* mark = lv_image_create(root_); lv_image_set_src(mark, brandImage()); lv_obj_set_pos(mark, 16, 14);
   label(root_, "VibeMon", 58, 11, 300, &lv_font_montserrat_24);
-  connection_ = label(root_, "", 59, 41, 344, fonts_.small(), Green);
+  connection_ = label(root_, "", 59, 41, 344, fonts_.small(), Good);
   widgets_["settings"] = button(root_, LV_SYMBOL_SETTINGS, 420, 12, 44, 44, [this] { settings(); });
   label(root_, "YOUR WORKSPACE", 16, 72, 210, &lv_font_montserrat_12, Muted);
-  auto* hint = label(root_, "Tap a card to change", 238, 71, 226, fonts_.small(), Muted);
+  auto* hint = label(root_, "Tap a card for details", 238, 71, 226, fonts_.small(), Muted);
   lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_RIGHT, 0);
   for (std::size_t i = 0; i < PanelCount; ++i) {
     auto& card = cards_[i];
@@ -160,8 +148,11 @@ void DashboardUi::dashboard() {
     box(card.box, 16 + static_cast<int>(i % 2) * 232, 94 + static_cast<int>(i / 2) * 186, 216, 174, Surface);
     lv_obj_set_style_border_width(card.box, 1, 0);
     lv_obj_set_style_border_color(card.box, lv_color_hex(Border), 0);
-    lv_obj_set_style_bg_color(card.box, lv_color_hex(0x25324b), LV_STATE_PRESSED);
-    event(card.box, LV_EVENT_CLICKED, [this, i](lv_event_t*) { picker(i); });
+    lv_obj_set_style_bg_color(card.box, lv_color_hex(SurfaceRaised), LV_STATE_PRESSED);
+    event(card.box, LV_EVENT_CLICKED, [this, i](lv_event_t*) {
+      if (controller_.workspace().catalog.find(controller_.workspace().panels[i])) details(i);
+      else picker(i);
+    });
     widgets_["panel-" + std::to_string(i)] = card.box;
     card.category = label(card.box, "PANEL " + std::to_string(i + 1), 14, 13, 168, &lv_font_montserrat_12, Muted);
     label(card.box, LV_SYMBOL_RIGHT, 188, 13, 16, &lv_font_montserrat_12, Muted);
@@ -172,7 +163,7 @@ void DashboardUi::dashboard() {
     for (std::size_t metric = 0; metric < 3; ++metric) {
       const int y = 67 + static_cast<int>(metric) * 28;
       card.labels[metric] = label(card.box, "", 14, y + 3, 101, fonts_.small(), Muted);
-      card.values[metric] = label(card.box, "", 114, y, 88, fonts_.normal());
+      card.values[metric] = label(card.box, "", 114, y + 3, 88, fonts_.small());
       lv_obj_set_style_text_align(card.values[metric], LV_TEXT_ALIGN_RIGHT, 0);
       card.bars[metric] = lv_bar_create(card.box);
       box(card.bars[metric], 14, y + 23, 188, 2, Border, 1);
@@ -182,6 +173,7 @@ void DashboardUi::dashboard() {
       lv_obj_set_style_radius(card.bars[metric], 1, LV_PART_INDICATOR);
     }
     card.footer = label(card.box, "", 14, 152, 190, fonts_.small(), Muted);
+    widgets_["panel-status-" + std::to_string(i)] = card.footer;
   }
   label(root_, "A little more aware.", 16, 463, 448, &lv_font_montserrat_12, Muted);
   updateCards(lv_tick_get());
@@ -189,8 +181,8 @@ void DashboardUi::dashboard() {
 
 void DashboardUi::updateCards(std::uint32_t now) {
   const auto& workspace = controller_.workspace();
-  if (setText(connection_, shortConnection(workspace.connection))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Green : Amber), 0);
-  const auto elapsed = static_cast<std::uint32_t>(now - workspace.receivedAtMs);
+  if (setText(connection_, shortConnection(workspace.connection))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Good : Warning), 0);
+  const auto elapsed = controller_.snapshotAgeMs(now);
   for (std::size_t index = 0; index < PanelCount; ++index) {
     auto& card = cards_[index];
     const auto& selection = workspace.panels[index];
@@ -200,14 +192,15 @@ void DashboardUi::updateCards(std::uint32_t now) {
       setText(card.category, "PANEL " + std::to_string(index + 1));
       setText(card.empty, selection.id.empty() ? "+\nChoose an item" : "Item unavailable\nTap to choose another");
       setText(card.footer, selection.id.empty() ? "Resource or account" : "Selection kept for reconnect");
+      if (card.accent != Muted) { lv_obj_set_style_text_color(card.footer, lv_color_hex(Muted), 0); card.accent = Muted; }
     } else {
-      const bool isStale = stale(*item, elapsed);
+      const auto state = monitorState(*item, elapsed);
       setText(card.category, item->category);
       setText(card.name, item->name);
-      const auto color = healthColor(*item, isStale);
-      const auto caption = isStale ? "No report · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed) :
-          item->selection.kind == ItemKind::Account ? activityLabel(*item, elapsed) + " · " + std::to_string(item->projectCount) + (item->projectCount == 1 ? " project" : " projects") :
-          healthText(*item) + " · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed);
+      const auto color = statusColor(state);
+      const auto caption = stateLabel(state) + " · " + (item->selection.kind == ItemKind::Account ?
+          std::to_string(item->projects.size()) + (item->projects.size() == 1 ? " project" : " projects") :
+          ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed));
       setText(card.footer, caption);
       if (card.accent != color) { lv_obj_set_style_text_color(card.footer, lv_color_hex(color), 0); card.accent = color; }
     }
@@ -217,7 +210,7 @@ void DashboardUi::updateCards(std::uint32_t now) {
       if (!available) { visible(card.bars[m], false); continue; }
       const auto& metric = item->metrics[m];
       setText(card.labels[m], metric.label);
-      setText(card.values[m], metricValue(metric) + (metric.value && !metric.unit.empty() ? (metric.unit == "%" ? "" : " ") + metric.unit : ""));
+      setText(card.values[m], metricText(metric));
       const bool bar = metric.display == MetricDisplay::Bar && metric.value && metric.maximum;
       visible(card.bars[m], bar);
       if (bar) {
@@ -225,6 +218,85 @@ void DashboardUi::updateCards(std::uint32_t now) {
         if (lv_bar_get_value(card.bars[m]) != progress) lv_bar_set_value(card.bars[m], progress, LV_ANIM_OFF);
       }
     }
+  }
+}
+
+lv_obj_t* DashboardUi::detailLabel(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t color) {
+  auto* value = label(parent, text, 0, 0, 408, font, color);
+  lv_obj_set_width(value, LV_PCT(100));
+  wrap(value);
+  return value;
+}
+
+void DashboardUi::details(std::size_t panel) {
+  clear(Page::Details); selectedPanel_ = panel;
+  header("Details", [this] { dashboard(); });
+  list_ = lv_obj_create(root_); box(list_, 16, 70, 448, 334, Surface, 12);
+  lv_obj_set_style_pad_all(list_, 16, 0); lv_obj_set_style_pad_row(list_, 12, 0);
+  lv_obj_set_scrollable(list_, true); lv_obj_set_scroll_dir(list_, LV_DIR_VER);
+  lv_obj_set_flex_flow(list_, LV_FLEX_FLOW_COLUMN);
+  widgets_["detail-list"] = list_;
+  detailCategory_ = detailLabel(list_, "", fonts_.small(), Muted);
+  detailName_ = detailLabel(list_, "", fonts_.title(), Foreground);
+  detailStatus_ = detailLabel(list_, "", fonts_.normal(), Muted);
+  detailMessage_ = detailLabel(list_, "", fonts_.normal(), Muted);
+  widgets_["detail-name"] = detailName_; widgets_["detail-status"] = detailStatus_;
+  widgets_["detail-message"] = detailMessage_;
+  auto section = [this] {
+    auto* section = lv_obj_create(list_); box(section, 0, 0, 416, 1, Surface, 0);
+    lv_obj_set_width(section, LV_PCT(100)); lv_obj_set_height(section, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_row(section, 12, 0); lv_obj_set_flex_flow(section, LV_FLEX_FLOW_COLUMN);
+    return section;
+  };
+  detailReadings_ = section(); detailProjects_ = section();
+  widgets_["change-item"] = button(root_, "Change item", 16, 420, 448, 48, [this] { picker(selectedPanel_); });
+  updateDetails(lv_tick_get());
+}
+
+void DashboardUi::updateDetails(std::uint32_t now) {
+  const auto& workspace = controller_.workspace();
+  const auto* item = workspace.catalog.find(workspace.panels[selectedPanel_]);
+  if (!item) {
+    setText(detailName_, "Item unavailable"); setText(detailCategory_, "Selection kept for reconnect");
+    setText(detailStatus_, "Choose another item or wait for its next report.");
+    lv_obj_set_style_text_color(detailStatus_, lv_color_hex(Muted), 0);
+    visible(detailMessage_, false); visible(detailReadings_, false); visible(detailProjects_, false);
+    return;
+  }
+  const auto elapsed = controller_.snapshotAgeMs(now);
+  const auto state = monitorState(*item, elapsed);
+  setText(detailName_, item->name); setText(detailCategory_, item->category);
+  setText(detailStatus_, stateLabel(state) + " · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed));
+  const auto color = lv_color_hex(statusColor(state));
+  if (!lv_color_eq(lv_obj_get_style_text_color(detailStatus_, LV_PART_MAIN), color)) lv_obj_set_style_text_color(detailStatus_, color, 0);
+  setText(detailMessage_, item->statusMessage); visible(detailMessage_, !item->statusMessage.empty());
+  auto updateRows = [this](lv_obj_t* section, auto& rows, const auto& values, const auto& key, const auto& name, const auto& value, bool projects) {
+    const bool changed = rows.size() != values.size() || !std::equal(rows.begin(), rows.end(), values.begin(),
+        [&key](const auto& row, const auto& input) { return row.key == key(input); });
+    visible(section, !values.empty());
+    if (changed) {
+      lv_obj_clean(section); rows.clear();
+      if (projects) detailLabel(section, "Reporting projects", fonts_.normal(), Foreground);
+      for (const auto& input : values) {
+        auto* group = lv_obj_create(section); box(group, 0, 0, 416, 1, Surface, 0);
+        lv_obj_set_width(group, LV_PCT(100)); lv_obj_set_height(group, LV_SIZE_CONTENT);
+        lv_obj_set_style_pad_row(group, 3, 0); lv_obj_set_flex_flow(group, LV_FLEX_FLOW_COLUMN);
+        rows.push_back({key(input), detailLabel(group, "", fonts_.small(), Muted), detailLabel(group, "", fonts_.normal(), Foreground)});
+      }
+    }
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      setText(rows[i].name, name(values[i])); setText(rows[i].value, value(values[i]));
+    }
+  };
+  updateRows(detailReadings_, detailMetrics_, item->metrics, [](const Metric& metric) { return metric.key; },
+      [](const Metric& metric) { return metric.label; }, [](const Metric& metric) { return metricText(metric, false); }, false);
+  updateRows(detailProjects_, detailMembers_, item->projects, [](const ReportState& project) { return project.sourceId; },
+      [](const ReportState& project) { return project.project.empty() ? project.sourceId : project.project; },
+      [elapsed](const ReportState& project) { return stateLabel(projectState(project, elapsed)); }, true);
+  for (std::size_t i = 0; i < item->projects.size(); ++i) {
+    const auto projectColor = lv_color_hex(statusColor(projectState(item->projects[i], elapsed)));
+    if (!lv_color_eq(lv_obj_get_style_text_color(detailMembers_[i].value, LV_PART_MAIN), projectColor))
+      lv_obj_set_style_text_color(detailMembers_[i].value, projectColor, 0);
   }
 }
 
@@ -243,7 +315,7 @@ void DashboardUi::settings() {
   label(server, workspace.origin + (workspace.tokenConfigured ? " · key saved" : " · add read key"), 16, 44, 380, fonts_.small(), Muted);
   label(server, LV_SYMBOL_RIGHT, 410, 29, 24, fonts_.normal(), Muted);
   widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 448, 48, [this] { controller_.refresh(); dashboard(); });
-  auto* message = label(root_, workspace.message, 20, 376, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Amber);
+  auto* message = label(root_, workspace.message, 20, 376, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
   wrap(message);
   label(root_, "VibeMon Touch · ESP32-4848S040", 20, 446, 440, fonts_.small(), Muted);
 }
@@ -313,7 +385,7 @@ void DashboardUi::attachKeyboard() {
   lv_obj_set_style_bg_color(keyboard_, lv_color_hex(Surface), LV_PART_ITEMS);
   lv_obj_set_style_bg_opa(keyboard_, LV_OPA_COVER, LV_PART_ITEMS);
   lv_obj_set_style_radius(keyboard_, 7, LV_PART_ITEMS);
-  lv_obj_set_style_text_color(keyboard_, lv_color_hex(Text), LV_PART_ITEMS);
+  lv_obj_set_style_text_color(keyboard_, lv_color_hex(Foreground), LV_PART_ITEMS);
   lv_obj_set_style_text_font(keyboard_, &lv_font_montserrat_16, LV_PART_ITEMS);
   lv_obj_set_style_bg_color(keyboard_, lv_color_hex(Border), static_cast<lv_style_selector_t>(LV_PART_ITEMS) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED));
   lv_keyboard_set_map(keyboard_, LV_KEYBOARD_MODE_USER_1, TokenKeys, TokenControls);
@@ -325,7 +397,7 @@ void DashboardUi::attachKeyboard() {
 
 void DashboardUi::formStatus(const std::string& message, bool error) {
   if (!formMessage_) return;
-  setText(formMessage_, message); lv_obj_set_style_text_color(formMessage_, lv_color_hex(error ? Red : Muted), 0);
+  setText(formMessage_, message); lv_obj_set_style_text_color(formMessage_, lv_color_hex(error ? Danger : Muted), 0);
 }
 
 void DashboardUi::wifiForm(const std::string& ssid) {
@@ -376,7 +448,7 @@ void DashboardUi::picker(std::size_t panel) {
     if (result.ok) dashboard(); else formStatus(result.message, true);
   });
   widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] { controller_.refresh(); pendingPickerRefresh_ = true; });
-  formMessage_ = label(root_, "", 20, 382, 440, fonts_.small(), Red);
+  formMessage_ = label(root_, "", 20, 382, 440, fonts_.small(), Danger);
   wrap(formMessage_);
   updatePicker();
 }
@@ -438,7 +510,8 @@ void DashboardUi::update(std::uint32_t now) {
     if (changed && !workspace.hasSnapshot && workspace.connection == Connection::NeedCloud) { cloud(); return; }
     if (changed && !workspace.hasSnapshot && workspace.connection == Connection::WifiUnavailable) { wifi(); return; }
     updateCards(now);
-  } else if (page_ == Page::Wifi) updateNetworks();
+  } else if (page_ == Page::Details) updateDetails(now);
+  else if (page_ == Page::Wifi) updateNetworks();
   else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
     pendingPickerRefresh_ = false; updatePicker();
   }
