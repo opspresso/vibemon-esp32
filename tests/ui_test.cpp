@@ -136,6 +136,7 @@ int main() {
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
       CHECK(lv_obj_get_style_outline_width(ui.widget("panel-3"), LV_PART_MAIN) == 1);
+      CHECK(lv_obj_get_style_shadow_width(ui.widget("panel-3"), LV_PART_MAIN) == 20);
       lv_area_t activeTitleBounds; lv_obj_get_coords(ui.widget("panel-name-3"), &activeTitleBounds);
       CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN)));
       tap(ui, "panel-0"); tap(ui, "change-item"); tap(ui, "clear-panel"); CHECK(app.workspace().panels[0].id.empty());
@@ -171,6 +172,7 @@ int main() {
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "web-console");
       CHECK(lv_obj_get_style_border_width(ui.widget("panel-3"), LV_PART_MAIN) == 1);
       CHECK(lv_obj_get_style_outline_width(ui.widget("panel-3"), LV_PART_MAIN) == 0);
+      CHECK(lv_obj_get_style_shadow_width(ui.widget("panel-3"), LV_PART_MAIN) == 0);
       lv_area_t inactiveTitleBounds; lv_obj_get_coords(ui.widget("panel-name-3"), &inactiveTitleBounds);
       CHECK(activeTitleBounds.x1 == inactiveTitleBounds.x1 && activeTitleBounds.y1 == inactiveTitleBounds.y1);
       CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_border_color(ui.widget("panel-2"), LV_PART_MAIN)));

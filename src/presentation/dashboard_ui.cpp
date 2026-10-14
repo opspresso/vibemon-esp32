@@ -148,6 +148,8 @@ void DashboardUi::dashboard() {
     box(card.box, 16 + static_cast<int>(i % 2) * 232, 94 + static_cast<int>(i / 2) * 186, 216, 174, Surface);
     lv_obj_set_style_border_width(card.box, 1, 0);
     lv_obj_set_style_border_color(card.box, lv_color_hex(Border), 0);
+    lv_obj_set_style_shadow_opa(card.box, LV_OPA_30, 0);
+    lv_obj_set_style_shadow_opa(card.box, LV_OPA_60, LV_STATE_PRESSED);
     lv_obj_set_style_bg_color(card.box, lv_color_hex(SurfaceRaised), LV_STATE_PRESSED);
     event(card.box, LV_EVENT_CLICKED, [this, i](lv_event_t*) {
       if (controller_.workspace().catalog.find(controller_.workspace().panels[i])) details(i);
@@ -192,10 +194,13 @@ void DashboardUi::updateCards(std::uint32_t now) {
     const auto tone = item && item->selection.kind == ItemKind::Account ? stateTone(state) : "neutral";
     const auto edge = lv_color_hex(tone == "neutral" ? Border : statusColor(state));
     const int emphasis = tone == "warning" || tone == "danger" ? 1 : 0;
+    const int glow = tone == "neutral" ? 0 : emphasis ? 20 : 14;
     if (!lv_color_eq(lv_obj_get_style_border_color(card.box, LV_PART_MAIN), edge)) lv_obj_set_style_border_color(card.box, edge, 0);
     // Outline emphasis does not change the content box or move its touch targets.
     if (!lv_color_eq(lv_obj_get_style_outline_color(card.box, LV_PART_MAIN), edge)) lv_obj_set_style_outline_color(card.box, edge, 0);
     if (lv_obj_get_style_outline_width(card.box, LV_PART_MAIN) != emphasis) lv_obj_set_style_outline_width(card.box, emphasis, 0);
+    if (!lv_color_eq(lv_obj_get_style_shadow_color(card.box, LV_PART_MAIN), edge)) lv_obj_set_style_shadow_color(card.box, edge, 0);
+    if (lv_obj_get_style_shadow_width(card.box, LV_PART_MAIN) != glow) lv_obj_set_style_shadow_width(card.box, glow, 0);
     visible(card.empty, !item); visible(card.name, item != nullptr);
     if (!item) {
       setText(card.category, "PANEL " + std::to_string(index + 1));
