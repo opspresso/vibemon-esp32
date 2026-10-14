@@ -175,7 +175,9 @@ int main() {
       wifi.current.link = WifiLink::Failed; app.tick(timeMs); advance(ui); screenshot("wifi-failed");
       CHECK(ui.page() == Page::WifiForm);
       tap(ui, "back"); CHECK(!app.changingWifi() && wifi.requested == "Workshop");
-      ui.dashboard(); advance(ui, 130000); screenshot("stale-dashboard");
+      ui.dashboard(); advance(ui, 130000);
+      // Resources are stale; coding projects expire later on their event clock (working -> idle -> sleep).
+      timeMs += 470000; advance(ui); screenshot("stale-dashboard");
       const auto* accountStatus = lv_label_get_text(ui.widget("panel-status-3"));
       CHECK(std::string(accountStatus) == "Inactive · 2 projects");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "web-console");
@@ -245,7 +247,7 @@ int main() {
       Store store; configured(store);
       auto account = demo().items.back();
       account.activity = state == "inactive" ? "working" : state;
-      account.reportedStale = state == "inactive";
+      if (state == "inactive") account.activityAgeMs = 600000;
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
       store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;

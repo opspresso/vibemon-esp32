@@ -164,20 +164,21 @@ std::string healthState(Health health) {
   }
 }
 std::string reportState(const ReportState& item, bool agent, std::uint64_t elapsedMs) {
-  if (stale(item, elapsedMs)) return agent ? "inactive" : "stale";
   const auto health = healthState(item.health);
-  if (!agent) return health;
+  if (!agent) return stale(item, elapsedMs) ? "stale" : health;
+  // Coding hooks report events, not a heartbeat: a long tool call or response
+  // is silent while the agent works, so liveness follows the event clock.
   std::string state = item.activity;
   auto age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
   auto* rule = stateRule(state);
-  if (!rule || !rule->holdWhileReporting) {
-    while (rule && rule->afterMs && age >= rule->afterMs) {
-      age -= rule->afterMs;
-      state = rule->next;
-      rule = stateRule(state);
-    }
+  while (rule && rule->afterMs && age >= rule->afterMs) {
+    age -= rule->afterMs;
+    state = rule->next;
+    rule = stateRule(state);
   }
-  return attentionRank(health) < attentionRank(state) ? health : state;
+  if (state == "sleep") return "inactive";
+  // Health belongs to the event; once its state has aged, so has its health.
+  return state == item.activity && attentionRank(health) < attentionRank(state) ? health : state;
 }
 }  // namespace
 

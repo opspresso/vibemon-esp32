@@ -6,7 +6,7 @@ The device requests `GET /api/v1/sources` every 10 seconds while connected. It s
 
 The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
 
-Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events rather than continuous heartbeats: after that boundary their status is neutral `Inactive`. Fresh errors and input requests remain actionable regardless of the original event's age. The device reevaluates each project's receipt and event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
+Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events rather than continuous heartbeats, so a long tool call or response is silent while the agent works. A coding project's state therefore follows its last event through the shared state timeouts and becomes neutral `Inactive` when that clock reaches `sleep`; an event's health ages with its state. The device reevaluates each resource's receipt age and each project's event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
 
 Report age starts from `serverTime` and advances with accumulated device uptime. The 32-bit platform clock wrapping after about 49.7 days does not reset an offline report's age. A newly accepted snapshot resets only the elapsed time since that snapshot.
 
@@ -19,7 +19,7 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
-| Report stale boundary | 120 seconds since the server received it |
+| Resource stale boundary | 120 seconds since the server received it |
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
