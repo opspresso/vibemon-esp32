@@ -17,7 +17,7 @@ def palette():
     css = (ROOT / "contracts/tokens.css").read_text()
     names = {"Background": "background", "Surface": "surface", "SurfaceRaised": "surface-raised",
              "Border": "border", "Foreground": "foreground", "Muted": "muted", "Accent": "accent",
-             "AccentForeground": "accent-foreground", "Good": "good", "Warning": "warning", "Danger": "danger"}
+             "AccentForeground": "accent-foreground", "Info": "info", "Good": "good", "Warning": "warning", "Danger": "danger"}
     lines = ["// Generated from the pinned App dark palette; do not edit.", "#pragma once", "#include <cstdint>", "namespace vibemon::design {"]
     for name, token in names.items():
         values = re.findall(r"--vm-" + re.escape(token) + r"\s*:\s*light-dark\(#[0-9a-fA-F]{6},\s*#([0-9a-fA-F]{6})\)\s*;", css)

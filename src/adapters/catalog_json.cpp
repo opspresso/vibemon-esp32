@@ -141,7 +141,7 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
           !text(source["account"]["displayName"], item.name, 512) || !validAccountId(provider + ":" + accountId) ||
           !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return {false, "A coding account contains invalid fields."};
       item.selection = {ItemKind::Account, provider + ":" + accountId};
-      item.category = provider;
+      item.category = provider + " · " + accountId;
       item.projects.push_back(item);
       if (!presetMetrics(source, kind, item)) return {false, "A coding account contains invalid measurements."};
       auto previous = accounts.find(item.selection.id);

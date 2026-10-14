@@ -94,6 +94,8 @@ bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = 
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
 bool stale(const ReportState& item, std::uint64_t elapsedMs);
 std::string monitorState(const Monitor& item, std::uint64_t elapsedMs);
+const ReportState* accountActivity(const Monitor& item, std::uint64_t elapsedMs);
+std::string monitorTitle(const Monitor& item, std::uint64_t elapsedMs);
 std::string projectState(const ReportState& item, std::uint64_t elapsedMs);
 std::string stateLabel(const std::string& state);
 std::string stateTone(const std::string& state);
