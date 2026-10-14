@@ -188,11 +188,14 @@ void DashboardUi::updateCards(std::uint32_t now) {
     auto& card = cards_[index];
     const auto& selection = workspace.panels[index];
     const auto* item = workspace.catalog.find(selection);
-    const auto tone = item && item->selection.kind == ItemKind::Account ? stateTone(monitorState(*item, elapsed)) : "neutral";
-    const auto edge = lv_color_hex(tone == "neutral" ? Border : statusColor(monitorState(*item, elapsed)));
-    const int edgeWidth = tone == "warning" || tone == "danger" ? 2 : 1;
+    const auto state = item ? monitorState(*item, elapsed) : "unknown";
+    const auto tone = item && item->selection.kind == ItemKind::Account ? stateTone(state) : "neutral";
+    const auto edge = lv_color_hex(tone == "neutral" ? Border : statusColor(state));
+    const int emphasis = tone == "warning" || tone == "danger" ? 1 : 0;
     if (!lv_color_eq(lv_obj_get_style_border_color(card.box, LV_PART_MAIN), edge)) lv_obj_set_style_border_color(card.box, edge, 0);
-    if (lv_obj_get_style_border_width(card.box, LV_PART_MAIN) != edgeWidth) lv_obj_set_style_border_width(card.box, edgeWidth, 0);
+    // Outline emphasis does not change the content box or move its touch targets.
+    if (!lv_color_eq(lv_obj_get_style_outline_color(card.box, LV_PART_MAIN), edge)) lv_obj_set_style_outline_color(card.box, edge, 0);
+    if (lv_obj_get_style_outline_width(card.box, LV_PART_MAIN) != emphasis) lv_obj_set_style_outline_width(card.box, emphasis, 0);
     visible(card.empty, !item); visible(card.name, item != nullptr);
     if (!item) {
       setText(card.category, "PANEL " + std::to_string(index + 1));
@@ -200,7 +203,6 @@ void DashboardUi::updateCards(std::uint32_t now) {
       setText(card.footer, selection.id.empty() ? "Resource or account" : "Selection kept for reconnect");
       if (card.accent != Muted) { lv_obj_set_style_text_color(card.footer, lv_color_hex(Muted), 0); card.accent = Muted; }
     } else {
-      const auto state = monitorState(*item, elapsed);
       setText(card.category, item->category);
       setText(card.name, monitorTitle(*item, elapsed));
       const auto color = statusColor(state);
