@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# arduino/setup-arduino-cli@v2 still runs on Node.js 20.
+env:
+  ARDUINO_CLI_VERSION: '1.5.1'
+
 jobs:
   native:
     runs-on: ubuntu-latest
@@ -17,9 +21,12 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: arduino/setup-arduino-cli@v2
-        with:
-          version: '1.5.1'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
       - name: Install pinned test dependencies
         run: |
           python3 -m venv build/venv
@@ -42,9 +49,12 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: arduino/setup-arduino-cli@v2
-        with:
-          version: '1.5.1'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
       - name: Install pinned toolchain
         run: |
           python3 -m venv build/venv
