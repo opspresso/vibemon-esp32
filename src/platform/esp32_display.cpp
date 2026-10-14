@@ -36,9 +36,11 @@ bool EspDisplay::begin() {
   lv_display_set_color_format(display_, LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display_, back, front, bytes, LV_DISPLAY_RENDER_MODE_DIRECT);
   lv_display_set_user_data(display_, this);
-  lv_display_set_flush_cb(display_, [](lv_display_t* display, const lv_area_t*, std::uint8_t* pixels) {
+  lv_display_set_flush_cb(display_, [](lv_display_t* display, const lv_area_t* area, std::uint8_t* pixels) {
     auto& self = *static_cast<EspDisplay*>(lv_display_get_user_data(display));
+    self.renderedPixels_ += static_cast<std::uint32_t>(lv_area_get_width(area) * lv_area_get_height(area));
     if (lv_display_flush_is_last(display)) {
+      ++self.redraws_;
       if (!self.board_.getLCD()->switchFrameBufferTo(pixels)) {
         Serial.println("Display framebuffer switch failed");
         abort();

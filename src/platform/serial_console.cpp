@@ -46,6 +46,8 @@ void SerialConsole::command() {
       response["tokenConfigured"] = workspace.tokenConfigured;
       response["touchPresses"] = display_.touchPresses();
       response["displayFrames"] = display_.completedFrames();
+      response["displayRedraws"] = display_.redraws();
+      response["renderedPixels"] = display_.renderedPixels();
       response["displayClockHz"] = display_.pixelClock();
       response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
     } else if (name == "display-clock") {

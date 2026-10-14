@@ -45,12 +45,41 @@ std::string shortConnection(Connection connection) {
   }
   return "Not connected";
 }
+std::uint32_t blendColor(std::uint32_t first, std::uint32_t second, unsigned percent) {
+  std::uint32_t result = 0;
+  for (unsigned shift : {0u, 8u, 16u}) result |= ((((first >> shift) & 255) * percent + ((second >> shift) & 255) * (100 - percent) + 50) / 100) << shift;
+  return result;
+}
 std::uint32_t statusColor(const std::string& state) {
+  if (state == "thinking") return Accent;
+  if (state == "planning") return blendColor(Info, Good, 65);
+  if (state == "packing") return blendColor(Accent, Danger, 65);
   const auto tone = stateTone(state);
   if (tone == "warning") return Warning;
   if (tone == "danger") return Danger;
   if (tone == "good") return Good;
   return tone == "active" ? Info : Muted;
+}
+
+lv_point_t edgePoint(float phase) {
+  constexpr float pi = 3.14159265f, radius = 15, horizontal = 184, vertical = 142, arc = pi * radius / 2;
+  float distance = (phase - std::floor(phase)) * (2 * (horizontal + vertical) + 4 * arc);
+  auto point = [](float x, float y) { return lv_point_t{static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y))}; };
+  if (distance < horizontal) return point(16 + distance, 1);
+  distance -= horizontal;
+  if (distance < arc) return point(200 + radius * std::sin(distance / radius), 16 - radius * std::cos(distance / radius));
+  distance -= arc;
+  if (distance < vertical) return point(215, 16 + distance);
+  distance -= vertical;
+  if (distance < arc) return point(200 + radius * std::cos(distance / radius), 158 + radius * std::sin(distance / radius));
+  distance -= arc;
+  if (distance < horizontal) return point(200 - distance, 173);
+  distance -= horizontal;
+  if (distance < arc) return point(16 - radius * std::sin(distance / radius), 158 + radius * std::cos(distance / radius));
+  distance -= arc;
+  if (distance < vertical) return point(1, 158 - distance);
+  distance -= vertical;
+  return point(16 - radius * std::cos(distance / radius), 16 - radius * std::sin(distance / radius));
 }
 }  // namespace
 
@@ -156,7 +185,8 @@ void DashboardUi::dashboard() {
       else picker(i);
     });
     widgets_["panel-" + std::to_string(i)] = card.box;
-    card.category = label(card.box, "PANEL " + std::to_string(i + 1), 14, 13, 168, &lv_font_montserrat_12, Muted);
+    card.category = label(card.box, "PANEL " + std::to_string(i + 1), 14, 13, 168, fonts_.small(), Muted);
+    widgets_["panel-category-" + std::to_string(i)] = card.category;
     label(card.box, LV_SYMBOL_RIGHT, 188, 13, 16, &lv_font_montserrat_12, Muted);
     card.name = label(card.box, "", 14, 34, 188, fonts_.title());
     widgets_["panel-name-" + std::to_string(i)] = card.name;
@@ -177,9 +207,21 @@ void DashboardUi::dashboard() {
     }
     card.footer = label(card.box, "", 14, 152, 190, fonts_.small(), Muted);
     widgets_["panel-status-" + std::to_string(i)] = card.footer;
+    for (std::size_t lightIndex = 0; lightIndex < card.lights.size(); ++lightIndex) {
+      auto*& light = card.lights[lightIndex];
+      light = lv_obj_create(root_);
+      const int size = lightIndex % 4 == 0 ? 8 : 6;
+      box(light, 0, 0, size, size, Info, size);
+      lv_obj_set_clickable(light, false);
+      lv_obj_set_style_shadow_width(light, lightIndex % 4 == 0 ? 14 : 6, 0);
+      lv_obj_set_style_shadow_opa(light, LV_OPA_70, 0);
+      visible(light, false);
+      widgets_["panel-light-" + std::to_string(i) + "-" + std::to_string(lightIndex)] = light;
+    }
   }
   label(root_, "A little more aware.", 16, 463, 448, &lv_font_montserrat_12, Muted);
   updateCards(lv_tick_get());
+  updateCardMotion(lv_tick_get());
 }
 
 void DashboardUi::updateCards(std::uint32_t now) {
@@ -191,6 +233,20 @@ void DashboardUi::updateCards(std::uint32_t now) {
     const auto& selection = workspace.panels[index];
     const auto* item = workspace.catalog.find(selection);
     const auto state = item ? monitorState(*item, elapsed) : "unknown";
+    const auto motionState = item && item->selection.kind == ItemKind::Account ? state : "inactive";
+    if (card.motionState != motionState) {
+      card.motionState = motionState; card.motionSince = now;
+      const auto motionTone = stateTone(motionState);
+      card.trailLength = motionState == "packing" || motionTone == "danger" || motionTone == "warning" ? 2 : 4;
+      const auto color = lv_color_hex(statusColor(motionState));
+      for (std::size_t i = 0; i < card.lights.size(); ++i) {
+        const bool head = i % card.trailLength == 0;
+        lv_obj_set_size(card.lights[i], head ? 8 : 6, head ? 8 : 6);
+        lv_obj_set_style_shadow_width(card.lights[i], head ? 14 : 6, 0);
+        lv_obj_set_style_bg_color(card.lights[i], head ? lv_color_mix(lv_color_white(), color, LV_OPA_50) : color, 0);
+        lv_obj_set_style_shadow_color(card.lights[i], color, 0);
+      }
+    }
     const auto tone = item && item->selection.kind == ItemKind::Account ? stateTone(state) : "neutral";
     const auto edge = lv_color_hex(tone == "neutral" ? Border : statusColor(state));
     const int emphasis = tone == "warning" || tone == "danger" ? 1 : 0;
@@ -230,6 +286,34 @@ void DashboardUi::updateCards(std::uint32_t now) {
         const auto progress = static_cast<int>(std::lround(std::clamp((*metric.value - metric.minimum) / (*metric.maximum - metric.minimum), 0.0, 1.0) * 1000));
         if (lv_bar_get_value(card.bars[m]) != progress) lv_bar_set_value(card.bars[m], progress, LV_ANIM_OFF);
       }
+    }
+  }
+}
+
+void DashboardUi::updateCardMotion(std::uint32_t now) {
+  for (auto& card : cards_) {
+    if (!card.box) continue;
+    const auto& state = card.motionState;
+    const auto tone = stateTone(state);
+    const auto elapsed = static_cast<std::uint32_t>(now - card.motionSince);
+    const bool waiting = tone == "warning";
+    const bool moving = tone == "active" || needsAttention(state) || (state == "done" && elapsed < 1600);
+    const float period = state == "thinking" ? 6400 : state == "planning" ? 7000 : state == "packing" ? 2400 : tone == "danger" ? 1800 : state == "start" ? 2200 : state == "done" ? 1600 : 3600;
+    const float phase = static_cast<float>(elapsed % static_cast<unsigned>(period)) / period;
+    const float pulse = .5f - .5f * std::cos(static_cast<float>(elapsed % 2400) / 2400 * 6.2831853f);
+    for (std::size_t i = 0; i < card.lights.size(); ++i) {
+      auto* light = card.lights[i];
+      visible(light, moving);
+      if (!moving) continue;
+      const float direction = state == "packing" ? -1 : 1;
+      const float head = waiting ? .04f : direction * phase;
+      const auto trail = i % card.trailLength;
+      const auto point = edgePoint(head + (i / card.trailLength) * .5f - direction * trail * (card.trailLength == 2 ? .018f : .012f));
+      const int size = lv_obj_get_width(light);
+      lv_obj_set_pos(light, lv_obj_get_x(card.box) + point.x - size / 2, lv_obj_get_y(card.box) + point.y - size / 2);
+      constexpr int opacity[] = {255, 170, 95, 45};
+      const auto alpha = static_cast<lv_opa_t>(opacity[trail] * ((waiting || state == "thinking") ? .4f + .6f * pulse : 1));
+      if (lv_obj_get_style_opa(light, LV_PART_MAIN) != alpha) lv_obj_set_style_opa(light, alpha, 0);
     }
   }
 }
@@ -499,6 +583,10 @@ void DashboardUi::updatePicker() {
 }
 
 void DashboardUi::update(std::uint32_t now) {
+  // Move only small light objects; the static card and text retain their pixels.
+  if (page_ == Page::Dashboard && static_cast<std::uint32_t>(now - lastMotion_) >= 34) {
+    lastMotion_ = now; updateCardMotion(now);
+  }
   const auto& workspace = controller_.workspace();
   const bool changed = lastRevision_ != workspace.revision;
   if (!changed && static_cast<std::uint32_t>(now - lastDraw_) < 250) return;

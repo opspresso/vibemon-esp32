@@ -39,7 +39,7 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch press count, completed frames and requested pixel clock; no credentials or names |
+| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |

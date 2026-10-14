@@ -32,6 +32,8 @@ The board has 8 MB PSRAM. Two complete RGB565 framebuffers use PSRAM (900 KiB to
 
 HTTP bodies and JSON allocations have separate limits. A single request is active at a time. Wi-Fi association and scanning progress asynchronously. HTTPS runs outside the UI task; the UI loop yields every 5 ms. Flash writes occur for verified connection changes and changed selections, not periodic readings.
 
+Coding cards animate small light trails around their rounded edges at up to 30 updates per second. Working, thinking, planning and compacting have different colors and rhythms; input requests pulse, errors use two fast trails, and completion makes one green sweep. Inactive cards stop animating. Only the lights' previous and next regions are invalidated; text and card geometry remain fixed. Leaving the dashboard destroys the lights and stops their updates. Dynamic category labels use the same Unicode font fallback as other readings, including the account separator.
+
 Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_json.py` applies a hash-verified change to the isolated ArduinoJson numeric parser: decimal tokens use C++ `from_chars` rather than narrowing short mantissas to 32-bit floats. This preserves the Web value before formatting; for example, `1.005` remains the same double and displays as `1.01%`. The original and modified parser hashes are locked. User-installed libraries and the ESP-IDF checkout remain untouched.
 
 The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. The single application slot does not provide an OTA update service.
@@ -45,7 +47,7 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Verified saves, rejected keys, delayed replies, account changes, offline retention and timer rollover.
 - Four touch cards, category selection, setup forms, actual keyboard input and masking.
 - Long Korean names, 32 metrics, complete values and units, touch scrolling, per-project states and scroll retention during a reading update.
-- The idle redraw budget: unchanged readings do not repaint the dashboard.
+- Bounded animation redraw regions, stable touch targets, Unicode category separators, and zero idle redraws after activity stops.
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 
 `tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 8 MB application limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
