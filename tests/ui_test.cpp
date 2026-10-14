@@ -12,6 +12,7 @@ std::uint32_t timeMs = 0;
 std::array<std::uint16_t, 480 * 480> pixels;
 std::array<std::uint16_t, 480 * 480> drawBuffer, secondBuffer;
 std::size_t flushes = 0;
+std::size_t flushedPixels = 0;
 lv_point_t position{};
 bool pressed = false;
 lv_indev_t* pointer = nullptr;
@@ -87,7 +88,7 @@ Catalog demo() {
     value.items.push_back(item);
   }
   Monitor agent;
-  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "Codex";
+  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "codex · work";
   agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working";
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
@@ -105,8 +106,9 @@ int main() {
     auto* display = lv_display_create(480, 480);
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(display, drawBuffer.data(), secondBuffer.data(), sizeof(drawBuffer), LV_DISPLAY_RENDER_MODE_DIRECT);
-    lv_display_set_flush_cb(display, [](lv_display_t* display, const lv_area_t*, std::uint8_t* data) {
+    lv_display_set_flush_cb(display, [](lv_display_t* display, const lv_area_t* area, std::uint8_t* data) {
       if (lv_display_flush_is_last(display)) std::memcpy(pixels.data(), data, sizeof(pixels));
+      flushedPixels += static_cast<std::size_t>(lv_area_get_width(area) * lv_area_get_height(area));
       ++flushes; lv_display_flush_ready(display);
     });
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
@@ -128,8 +130,15 @@ int main() {
         auto* panel = ui.widget("panel-" + std::to_string(i)); CHECK(panel);
         CHECK(lv_obj_get_width(panel) == 216 && lv_obj_get_height(panel) == 174);
       }
-      // Once the fixed dashboard is drawn, repeated unchanged updates must not repaint it.
-      advance(ui, 250); const auto stable = flushes; advance(ui, 1000); CHECK(flushes == stable);
+      lv_font_glyph_dsc_t glyph{};
+      CHECK(!lv_font_get_glyph_dsc(&lv_font_montserrat_12, &glyph, 0xB7, 0) || glyph.is_placeholder);
+      const auto* categoryFont = lv_obj_get_style_text_font(ui.widget("panel-category-1"), LV_PART_MAIN);
+      CHECK(lv_font_get_glyph_dsc(categoryFont, &glyph, 0xB7, 0) && !glyph.is_placeholder);
+      CHECK(lv_font_get_glyph_dsc(categoryFont, &glyph, 0xD55C, 0) && !glyph.is_placeholder);
+      // Animated lights must refresh bounded regions, not the whole dashboard.
+      advance(ui, 250); const auto stable = flushes; const auto pixelsBefore = flushedPixels;
+      advance(ui, 1000); CHECK(flushes > stable);
+      CHECK(flushedPixels - pixelsBefore < 480 * 480 * 4);
       tap(ui, "panel-3"); CHECK(ui.page() == Page::Details); screenshot("resource-details");
       tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
@@ -179,6 +188,8 @@ int main() {
       const auto inactiveColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
       const auto staleColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
       CHECK(!lv_color_eq(inactiveColor, staleColor));
+      advance(ui, 500); const auto inactiveFlushes = flushes; advance(ui, 1000);
+      CHECK(flushes == inactiveFlushes);
     }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
@@ -229,6 +240,41 @@ int main() {
       screenshot("account-details");
       lv_obj_scroll_to_view_recursive(findText(list, "Needs input"), LV_ANIM_OFF); advance(ui);
       screenshot("account-details-end");
+    }
+    for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "inactive"}) {
+      Store store; configured(store);
+      auto account = demo().items.back();
+      account.activity = state == "inactive" ? "working" : state;
+      account.reportedStale = state == "inactive";
+      account.projects = {account};
+      Catalog catalog; catalog.items = {account};
+      store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;
+      Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(timeMs); wifi.connected(); app.tick(timeMs); cloud.complete(catalog); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui, 250);
+      auto* light = ui.widget("panel-light-0-0"); CHECK(light);
+      const bool active = state != "idle" && state != "inactive";
+      CHECK(lv_obj_is_hidden(light) != active);
+      const auto x = lv_obj_get_x(light), y = lv_obj_get_y(light);
+      const auto opacity = lv_obj_get_style_opa(light, LV_PART_MAIN);
+      const auto before = flushedPixels;
+      screenshot("motion-" + state + "-a"); advance(ui, 800);
+      const auto painted = flushedPixels - before;
+      CHECK(painted < 480 * 480 * 4);
+      if (!active) CHECK(painted == 0);
+      else if (state == "notification") CHECK(lv_obj_get_style_opa(light, LV_PART_MAIN) != opacity);
+      else CHECK(lv_obj_get_x(light) != x || lv_obj_get_y(light) != y);
+      screenshot("motion-" + state + "-b");
+      if (state == "done") {
+        advance(ui, 800); CHECK(lv_obj_is_hidden(light));
+        const auto settled = flushes; advance(ui, 800); CHECK(flushes == settled);
+      }
+      std::cout << "Motion " << state << ": " << painted << " pixels / 800ms across four cards\n";
+      if (state == "working") {
+        tap(ui, "panel-light-0-0"); CHECK(ui.page() == Page::Details);
+        CHECK(!ui.widget("panel-light-0-0"));
+        advance(ui, 250); const auto resting = flushes; advance(ui, 800); CHECK(flushes == resting);
+      }
     }
     lv_deinit();
     std::cout << "PASS real LVGL UI: four cards, touch selection, category filtering, persistence, setup forms, Unicode, missing values, offline display and idle redraw budget\n";

@@ -10,6 +10,8 @@ class EspDisplay {
   bool begin();
   std::uint32_t touchPresses() const { return touchPresses_; }
   std::uint32_t completedFrames() const { return completedFrames_; }
+  std::uint32_t redraws() const { return redraws_; }
+  std::uint32_t renderedPixels() const { return renderedPixels_; }
   bool setPixelClock(std::uint32_t hz);
   std::uint32_t pixelClock() const { return pixelClockHz_; }
  private:
@@ -22,6 +24,8 @@ class EspDisplay {
   std::uint32_t pixelClockHz_ = 16000000;
   static bool IRAM_ATTR frameComplete(void* context);
   std::uint32_t touchPresses_ = 0;
+  std::uint32_t redraws_ = 0;
+  std::uint32_t renderedPixels_ = 0;
   bool pressed_ = false;
 };
 }  // namespace vibemon

@@ -38,6 +38,11 @@ class DashboardUi {
     std::array<lv_obj_t*, 3> labels{};
     std::array<lv_obj_t*, 3> values{};
     std::array<lv_obj_t*, 3> bars{};
+    // Bound moving objects so LVGL's dirty-area queue does not fall back to a full-screen redraw.
+    std::array<lv_obj_t*, 4> lights{};
+    std::size_t trailLength = 4;
+    std::string motionState;
+    std::uint32_t motionSince = 0;
     std::uint32_t accent = 0;
   };
   struct DetailRow { std::string key; lv_obj_t* name; lv_obj_t* value; };
@@ -69,6 +74,7 @@ class DashboardUi {
   std::string networkSignature_;
   std::uint32_t lastRevision_ = 0;
   std::uint32_t lastDraw_ = 0;
+  std::uint32_t lastMotion_ = 0;
   bool waitingWifi_ = false;
   bool waitingCloud_ = false;
   bool pendingPickerRefresh_ = false;
@@ -83,6 +89,7 @@ class DashboardUi {
   void focusField(lv_obj_t* input);
   void wifiForm(const std::string& ssid);
   void updateCards(std::uint32_t now);
+  void updateCardMotion(std::uint32_t now);
   void updateDetails(std::uint32_t now);
   lv_obj_t* detailLabel(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t color);
   void updateNetworks();
