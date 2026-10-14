@@ -197,6 +197,22 @@ std::string monitorState(const Monitor& item, std::uint64_t elapsedMs) {
   return state;
 }
 
+const ReportState* accountActivity(const Monitor& item, std::uint64_t elapsedMs) {
+  const auto state = monitorState(item, elapsedMs);
+  for (const auto& project : item.projects) {
+    if (projectState(project, elapsedMs) == state) return &project;
+  }
+  return nullptr;
+}
+
+std::string monitorTitle(const Monitor& item, std::uint64_t elapsedMs) {
+  if (item.selection.kind == ItemKind::Account) {
+    const auto* project = accountActivity(item, elapsedMs);
+    if (project && !project->project.empty()) return project->project;
+  }
+  return item.name;
+}
+
 std::string stateLabel(const std::string& state) {
   const auto* rule = stateRule(state);
   return rule ? rule->label : state;

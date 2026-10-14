@@ -63,6 +63,11 @@ int main(int argc, char** argv) {
         if (state != expected.as<std::string>()) throw std::runtime_error(fixture["name"].as<std::string>() + ": " + item.selection.id + " was " + state);
         const auto latest = fixture["expected"]["latest"][item.selection.id];
         if (!latest.isNull()) CHECK(item.sourceId == latest.as<std::string>());
+        const auto activity = fixture["expected"]["activity"][item.selection.id];
+        if (!activity.isNull()) {
+          const auto* project = accountActivity(item, elapsed);
+          CHECK(project && project->sourceId == activity.as<std::string>());
+        }
       }
       ++count;
     }

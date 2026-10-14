@@ -134,6 +134,9 @@ int main() {
       tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
+      CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
+      CHECK(lv_obj_get_style_border_width(ui.widget("panel-3"), LV_PART_MAIN) == 2);
+      CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN)));
       tap(ui, "panel-0"); tap(ui, "change-item"); tap(ui, "clear-panel"); CHECK(app.workspace().panels[0].id.empty());
       screenshot("empty-panel");
       tap(ui, "settings"); CHECK(ui.page() == Page::Settings); screenshot("settings");
@@ -164,6 +167,9 @@ int main() {
       ui.dashboard(); advance(ui, 130000); screenshot("stale-dashboard");
       const auto* accountStatus = lv_label_get_text(ui.widget("panel-status-3"));
       CHECK(std::string(accountStatus) == "Inactive · 2 projects");
+      CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "web-console");
+      CHECK(lv_obj_get_style_border_width(ui.widget("panel-3"), LV_PART_MAIN) == 1);
+      CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_border_color(ui.widget("panel-2"), LV_PART_MAIN)));
       const auto inactiveColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
       const auto staleColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
       CHECK(!lv_color_eq(inactiveColor, staleColor));
