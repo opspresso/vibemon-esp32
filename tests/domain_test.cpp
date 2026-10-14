@@ -66,8 +66,9 @@ int main() {
     CHECK(account->projects[0].project == "api" && account->projects[1].project == "web");
     CHECK(account->metrics[1].value == 0);
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
-    CHECK(stateLabel(monitorState(*account, 300000)) == "Inactive");
-    CHECK(!needsAttention(monitorState(*account, 300000)));
+    CHECK(stateLabel(monitorState(*account, 180000)) == "Working");
+    CHECK(stateLabel(monitorState(*account, 600000)) == "Inactive");
+    CHECK(!needsAttention(monitorState(*account, 600000)));
     std::uint64_t rolloverAge = 1;
     rolloverAge <<= 32;
     CHECK(stale(*resource, rolloverAge));

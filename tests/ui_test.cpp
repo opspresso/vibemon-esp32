@@ -245,7 +245,7 @@ int main() {
       Store store; configured(store);
       auto account = demo().items.back();
       account.activity = state == "inactive" ? "working" : state;
-      account.reportedStale = state == "inactive";
+      if (state == "inactive") account.activityAgeMs = 600000;
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
       store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;
