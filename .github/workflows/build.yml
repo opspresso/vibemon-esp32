@@ -1,10 +1,14 @@
 name: Verify firmware
 
-# A pull request check builds the merge result, so main is not built again
-# after the merge. A vX.Y.Z tag builds once more in release.yml to publish.
+# Runs before every release (called by release.yml) and on demand. Pull requests and pushes do not
+# start it; release.yml publishes only after these checks pass.
 on:
-  pull_request:
-    branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to verify; defaults to the triggering commit.
+        type: string
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -19,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -47,6 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

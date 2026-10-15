@@ -16,7 +16,11 @@ env:
   ARDUINO_CLI_VERSION: '1.5.1'
 
 jobs:
+  verify:
+    uses: ./.github/workflows/build.yml
+
   build:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
