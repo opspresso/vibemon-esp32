@@ -166,8 +166,8 @@ std::string healthState(Health health) {
 std::string reportState(const ReportState& item, bool agent, std::uint64_t elapsedMs) {
   const auto health = healthState(item.health);
   if (!agent) return stale(item, elapsedMs) ? "stale" : health;
-  // Coding hooks report events, not a heartbeat: a long tool call or response
-  // is silent while the agent works, so liveness follows the event clock.
+  // Coding hooks report events plus a heartbeat while a turn runs, so liveness
+  // follows the clock of the newest report: a turn that stops reporting ages.
   std::string state = item.activity;
   auto age = static_cast<std::uint64_t>(item.activityAgeMs) + elapsedMs;
   auto* rule = stateRule(state);
