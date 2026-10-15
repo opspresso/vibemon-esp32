@@ -6,13 +6,13 @@
 #include <NetworkClientSecure.h>
 #include <WiFi.h>
 #include <esp_ota_ops.h>
+#include <esp_heap_caps.h>
 #include <esp_system.h>
 #include <mbedtls/sha256.h>
 #include <algorithm>
 #include <array>
 #include <cstdio>
 #include <memory>
-#include <new>
 
 namespace vibemon {
 namespace {
@@ -142,7 +142,9 @@ std::unique_ptr<UpdateResult> EspUpdate::write(const FirmwareRelease& release) {
   if (esp_ota_begin(target, OTA_WITH_SEQUENTIAL_WRITES, &handle) != ESP_OK) {
     http.end(); result->error = UpdateError::Storage; return result;
   }
-  std::unique_ptr<std::uint8_t[]> buffer(new (std::nothrow) std::uint8_t[4096]);
+  // Flash writes read the source while the cache is off; keep it in internal RAM.
+  std::unique_ptr<std::uint8_t, decltype(&heap_caps_free)> buffer(
+      static_cast<std::uint8_t*>(heap_caps_malloc(4096, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)), heap_caps_free);
   Sha256 digest;
   auto* stream = http.getStreamPtr();
   const std::uint32_t started = millis();
@@ -160,6 +162,8 @@ std::unique_ptr<UpdateResult> EspUpdate::write(const FirmwareRelease& release) {
     digest.update(buffer.get(), read);
     written += read;
     lastData = now;
+    // Let core 0's idle task run so the task watchdog stays satisfied.
+    vTaskDelay(1);
     progress_ = static_cast<std::uint8_t>(static_cast<std::uint64_t>(written) * 100 / release.size);
   }
   http.end();
