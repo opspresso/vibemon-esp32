@@ -29,11 +29,12 @@ void wrap(lv_obj_t* object) {
   lv_label_set_long_mode(object, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_set_height(object, LV_SIZE_CONTENT);
 }
-std::string shortConnection(Connection connection) {
+std::string shortConnection(Connection connection, bool hasSnapshot) {
   switch (connection) {
     case Connection::NeedWifi: return "Set up Wi-Fi";
     case Connection::ConnectingWifi: return "Connecting to Wi-Fi";
-    case Connection::WifiUnavailable: return "Offline · last readings";
+    // The saved network is retried automatically; only the readings differ.
+    case Connection::WifiUnavailable: return hasSnapshot ? "Offline · last readings" : "Wi-Fi unavailable · retrying";
     case Connection::SettingClock: return "Setting the clock";
     case Connection::ClockUnavailable: return "Check network time";
     case Connection::NeedCloud: return "Connect your workspace";
@@ -167,6 +168,7 @@ void DashboardUi::dashboard() {
   auto* mark = lv_image_create(root_); lv_image_set_src(mark, brandImage()); lv_obj_set_pos(mark, 16, 14);
   label(root_, "VibeMon", 58, 11, 300, &lv_font_montserrat_24);
   connection_ = label(root_, "", 59, 41, 344, fonts_.small(), Good);
+  widgets_["connection"] = connection_;
   widgets_["settings"] = button(root_, LV_SYMBOL_SETTINGS, 420, 12, 44, 44, [this] { settings(); });
   label(root_, "YOUR WORKSPACE", 16, 72, 210, &lv_font_montserrat_12, Muted);
   auto* hint = label(root_, "Tap a card for details", 238, 71, 226, fonts_.small(), Muted);
@@ -226,7 +228,7 @@ void DashboardUi::dashboard() {
 
 void DashboardUi::updateCards(std::uint32_t now) {
   const auto& workspace = controller_.workspace();
-  if (setText(connection_, shortConnection(workspace.connection))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Good : Warning), 0);
+  if (setText(connection_, shortConnection(workspace.connection, workspace.hasSnapshot))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Good : Warning), 0);
   const auto elapsed = controller_.snapshotAgeMs(now);
   for (std::size_t index = 0; index < PanelCount; ++index) {
     auto& card = cards_[index];
@@ -608,8 +610,10 @@ void DashboardUi::update(std::uint32_t now) {
     formStatus(workspace.message, workspace.connection == Connection::WifiUnavailable || workspace.connection == Connection::ClockUnavailable);
   }
   if (page_ == Page::Dashboard) {
+    // Only a missing configuration needs setup. A saved Wi-Fi network that is
+    // unavailable is retried in the background, so the dashboard stays and
+    // returns to live readings when the network does.
     if (changed && !workspace.hasSnapshot && workspace.connection == Connection::NeedCloud) { cloud(); return; }
-    if (changed && !workspace.hasSnapshot && workspace.connection == Connection::WifiUnavailable) { wifi(); return; }
     updateCards(now);
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();

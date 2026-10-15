@@ -62,7 +62,7 @@ Opening the USB port may reset a CH340 board. The helper waits for a ready respo
 | Screen state | Action |
 | --- | --- |
 | No networks | Scan again, or enter a hidden SSID. Check that the network supports 2.4 GHz. |
-| Wi-Fi unavailable | Check the password and signal, then choose Wi-Fi in device settings. |
+| Wi-Fi unavailable · retrying, or Offline · last readings | The device retries the saved network every 30 seconds and stays on the dashboard. If it does not reconnect, check the password and signal, then choose Wi-Fi in device settings. |
 | Setting the clock / network time unavailable | Allow the network to reach an NTP server; HTTPS verification requires valid time. |
 | Token rejected | Retrieve or replace the token in Web Account, then enter it again. |
 | Read permission required | Use a read token. A write-only collector token cannot display the workspace. |
