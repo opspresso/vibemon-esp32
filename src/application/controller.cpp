@@ -8,8 +8,8 @@ namespace {
 bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
 }  // namespace
 
-Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud)
-    : settings_(settings), wifi_(wifi), cloud_(cloud) {}
+Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version)
+    : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)) {}
 
 void Controller::state(Connection connection, const std::string& message) {
   if (workspace_.connection == connection && workspace_.message == message) return;
@@ -195,6 +195,10 @@ void Controller::tick(std::uint32_t now) {
   if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
   const auto wifi = wifi_.status();
+  if (updater_.tick(now, wifi.link == WifiLink::Connected && wifi.clockReady, workspace_.connection == Connection::Online)) {
+    workspace_.firmware = updater_.view();
+    ++workspace_.revision;
+  }
   if (wifi.link != WifiLink::Connected) {
     if (hadConnection_) {
       ++generation_; inFlight_ = false; workspace_.refreshing = false; hadConnection_ = false;
@@ -237,7 +241,8 @@ void Controller::tick(std::uint32_t now) {
     if (workspace_.connection != Connection::TokenRejected && workspace_.connection != Connection::StorageError) state(Connection::NeedCloud, "Enter your server address and a read token.");
     return;
   }
-  if (inFlight_ || tokenRejected_ || storageBlocked_ || !due(now, nextPoll_)) return;
+  // A firmware download owns the network until the device restarts.
+  if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || !due(now, nextPoll_)) return;
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   if (cloud_.start({generation_, origin, token})) {

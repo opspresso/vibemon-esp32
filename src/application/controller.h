@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ports.h"
+#include "updater.h"
 
 namespace vibemon {
 
@@ -18,11 +18,12 @@ struct Workspace {
   std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};
   Catalog catalog;
+  FirmwareView firmware;
 };
 
 class Controller {
  public:
-  Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud);
+  Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version);
   void begin(std::uint32_t now);
   void tick(std::uint32_t now);
   Validation saveWifi(const std::string& ssid, const std::string& password);
@@ -32,6 +33,7 @@ class Controller {
   void retryWifi();
   void cancelSetup();
   void scanWifi();
+  void checkFirmware() { updater_.checkNow(); }
   const Workspace& workspace() const { return workspace_; }
   std::uint64_t snapshotAgeMs(std::uint32_t now) const {
     return workspace_.snapshotAgeMs + static_cast<std::uint32_t>(now - now_);
@@ -48,6 +50,7 @@ class Controller {
   SettingsStore& settings_;
   WifiPort& wifi_;
   CloudPort& cloud_;
+  Updater updater_;
   Config config_;
   Workspace workspace_;
   std::optional<WifiCredentials> pendingWifi_;

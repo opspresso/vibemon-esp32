@@ -42,6 +42,27 @@ struct Cloud final : CloudPort {
     busy = false;
   }
 };
+struct Update final : UpdatePort {
+  int checks = 0, confirms = 0, restarts = 0;
+  std::vector<FirmwareRelease> installs;
+  std::unique_ptr<UpdateResult> reply;
+  std::uint8_t percent = 0;
+  bool busy = false;
+  bool check() override { if (busy) return false; busy = true; ++checks; return true; }
+  bool install(const FirmwareRelease& release) override { if (busy) return false; busy = true; installs.push_back(release); return true; }
+  std::unique_ptr<UpdateResult> take() override { return std::move(reply); }
+  std::uint8_t progress() const override { return percent; }
+  void confirm() override { ++confirms; }
+  void restart() override { ++restarts; }
+  void complete(FirmwareRelease release = {}, UpdateError error = UpdateError::None) {
+    CHECK(busy);
+    reply = std::make_unique<UpdateResult>(UpdateResult{error, std::move(release)});
+    busy = false;
+  }
+};
+inline FirmwareRelease firmwareRelease(const std::string& version) {
+  return {version, std::string(FirmwareDownloadPrefix) + "v" + version + "/vibemon-esp32.ino.bin", 3800000, std::string(64, 'a')};
+}
 inline Catalog catalog(const std::string& id = "one") {
   Catalog value;
   Monitor resource;

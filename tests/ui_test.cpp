@@ -114,7 +114,7 @@ int main() {
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(pointer, [](lv_indev_t*, lv_indev_data_t* data) { data->point = position; data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED; });
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(demo()); app.tick(2);
       timeMs = 2;
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("dashboard");
@@ -194,7 +194,7 @@ int main() {
       CHECK(flushes == inactiveFlushes);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs); wifi.connected(); app.tick(timeMs);
       auto catalog = demo();
       auto& resource = catalog.items[0];
@@ -246,7 +246,7 @@ int main() {
     {
       // A saved network that misses its first join is retried automatically.
       // The dashboard keeps its place and says so; it is not a setup request.
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); CHECK(ui.page() == Page::Dashboard);
       wifi.current.link = WifiLink::Failed; app.tick(++timeMs); advance(ui);
@@ -266,7 +266,7 @@ int main() {
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
       store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;
-      Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs); wifi.connected(); app.tick(timeMs); cloud.complete(catalog); app.tick(++timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui, 250);
       auto* light = ui.widget("panel-light-0-0"); CHECK(light);
