@@ -1,5 +1,6 @@
 #include "serial_console.h"
 #include "esp32_display.h"
+#include "esp32_update.h"
 #include "../version.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -49,6 +50,10 @@ void SerialConsole::command() {
       response["displayRedraws"] = display_.redraws();
       response["renderedPixels"] = display_.renderedPixels();
       response["displayClockHz"] = display_.pixelClock();
+      response["firmwareSlot"] = update_.runningSlot();
+      response["firmwareState"] = static_cast<int>(workspace.firmware.state);
+      response["firmwareAvailable"] = workspace.firmware.available;
+      response["firmwareProgress"] = workspace.firmware.progress;
       response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
     } else if (name == "display-clock") {
       response["ok"] = request["hz"].is<std::uint32_t>() && display_.setPixelClock(request["hz"].as<std::uint32_t>());
@@ -69,6 +74,8 @@ void SerialConsole::command() {
       ui_.dashboard(); response["ok"] = true;
     } else if (name == "refresh") {
       controller_.refresh(); response["ok"] = true;
+    } else if (name == "update-check") {
+      controller_.checkFirmware(); response["ok"] = true;
     } else { response["ok"] = false; response["error"] = "Unknown command"; }
   }
   serializeJson(response, Serial); Serial.println();

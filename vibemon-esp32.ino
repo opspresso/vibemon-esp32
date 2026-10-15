@@ -3,9 +3,14 @@
 #include <esp_psram.h>
 #include "src/platform/esp32_display.h"
 #include "src/platform/esp32_services.h"
+#include "src/platform/esp32_update.h"
 #include "src/platform/serial_console.h"
 #include "src/presentation/dashboard_ui.h"
 #include "src/version.h"
+
+// Arduino otherwise confirms a trial image at startup. The Updater confirms it
+// only after the image reaches the workspace or the release server.
+extern "C" bool verifyRollbackLater() { return true; }
 
 #if !CONFIG_IDF_TARGET_ESP32S3
 #error "VibeMon Touch requires the ESP32-4848S040 (ESP32-S3) build profile."
@@ -16,9 +21,10 @@ vibemon::EspDisplay display;
 vibemon::NvsSettings settings;
 vibemon::EspWifi wifi;
 vibemon::EspCloud cloud;
-vibemon::Controller controller(settings, wifi, cloud);
+vibemon::EspUpdate update;
+vibemon::Controller controller(settings, wifi, cloud, update, VIBEMON_VERSION);
 vibemon::DashboardUi ui(controller);
-vibemon::SerialConsole console(controller, ui, display);
+vibemon::SerialConsole console(controller, ui, display, update);
 bool ready = false;
 }
 
@@ -33,6 +39,7 @@ void setup() {
   if (!display.begin()) { Serial.println("Startup failed: LCD or touch initialization."); return; }
   wifi.begin();
   if (!cloud.begin()) { Serial.println("Startup failed: HTTPS worker allocation."); return; }
+  if (!update.begin()) { Serial.println("Startup failed: update worker allocation."); return; }
   // Initialize drivers first. Application strings, catalogs and font caches then prefer PSRAM,
   // preserving internal memory for DMA, FreeRTOS stacks and Wi-Fi's capability-specific allocations.
   heap_caps_malloc_extmem_enable(0);
