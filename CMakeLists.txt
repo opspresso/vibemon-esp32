@@ -7,7 +7,7 @@ set(ARDUINO_LIB_DIR "${CMAKE_SOURCE_DIR}/build/arduino/libraries" CACHE PATH "Is
 if(NOT EXISTS "${ARDUINO_LIB_DIR}/ArduinoJson/src/ArduinoJson.h")
   message(FATAL_ERROR "Install the pinned libraries before configuring native tests")
 endif()
-add_library(vibemon_core src/domain/model.cpp src/adapters/catalog_json.cpp src/adapters/settings_json.cpp src/application/controller.cpp)
+add_library(vibemon_core src/domain/model.cpp src/domain/firmware.cpp src/adapters/release_json.cpp src/adapters/catalog_json.cpp src/adapters/settings_json.cpp src/application/controller.cpp src/application/updater.cpp)
 target_include_directories(vibemon_core PUBLIC src "${CMAKE_SOURCE_DIR}/build/generated" "${ARDUINO_LIB_DIR}/ArduinoJson/src")
 target_compile_options(vibemon_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 option(VIBEMON_SANITIZE "Enable native address and undefined-behavior sanitizers" ON)

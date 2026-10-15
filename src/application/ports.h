@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../domain/firmware.h"
 #include "../domain/model.h"
 #include <memory>
 
@@ -48,6 +49,27 @@ class CloudPort {
   virtual ~CloudPort() = default;
   virtual bool start(const CloudRequest& request) = 0;
   virtual std::unique_ptr<CloudResult> take() = 0;
+};
+
+enum class UpdateError { None, Network, InvalidRelease, Download, Integrity, Storage };
+struct UpdateResult {
+  UpdateError error = UpdateError::None;
+  // A check returns the published release. An install returns the release
+  // that the next boot starts.
+  FirmwareRelease release;
+};
+// Downloads run on a worker. Each call to check() or install() produces one result.
+class UpdatePort {
+ public:
+  virtual ~UpdatePort() = default;
+  virtual bool check() = 0;
+  virtual bool install(const FirmwareRelease& release) = 0;
+  virtual std::unique_ptr<UpdateResult> take() = 0;
+  virtual std::uint8_t progress() const = 0;  // 0-100 while an install runs
+  // Keeps the running image. Without this call, the bootloader returns to the
+  // previous image on the next restart.
+  virtual void confirm() = 0;
+  virtual void restart() = 0;
 };
 
 }  // namespace vibemon

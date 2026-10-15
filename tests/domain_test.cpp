@@ -1,5 +1,6 @@
 #include "domain/model.h"
 #include "adapters/catalog_json.h"
+#include "adapters/release_json.h"
 
 #include <cmath>
 #include <iostream>
@@ -105,6 +106,19 @@ int main() {
     metric.value = 14200; CHECK(metricValue(metric) == "14.2k");
     CHECK(metricValue(metric, false) == "14,200");
     CHECK(ageLabel(14999) == "Just now" && ageLabel(15000) == "15s ago" && ageLabel(60000) == "1m ago");
-    std::cout << "PASS domain: credential boundaries, Unicode, timestamps, account isolation, metric order, missing values, stale data and atomic snapshots\n";
+    CHECK(newerVersion("3.3.2", "3.4.0") && newerVersion("3.3.2", "3.3.10") && newerVersion("3.9.9", "4.0.0"));
+    CHECK(!newerVersion("3.4.0", "3.4.0") && !newerVersion("3.4.0", "3.3.9") && !newerVersion("3.4.0", "3.4"));
+    CHECK(!newerVersion("3.4.0", "3.4.0-rc.1") && !newerVersion("3.4.0", "v3.5.0") && !newerVersion("3.4.0", "3..5"));
+    const std::string digest(64, 'a');
+    const std::string release = "{\"board\":\"ESP32-4848S040\",\"version\":\"3.4.0\",\"url\":\"https://github.com/opspresso/vibemon-esp32/releases/download/v3.4.0/vibemon-esp32.ino.bin\",\"size\":3800000,\"sha256\":\"" + digest + "\"}";
+    FirmwareRelease firmware;
+    CHECK(decodeRelease(release, firmware) && firmware.version == "3.4.0" && firmware.size == 3800000 && firmware.sha256 == digest);
+    auto replace = [&](const std::string& from, const std::string& to) { auto value = release; value.replace(value.find(from), from.size(), to); return value; };
+    CHECK(!decodeRelease(replace("ESP32-4848S040", "ESP32-S3-Box"), firmware));
+    CHECK(!decodeRelease(replace("https://github.com/opspresso/vibemon-esp32/", "https://example.com/"), firmware));
+    CHECK(!decodeRelease(replace("3800000", "7340033"), firmware) && !decodeRelease(replace("3800000", "0"), firmware));
+    CHECK(!decodeRelease(replace(digest, std::string(64, 'A')), firmware) && !decodeRelease(replace(digest, digest.substr(1)), firmware));
+    CHECK(!decodeRelease(replace("\"3.4.0\"", "\"latest\""), firmware) && !decodeRelease("[]", firmware));
+    std::cout << "PASS domain: credential boundaries, Unicode, timestamps, account isolation, metric order, missing values, stale data, atomic snapshots and firmware releases\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

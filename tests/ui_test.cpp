@@ -114,7 +114,7 @@ int main() {
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(pointer, [](lv_indev_t*, lv_indev_data_t* data) { data->point = position; data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED; });
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(demo()); app.tick(2);
       timeMs = 2;
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("dashboard");
@@ -150,7 +150,20 @@ int main() {
       CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN)));
       tap(ui, "panel-0"); tap(ui, "change-item"); tap(ui, "clear-panel"); CHECK(app.workspace().panels[0].id.empty());
       screenshot("empty-panel");
-      tap(ui, "settings"); CHECK(ui.page() == Page::Settings); screenshot("settings");
+      tap(ui, "settings"); CHECK(ui.page() == Page::Settings);
+      auto firmwareText = [&] { return std::string(lv_label_get_text(ui.widget("firmware-status"))); };
+      CHECK(firmwareText() == "Update check pending");
+      tap(ui, "firmware"); app.tick(timeMs); CHECK(update.checks == 1);
+      update.complete(firmwareRelease("3.4.0")); app.tick(timeMs + 1); advance(ui);
+      CHECK(firmwareText() == "Up to date"); screenshot("settings");
+      tap(ui, "firmware"); app.tick(timeMs); update.complete(firmwareRelease("3.5.0")); app.tick(timeMs + 1);
+      update.percent = 42; app.tick(timeMs + 2); advance(ui);
+      CHECK(firmwareText() == "Installing 3.5.0 · 42%");
+      tap(ui, "back"); advance(ui);
+      CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Installing 3.5.0 · 42%"); screenshot("firmware-update");
+      update.complete({}, UpdateError::Download); app.tick(timeMs); advance(ui);
+      CHECK(std::string(lv_label_get_text(ui.widget("connection"))) != "Installing 3.5.0 · 42%");
+      tap(ui, "settings"); CHECK(firmwareText() == "3.5.0 failed · retrying later");
       tap(ui, "cloud-settings"); CHECK(ui.page() == Page::CloudForm);
       CHECK(std::string(lv_textarea_get_text(ui.widget("read-token"))).empty());
       CHECK(lv_textarea_get_password_mode(ui.widget("read-token")));
@@ -194,7 +207,7 @@ int main() {
       CHECK(flushes == inactiveFlushes);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs); wifi.connected(); app.tick(timeMs);
       auto catalog = demo();
       auto& resource = catalog.items[0];
@@ -246,7 +259,7 @@ int main() {
     {
       // A saved network that misses its first join is retried automatically.
       // The dashboard keeps its place and says so; it is not a setup request.
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); CHECK(ui.page() == Page::Dashboard);
       wifi.current.link = WifiLink::Failed; app.tick(++timeMs); advance(ui);
@@ -266,7 +279,7 @@ int main() {
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
       store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;
-      Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs); wifi.connected(); app.tick(timeMs); cloud.complete(catalog); app.tick(++timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui, 250);
       auto* light = ui.widget("panel-light-0-0"); CHECK(light);

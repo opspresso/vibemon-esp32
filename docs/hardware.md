@@ -28,3 +28,5 @@ The dependency versions are recorded in [toolchain.lock.json](../toolchain.lock.
 ## Device acceptance checks
 
 After flashing, verify all four corners respond at their displayed coordinates, text has correct colors, scrolling does not shift the RGB scanout, and touch remains responsive during HTTPS requests. Reboot to verify Wi-Fi, server, read token and four panel selections persist. Test an unavailable access point and a rejected token separately. A successful compile or host simulation does not prove these physical checks.
+
+For a release that changes update behavior, also verify on the device: publish a newer test release, check that settings show the install progress, the device restarts into the new version and `info` reports the other `firmwareSlot`. Then install an image that cannot reach Wi-Fi, restart it and check that the previous version starts again.

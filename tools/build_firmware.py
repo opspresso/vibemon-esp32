@@ -11,6 +11,7 @@ import sys
 
 from sdk_toolchain import ROOT, IDF, load
 from collect_licenses import collect
+from firmware_release import update_description
 
 
 def configuration(base, overrides, arduino_kconfig):
@@ -72,7 +73,7 @@ def main():
              ('boot_app0.bin', 'ota_data_initial.bin', 0xe000), ('vibemon-esp32.ino.bin', 'vibemon_touch.bin', 0x10000)]
     for destination, source, offset in files:
         data = (build / source).read_bytes()
-        if not data or (offset < 0xe000 and offset + len(data) > 0x9000) or offset + len(data) > 0x810000:
+        if not data or (offset < 0xe000 and offset + len(data) > 0x9000) or offset + len(data) > 0x710000:
             raise ValueError('Firmware image exceeds its partition or overlaps NVS')
         (output / destination).write_bytes(data)
         images[destination] = {'offset': offset, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
@@ -88,6 +89,8 @@ def main():
                 'display': {'pixelClockHz': 16000000, 'dataCacheBytes': 65536, 'cacheLineBytes': 64,
                             'forcedVsyncRestart': False, 'psramInstructionsAndRodata': True, 'cacheSafeInterrupts': True}}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    # Devices read this file from the latest release to find and verify an update.
+    (output / 'ota.json').write_text(json.dumps(update_description(description['project_version'], binary)) + '\n')
     # An old Arduino merged image would overwrite NVS and use the wrong SDK.
     (output / 'vibemon-esp32.ino.merged.bin').unlink(missing_ok=True)
     print('Built ESP32-4848S040 firmware:', binary['size'], 'bytes')

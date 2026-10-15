@@ -3,7 +3,7 @@
 int main() {
   try {
     {
-      Store store; Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0);
       CHECK(app.workspace().connection == Connection::NeedWifi && wifi.scans == 1);
       CHECK(!app.saveWifi("", "password").ok && store.writes == 0);
@@ -28,12 +28,12 @@ int main() {
       CHECK(app.select(0, {}).ok && store.writes == 3);
       app.refresh(); app.tick(10402); cloud.complete(catalog()); app.tick(10403);
       CHECK(app.workspace().panels[0].id.empty());
-      Store rebootedStore = store; Wifi rebootedWifi; Cloud rebootedCloud;
-      Controller rebooted(rebootedStore, rebootedWifi, rebootedCloud); rebooted.begin(0);
+      Store rebootedStore = store; Wifi rebootedWifi; Cloud rebootedCloud; Update rebootedUpdate;
+      Controller rebooted(rebootedStore, rebootedWifi, rebootedCloud, rebootedUpdate, "3.4.0"); rebooted.begin(0);
       CHECK(rebooted.workspace().panels[0].id.empty() && rebooted.workspace().panels[1].id == "codex:work");
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1);
       CHECK(cloud.requests.size() == 1);
       CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
@@ -49,7 +49,7 @@ int main() {
       CHECK(app.saveCloud("https://other.example", "").ok);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
       CHECK(app.saveCloud("https://wrong.example", "vm_" + std::string(60, 'b')).ok);
       app.tick(3); cloud.complete({}, CloudError::Unauthorized); app.tick(4);
@@ -62,7 +62,7 @@ int main() {
       CHECK(app.workspace().connection == Connection::TokenRejected);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
       const auto before = store.saved;
       CHECK(app.saveWifi("Other", "wrong-pass").ok);
@@ -72,7 +72,7 @@ int main() {
       app.retryWifi(); CHECK(wifi.requested == "Workshop");
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1);
       store.writable = false; cloud.complete(catalog()); app.tick(2);
       CHECK(app.workspace().connection == Connection::StorageError && !app.workspace().hasSnapshot);
@@ -82,25 +82,25 @@ int main() {
     }
     {
       Store store; configured(store); store.saved.origin = "http://unsafe.example";
-      Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud); app.begin(0);
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0"); app.begin(0);
       CHECK(app.workspace().connection == Connection::StorageError && wifi.connects == 0 && !app.workspace().tokenConfigured);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       const auto start = std::numeric_limits<std::uint32_t>::max() - 5;
       app.begin(start); wifi.connected(); app.tick(start); cloud.complete(catalog()); app.tick(start + 1);
       app.tick(2); CHECK(cloud.requests.size() == 1);
       app.tick(9996); CHECK(cloud.requests.size() == 2);
     }
     {
-      Store store; Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud); app.begin(0);
+      Store store; Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0"); app.begin(0);
       CHECK(app.saveWifi("Unverified", "test-password").ok);
       app.cancelSetup();
       CHECK(!app.changingWifi() && wifi.requested.empty() && store.writes == 0);
       CHECK(app.workspace().connection == Connection::NeedWifi);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
       const auto writes = store.writes;
       CHECK(app.saveWifi("Workshop", "test-password").ok);
@@ -114,13 +114,13 @@ int main() {
       CHECK(cloud.requests.back().origin == "https://vibemon.io");
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected("Workshop", false); app.tick(1); app.tick(30001);
       CHECK(app.workspace().connection == Connection::ClockUnavailable && cloud.requests.empty());
       wifi.connected(); app.tick(30002); CHECK(cloud.requests.size() == 1);
     }
     {
-      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1);
       auto fresh = catalog();
       fresh.items[0].ageMs = 0; fresh.items[0].health = Health::Ok;
@@ -143,6 +143,53 @@ int main() {
       CHECK(app.snapshotAgeMs(reconnected + 1) == 0);
       CHECK(monitorState(app.workspace().catalog.items[0], app.snapshotAgeMs(reconnected + 1)) == "ok");
     }
-    std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery and timer rollover\n";
+    {
+      // A newer release installs, holds workspace polling and restarts into the new image.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.workspace().connection == Connection::Online && update.checks == 0);
+      app.tick(3); CHECK(update.confirms == 1);
+      app.tick(Updater::FirstCheckDelayMs); CHECK(update.checks == 0);
+      app.tick(Updater::FirstCheckDelayMs + 1);
+      CHECK(update.checks == 1 && app.workspace().firmware.state == FirmwareState::Checking);
+      cloud.complete(catalog()); update.complete(firmwareRelease("3.4.0"));
+      app.tick(30002); CHECK(app.workspace().firmware.state == FirmwareState::Current && update.installs.empty());
+      app.checkFirmware(); app.tick(30003); CHECK(update.checks == 2);
+      update.complete(firmwareRelease("3.3.9")); app.tick(30004);
+      CHECK(app.workspace().firmware.state == FirmwareState::Current && update.installs.empty());
+      app.checkFirmware(); app.tick(30005); update.complete(firmwareRelease("3.5.0")); app.tick(30006);
+      CHECK(update.installs.size() == 1 && update.installs[0].version == "3.5.0");
+      CHECK(app.workspace().firmware.state == FirmwareState::Installing && app.workspace().firmware.available == "3.5.0");
+      const auto requests = cloud.requests.size();
+      app.tick(90000); CHECK(cloud.requests.size() == requests);
+      update.percent = 40; const auto revision = app.workspace().revision; app.tick(90001);
+      CHECK(app.workspace().firmware.progress == 40 && app.workspace().revision != revision);
+      update.complete(firmwareRelease("3.5.0")); app.tick(90002);
+      CHECK(app.workspace().firmware.state == FirmwareState::Restarting && update.restarts == 0);
+      app.tick(90002 + Updater::RestartDelayMs - 1); CHECK(update.restarts == 0);
+      app.tick(90002 + Updater::RestartDelayMs); CHECK(update.restarts == 1 && cloud.requests.size() == requests);
+    }
+    {
+      // Failures retry later; a reached release server confirms the running image.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected("Workshop", false); app.tick(1);
+      app.tick(Updater::FirstCheckDelayMs + 10); CHECK(update.checks == 0);
+      wifi.connected(); app.tick(Updater::FirstCheckDelayMs + 11);
+      const std::uint32_t first = 2 * Updater::FirstCheckDelayMs + 11;
+      app.tick(first); CHECK(update.checks == 1 && update.confirms == 0);
+      update.complete({}, UpdateError::Network); app.tick(first + 1);
+      CHECK(app.workspace().firmware.state == FirmwareState::Unavailable && update.confirms == 0);
+      app.tick(first + Updater::RetryDelayMs); CHECK(update.checks == 1);
+      app.tick(first + 1 + Updater::RetryDelayMs); CHECK(update.checks == 2);
+      update.complete(firmwareRelease("3.5.0")); app.tick(first + 2 + Updater::RetryDelayMs);
+      CHECK(update.confirms == 1 && update.installs.size() == 1);
+      update.complete({}, UpdateError::Integrity); app.tick(first + 3 + Updater::RetryDelayMs);
+      CHECK(app.workspace().firmware.state == FirmwareState::Failed && app.workspace().firmware.available == "3.5.0");
+      CHECK(update.restarts == 0);
+      cloud.complete(catalog()); app.tick(first + 4 + Updater::RetryDelayMs);
+      const auto requests = cloud.requests.size();
+      app.tick(first + 5 + Updater::RetryDelayMs + PollIntervalMs); CHECK(cloud.requests.size() == requests + 1);
+    }
+    std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery, timer rollover and firmware updates\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

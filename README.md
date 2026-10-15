@@ -6,7 +6,7 @@ The 480×480 display follows your VibeMon workspace over HTTPS. Each card can sh
 
 ## Set up the device
 
-1. Build and upload the firmware using the [setup guide](docs/arduino-setup.md).
+1. Build and upload the firmware using the [setup guide](docs/arduino-setup.md). Later releases install over Wi-Fi.
 2. On the screen, select a **2.4 GHz Wi-Fi** network and enter its password. Use **Hidden network** to enter a name manually.
 3. Enter `https://vibemon.io` or your own HTTPS VibeMon origin.
 4. Enter a token with **read** permission from [Account](https://vibemon.io/account). The device checks it before saving.
@@ -22,6 +22,7 @@ The first successful non-empty response fills up to four cards, alternating reso
 - On-screen Wi-Fi scanning, password input and a large read-token keypad.
 - Korean and Latin names, without downloading fonts at runtime.
 - Optional USB setup for pasting a long key; secrets are prompted and never echoed.
+- Firmware updates over Wi-Fi from this repository's releases. A new image that cannot reach the network rolls back on restart.
 
 ## Develop and verify
 

@@ -15,6 +15,25 @@ flash_spec = importlib.util.spec_from_file_location("flash", ROOT / "tools/flash
 flash = importlib.util.module_from_spec(flash_spec)
 flash_spec.loader.exec_module(flash)
 
+release_spec = importlib.util.spec_from_file_location("firmware_release", ROOT / "tools/firmware_release.py")
+release = importlib.util.module_from_spec(release_spec)
+release_spec.loader.exec_module(release)
+
+
+class UpdateDescriptionTests(unittest.TestCase):
+    def test_describes_the_tagged_application_image(self):
+        image = {"size": 3800000, "sha256": "a" * 64}
+        self.assertEqual(release.update_description("3.4.0", image), {
+            "board": "ESP32-4848S040", "version": "3.4.0",
+            "url": "https://github.com/opspresso/vibemon-esp32/releases/download/v3.4.0/vibemon-esp32.ino.bin",
+            "size": 3800000, "sha256": "a" * 64})
+
+    def test_rejects_versions_and_images_the_device_refuses(self):
+        with self.assertRaisesRegex(ValueError, "MAJOR.MINOR.PATCH"):
+            release.update_description("3.4.0-rc.1", {"size": 1, "sha256": "a" * 64})
+        with self.assertRaisesRegex(ValueError, "update slot"):
+            release.update_description("3.4.0", {"size": 0x700001, "sha256": "a" * 64})
+
 
 class UploadIntegrityTests(unittest.TestCase):
     def setUp(self):
@@ -43,8 +62,8 @@ class UploadIntegrityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NVS"):
             flash.verify_images(self.directory)
 
-    def test_app_cannot_overwrite_coredump_partition(self):
-        self.image("vibemon-esp32.ino.bin", 0x10000, b"x" * (0x800000 + 1))
+    def test_app_cannot_overflow_into_the_second_update_slot(self):
+        self.image("vibemon-esp32.ino.bin", 0x10000, b"x" * (0x700000 + 1))
         with self.assertRaisesRegex(ValueError, "application partition"):
             flash.verify_images(self.directory)
 

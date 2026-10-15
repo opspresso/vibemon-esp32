@@ -26,7 +26,7 @@ def verify_images(directory):
             raise ValueError("Build image overlaps NVS or is empty")
         ranges.append((offset, offset + len(data)))
     ranges.sort()
-    if any(previous[1] > following[0] for previous, following in zip(ranges, ranges[1:])) or ranges[-1][1] > 0x810000:
+    if any(previous[1] > following[0] for previous, following in zip(ranges, ranges[1:])) or ranges[-1][1] > 0x710000:
         raise ValueError("Upload image ranges overlap or exceed the application partition")
     return manifest
 

@@ -36,7 +36,19 @@ Coding cards animate small light trails around their rounded edges at up to 30 u
 
 Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_json.py` applies a hash-verified change to the isolated ArduinoJson numeric parser: decimal tokens use C++ `from_chars` rather than narrowing short mantissas to 32-bit floats. This preserves the Web value before formatting; for example, `1.005` remains the same double and displays as `1.01%`. The original and modified parser hashes are locked. User-installed libraries and the ESP-IDF checkout remain untouched.
 
-The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. The single application slot does not provide an OTA update service.
+The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. Two 7 MB application slots (`app0`, `app1`) hold the running image and the next update. The bootloader rolls back an update that restarts before it confirms itself; see [Firmware updates](#firmware-updates).
+
+## Firmware updates
+
+The device installs new releases over Wi-Fi. Two 7 MB application slots hold the running image and the next one.
+
+1. **Check.** 30 seconds after Wi-Fi and network time are ready, then every 6 hours, the device reads `ota.json` from `https://github.com/opspresso/vibemon-esp32/releases/latest/download/`. A tap on the firmware row in device settings, or the USB `update-check` command, checks immediately. A failed check retries after 15 minutes.
+2. **Accept.** The device accepts the release only when the board is `ESP32-4848S040`, the version is a newer `MAJOR.MINOR.PATCH`, the image fits one slot and the URL is in this repository's releases. Prereleases are never "latest", so they are not installed.
+3. **Install.** The update worker on core 0 streams the image into the slot that is not running. Workspace polling pauses until the restart. The dashboard status line shows the version and progress.
+4. **Verify.** The next boot selects the new slot only when the SHA-256 digest from `ota.json` matches and ESP-IDF validates the image. Otherwise the running image stays selected, and the device retries at the next 6-hour check.
+5. **Confirm or roll back.** The new image starts on trial. It confirms itself when it reaches the workspace or the release server. If it restarts before that, the bootloader starts the previous image again.
+
+TLS to GitHub authenticates the release files; the firmware images are not signed. The partition table and bootloader do not change over Wi-Fi. A change to either needs a USB upload.
 
 ## Verification commands
 
@@ -50,7 +62,7 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Bounded animation redraw regions, stable touch targets, Unicode category separators, and zero idle redraws after activity stops.
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 
-`tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 8 MB application limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
+`tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 7 MB application-slot limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
 
 ## Distribution notices
 

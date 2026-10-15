@@ -1,2 +1,2 @@
 #pragma once
-#define VIBEMON_VERSION "3.3.2"
+#define VIBEMON_VERSION "3.4.0"

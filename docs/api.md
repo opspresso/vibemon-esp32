@@ -39,17 +39,18 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock; no credentials or names. Frame/pixel counters wrap at 32 bits. |
+| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |
 | `refresh` | None | Request a refresh, including an explicit retry after a rejected token. |
+| `update-check` | None | Check for a firmware release now. A newer release installs and the device restarts. |
 | `display-clock` | `hz`: 8000000, 12000000, 16000000, 20000000 or 26000000 | Local display diagnosis only. Change at a frame boundary; reboot restores 16 MHz. Higher values may cause display corruption. |
 
 An optional unsigned 32-bit `requestId` is echoed in the response. The USB helper probes `info` after opening the port because CH340 adapters may reset the board. It waits for readiness before sending a settings command once, and ignores responses for older requests.
 
 A setup response with `queued: true` is not proof that connection or storage succeeded. Use the screen or a subsequent `info` response.
 
-Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings, `6` details.
+Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Firmware update states: `0` check pending, `1` checking, `2` up to date, `3` check failed, `4` installing, `5` restarting, `6` install failed. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings, `6` details.
 
 Use [tools/device.py](../tools/device.py) to prompt for secrets safely rather than including credentials in shell commands.
