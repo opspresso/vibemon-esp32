@@ -29,6 +29,19 @@ void wrap(lv_obj_t* object) {
   lv_label_set_long_mode(object, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_set_height(object, LV_SIZE_CONTENT);
 }
+std::string firmwareStatus(const FirmwareView& firmware) {
+  switch (firmware.state) {
+    case FirmwareState::Waiting: return "Update check pending";
+    case FirmwareState::Checking: return "Checking for updates";
+    case FirmwareState::Current: return "Up to date";
+    case FirmwareState::Unavailable: return "Check failed · retrying";
+    case FirmwareState::Installing: return "Installing " + firmware.available + " · " + std::to_string(firmware.progress) + "%";
+    case FirmwareState::Restarting: return "Restarting into " + firmware.available;
+    case FirmwareState::Failed: return firmware.available + " failed · retrying later";
+  }
+  return {};
+}
+
 std::string shortConnection(Connection connection, bool hasSnapshot) {
   switch (connection) {
     case Connection::NeedWifi: return "Set up Wi-Fi";
@@ -228,7 +241,10 @@ void DashboardUi::dashboard() {
 
 void DashboardUi::updateCards(std::uint32_t now) {
   const auto& workspace = controller_.workspace();
-  if (setText(connection_, shortConnection(workspace.connection, workspace.hasSnapshot))) lv_obj_set_style_text_color(connection_, lv_color_hex(workspace.connection == Connection::Online ? Good : Warning), 0);
+  // An update interrupts readings and restarts the device, so it takes the status line.
+  const bool updating = workspace.firmware.state == FirmwareState::Installing || workspace.firmware.state == FirmwareState::Restarting;
+  const auto status = updating ? firmwareStatus(workspace.firmware) : shortConnection(workspace.connection, workspace.hasSnapshot);
+  if (setText(connection_, status)) lv_obj_set_style_text_color(connection_, lv_color_hex(updating ? Accent : workspace.connection == Connection::Online ? Good : Warning), 0);
   const auto elapsed = controller_.snapshotAgeMs(now);
   for (std::size_t index = 0; index < PanelCount; ++index) {
     auto& card = cards_[index];
@@ -414,9 +430,15 @@ void DashboardUi::settings() {
   label(server, workspace.origin + (workspace.tokenConfigured ? " · key saved" : " · add read key"), 16, 44, 380, fonts_.small(), Muted);
   label(server, LV_SYMBOL_RIGHT, 410, 29, 24, fonts_.normal(), Muted);
   widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 448, 48, [this] { controller_.refresh(); dashboard(); });
-  auto* message = label(root_, workspace.message, 20, 376, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
+  auto* message = label(root_, workspace.message, 20, 362, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
   wrap(message);
-  label(root_, "VibeMon Touch · ESP32-4848S040", 20, 446, 440, fonts_.small(), Muted);
+  label(root_, "FIRMWARE", 20, 404, 440, &lv_font_montserrat_12, Muted);
+  // Tapping starts a check now; a newer release then installs and restarts.
+  auto* firmware = button(root_, "", 16, 426, 448, 46, [this] { controller_.checkFirmware(); });
+  widgets_["firmware"] = firmware;
+  label(firmware, "VibeMon Touch " + controller_.firmwareVersion(), 16, 13, 160, fonts_.small());
+  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), Muted);
+  lv_obj_set_style_text_align(widgets_["firmware-status"], LV_TEXT_ALIGN_RIGHT, 0);
 }
 
 void DashboardUi::wifi() {
@@ -617,6 +639,7 @@ void DashboardUi::update(std::uint32_t now) {
     updateCards(now);
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
+  else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
   else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
     pendingPickerRefresh_ = false; updatePicker();
   }

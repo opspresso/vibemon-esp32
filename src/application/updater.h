@@ -28,6 +28,7 @@ class Updater {
   // An install or the restart after it owns the network and the next boot.
   bool busy() const { return view_.state == FirmwareState::Installing || view_.state == FirmwareState::Restarting; }
   const FirmwareView& view() const { return view_; }
+  const std::string& version() const { return version_; }
 
  private:
   UpdatePort& port_;

@@ -34,6 +34,7 @@ class Controller {
   void cancelSetup();
   void scanWifi();
   void checkFirmware() { updater_.checkNow(); }
+  const std::string& firmwareVersion() const { return updater_.version(); }
   const Workspace& workspace() const { return workspace_; }
   std::uint64_t snapshotAgeMs(std::uint32_t now) const {
     return workspace_.snapshotAgeMs + static_cast<std::uint32_t>(now - now_);
