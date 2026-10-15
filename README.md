@@ -38,7 +38,7 @@ build/venv/bin/python tools/build_firmware.py
 
 On Windows, use `build\venv\Scripts\python.exe` in place of `build/venv/bin/python`. Pass `--arduino-cli PATH` to the setup command if the CLI is not on PATH. The firmware uses Arduino APIs inside a source-built ESP-IDF SDK; compiling with the Arduino IDE’s prebuilt SDK is not supported.
 
-Native tests run the same LVGL screen code as the firmware. PNG renders appear in `build/native/screenshots/`. The compiled binary and its image manifest appear in `build/firmware/`. CI builds the firmware and uploads these artifacts.
+Native tests run the same LVGL screen code as the firmware. PNG renders appear in `build/native/screenshots/`. The compiled binary and its image manifest appear in `build/firmware/`. Pull request checks build the firmware and upload these artifacts. A version tag builds and publishes the release.
 
 ## Migration
 
