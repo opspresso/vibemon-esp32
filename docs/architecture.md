@@ -38,6 +38,18 @@ Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_j
 
 The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. Two 7 MB application slots (`app0`, `app1`) hold the running image and the next update. The bootloader rolls back an update that restarts before it confirms itself; see [Firmware updates](#firmware-updates).
 
+## Firmware updates
+
+The device installs new releases over Wi-Fi. Two 7 MB application slots hold the running image and the next one.
+
+1. **Check.** 30 seconds after Wi-Fi and network time are ready, then every 6 hours, the device reads `ota.json` from `https://github.com/opspresso/vibemon-esp32/releases/latest/download/`. A tap on the firmware row in device settings, or the USB `update-check` command, checks immediately. A failed check retries after 15 minutes.
+2. **Accept.** The device accepts the release only when the board is `ESP32-4848S040`, the version is a newer `MAJOR.MINOR.PATCH`, the image fits one slot and the URL is in this repository's releases. Prereleases are never "latest", so they are not installed.
+3. **Install.** The update worker on core 0 streams the image into the slot that is not running. Workspace polling pauses until the restart. The dashboard status line shows the version and progress.
+4. **Verify.** The next boot selects the new slot only when the SHA-256 digest from `ota.json` matches and ESP-IDF validates the image. Otherwise the running image stays selected, and the device retries at the next 6-hour check.
+5. **Confirm or roll back.** The new image starts on trial. It confirms itself when it reaches the workspace or the release server. If it restarts before that, the bootloader starts the previous image again.
+
+TLS to GitHub authenticates the release files; the firmware images are not signed. The partition table and bootloader do not change over Wi-Fi. A change to either needs a USB upload.
+
 ## Verification commands
 
 Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs address/undefined-behavior sanitizers, then renders the actual LVGL screens and exercises pointer events. Tests cover:

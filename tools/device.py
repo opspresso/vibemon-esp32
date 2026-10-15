@@ -58,7 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     commands = parser.add_subparsers(dest="command", required=True)
-    for command in ("info", "dashboard", "refresh"):
+    for command in ("info", "dashboard", "refresh", "update-check"):
         commands.add_parser(command)
     wifi = commands.add_parser("wifi")
     wifi.add_argument("--ssid", help="Network name; prompted if omitted")

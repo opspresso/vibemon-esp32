@@ -37,6 +37,20 @@ The helper verifies all four images, their hashes, offsets and non-overlap with 
 
 If automatic bootloader entry fails, use the board's documented BOOT/RESET sequence, then retry the same port. Do not change LCD pins or reduce display timing to work around a serial transport error.
 
+## Update over Wi-Fi
+
+After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, key and panel settings stay in NVS and are kept.
+
+Use USB again only when a release changes the partition table or bootloader, or when the device cannot reach Wi-Fi.
+
+## Publish a release
+
+1. Set `VIBEMON_VERSION` in `src/version.h` to the new `MAJOR.MINOR.PATCH` and merge it.
+2. Create an annotated tag on that commit. Its message becomes the release notes: `git tag -a v3.4.1 -m "..."`, then `git push origin v3.4.1`.
+3. The **Release firmware** workflow builds the firmware, checks that the tag matches the built version and publishes the bundle, `SHA256SUMS`, `manifest.json`, `vibemon-esp32.ino.bin` and `ota.json`.
+
+Devices install the release within 6 hours, or at their next restart. A tag that does not match `src/version.h` fails without publishing.
+
 ## Enter Wi-Fi and account settings
 
 On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter its password and press **Connect Wi-Fi**. An open network uses an empty password. **Hidden network** accepts a manually entered SSID. A failed connection leaves the saved configuration unchanged and shows a recovery path.
