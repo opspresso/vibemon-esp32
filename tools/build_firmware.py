@@ -72,7 +72,7 @@ def main():
              ('boot_app0.bin', 'ota_data_initial.bin', 0xe000), ('vibemon-esp32.ino.bin', 'vibemon_touch.bin', 0x10000)]
     for destination, source, offset in files:
         data = (build / source).read_bytes()
-        if not data or (offset < 0xe000 and offset + len(data) > 0x9000) or offset + len(data) > 0x810000:
+        if not data or (offset < 0xe000 and offset + len(data) > 0x9000) or offset + len(data) > 0x710000:
             raise ValueError('Firmware image exceeds its partition or overlaps NVS')
         (output / destination).write_bytes(data)
         images[destination] = {'offset': offset, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}

@@ -43,8 +43,8 @@ class UploadIntegrityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NVS"):
             flash.verify_images(self.directory)
 
-    def test_app_cannot_overwrite_coredump_partition(self):
-        self.image("vibemon-esp32.ino.bin", 0x10000, b"x" * (0x800000 + 1))
+    def test_app_cannot_overflow_into_the_second_update_slot(self):
+        self.image("vibemon-esp32.ino.bin", 0x10000, b"x" * (0x700000 + 1))
         with self.assertRaisesRegex(ValueError, "application partition"):
             flash.verify_images(self.directory)
 

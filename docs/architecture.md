@@ -36,7 +36,7 @@ Coding cards animate small light trails around their rounded edges at up to 30 u
 
 Measurements retain binary64 precision throughout JSON parsing. `tools/prepare_json.py` applies a hash-verified change to the isolated ArduinoJson numeric parser: decimal tokens use C++ `from_chars` rather than narrowing short mantissas to 32-bit floats. This preserves the Web value before formatting; for example, `1.005` remains the same double and displays as `1.01%`. The original and modified parser hashes are locked. User-installed libraries and the ESP-IDF checkout remain untouched.
 
-The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. The single application slot does not provide an OTA update service.
+The upload bundle writes boot metadata at `0xe000`. The partition table reserves that range outside the `0x9000`–`0xe000` NVS region. Uploading individual images preserves settings. Two 7 MB application slots (`app0`, `app1`) hold the running image and the next update. The bootloader rolls back an update that restarts before it confirms itself; see [Firmware updates](#firmware-updates).
 
 ## Verification commands
 
@@ -50,7 +50,7 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Bounded animation redraw regions, stable touch targets, Unicode category separators, and zero idle redraws after activity stops.
 - USB readiness after CH340 reset, response correlation, one-shot setting changes, frame splitting and size limits.
 
-`tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 8 MB application limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
+`tools/build_firmware.py` builds the pinned ESP-IDF SDK and Arduino component from source. It enforces a 64 KB data cache with 64-byte lines, conditional DMA recovery, PSRAM instruction/read-only-data placement and cache-safe RGB interrupts. It compiles the exact target, checks the 7 MB application-slot limit and records artifact hashes. `tools/flash_firmware.py` verifies hashes and upload ranges before writing. Native tests and cross-compilation do not substitute for the [physical device checks](hardware.md#device-acceptance-checks).
 
 ## Distribution notices
 

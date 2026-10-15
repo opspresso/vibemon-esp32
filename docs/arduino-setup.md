@@ -33,7 +33,7 @@ build/venv/bin/python tools/flash_firmware.py --port /dev/cu.usbserial-110
 
 Replace the example port with the discovered port, such as `COM5` on Windows. The default upload speed is 115200. A higher `--baud` is optional; use it only when sustained reads/writes are reliable on that cable and adapter.
 
-The helper verifies all four images, their hashes, offsets and non-overlap with NVS. It uploads the individual bootloader, partition table, boot metadata and application images. **Do not flash the merged image when preserving settings**: it also contains blank data over the NVS area. The board profile enables 16 MB flash and 8 MB octal PSRAM; the application partition is 8 MB.
+The helper verifies all four images, their hashes, offsets and non-overlap with NVS. It uploads the individual bootloader, partition table, boot metadata and application images. **Do not flash the merged image when preserving settings**: it also contains blank data over the NVS area. The board profile enables 16 MB flash and 8 MB octal PSRAM; each of the two application slots is 7 MB.
 
 If automatic bootloader entry fails, use the board's documented BOOT/RESET sequence, then retry the same port. Do not change LCD pins or reduce display timing to work around a serial transport error.
 
