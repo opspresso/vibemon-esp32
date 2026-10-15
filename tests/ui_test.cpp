@@ -243,6 +243,21 @@ int main() {
       lv_obj_scroll_to_view_recursive(findText(list, "Needs input"), LV_ANIM_OFF); advance(ui);
       screenshot("account-details-end");
     }
+    {
+      // A saved network that misses its first join is retried automatically.
+      // The dashboard keeps its place and says so; it is not a setup request.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Controller app(store, wifi, cloud);
+      app.begin(timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); CHECK(ui.page() == Page::Dashboard);
+      wifi.current.link = WifiLink::Failed; app.tick(++timeMs); advance(ui);
+      CHECK(app.workspace().connection == Connection::WifiUnavailable && !app.workspace().hasSnapshot);
+      CHECK(ui.page() == Page::Dashboard);
+      CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Wi-Fi unavailable · retrying");
+      screenshot("wifi-retrying");
+      wifi.connected(); app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::Dashboard && app.workspace().connection == Connection::Online);
+      CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Workspace connected");
+    }
     for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "inactive"}) {
       Store store; configured(store);
       auto account = demo().items.back();
