@@ -47,7 +47,7 @@ Use USB again only when a release changes the partition table or bootloader, or 
 
 1. Set `VIBEMON_VERSION` in `src/version.h` to the new `MAJOR.MINOR.PATCH` and merge it.
 2. Create an annotated tag on that commit. Its message becomes the release notes: `git tag -a v3.4.1 -m "..."`, then `git push origin v3.4.1`.
-3. The **Release firmware** workflow builds the firmware, checks that the tag matches the built version and publishes the bundle, `SHA256SUMS`, `manifest.json`, `vibemon-esp32.ino.bin` and `ota.json`.
+3. The **Release firmware** workflow first runs **Verify firmware** (native checks and a firmware build), then builds the firmware, checks that the tag matches the built version and publishes the bundle, `SHA256SUMS`, `manifest.json`, `vibemon-esp32.ino.bin` and `ota.json`.
 
 Devices install the release within 6 hours, or at their next restart. A tag that does not match `src/version.h` fails without publishing.
 
