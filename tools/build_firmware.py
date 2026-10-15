@@ -11,6 +11,7 @@ import sys
 
 from sdk_toolchain import ROOT, IDF, load
 from collect_licenses import collect
+from firmware_release import update_description
 
 
 def configuration(base, overrides, arduino_kconfig):
@@ -88,6 +89,8 @@ def main():
                 'display': {'pixelClockHz': 16000000, 'dataCacheBytes': 65536, 'cacheLineBytes': 64,
                             'forcedVsyncRestart': False, 'psramInstructionsAndRodata': True, 'cacheSafeInterrupts': True}}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    # Devices read this file from the latest release to find and verify an update.
+    (output / 'ota.json').write_text(json.dumps(update_description(description['project_version'], binary)) + '\n')
     # An old Arduino merged image would overwrite NVS and use the wrong SDK.
     (output / 'vibemon-esp32.ino.merged.bin').unlink(missing_ok=True)
     print('Built ESP32-4848S040 firmware:', binary['size'], 'bytes')

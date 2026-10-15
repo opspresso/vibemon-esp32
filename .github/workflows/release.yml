@@ -1,0 +1,55 @@
+name: Release firmware
+
+# Push an annotated tag vMAJOR.MINOR.PATCH whose version matches src/version.h.
+# The tag message becomes the release notes. Devices install the release
+# because ota.json in the latest release names it.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+env:
+  ARDUINO_CLI_VERSION: '1.5.1'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
+      - name: Install pinned toolchain
+        run: |
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py --firmware
+      - name: Compile ESP32-4848S040
+        run: build/venv/bin/python tools/build_firmware.py
+      - name: Check that the tag names the built version
+        run: |
+          version="$(python3 -c 'import json; print(json.load(open("build/firmware/ota.json"))["version"])')"
+          test "v$version" = "$GITHUB_REF_NAME"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Package release files
+        working-directory: build/firmware
+        run: |
+          bundle="VibeMon-Touch-$VERSION-ESP32-4848S040.zip"
+          zip -qr "../$bundle" vibemon-esp32.ino.bin vibemon-esp32.ino.bootloader.bin vibemon-esp32.ino.partitions.bin \
+            boot_app0.bin manifest.json LICENSE LICENSE-ESP-IDF LICENSE-Arduino OFL-NanumGothic.txt licenses
+          (cd .. && sha256sum "$bundle" vibemon-esp32.ino.bin > "VibeMon-Touch-$VERSION-SHA256SUMS.txt")
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "VibeMon Touch $VERSION" --notes-from-tag --verify-tag \
+            "build/VibeMon-Touch-$VERSION-ESP32-4848S040.zip" "build/VibeMon-Touch-$VERSION-SHA256SUMS.txt" \
+            build/firmware/manifest.json build/firmware/vibemon-esp32.ino.bin build/firmware/ota.json
