@@ -12,7 +12,7 @@ The 480×480 display follows your VibeMon workspace over HTTPS. Each card can sh
 4. Enter a token with **read** permission from [Account](https://vibemon.io/account). The device checks it before saving.
 5. Tap an empty card, or open a populated card and select **Change item**. Choose a resource or coding account; category buttons narrow the list.
 
-The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing measurements display `—`; lost connections retain the last readings with an explicit connection status. Resources without recent reports become `Stale`. Coding projects follow their last event through the shared state timeouts and become neutral `Inactive` when that clock reaches sleep.
+The first successful non-empty response fills up to four cards, alternating resources and accounts. Your selections then remain fixed until you change them. Missing measurements display `—`; lost connections retain the last readings with an explicit connection status. Resources without recent reports become `Stale`. Coding projects follow their newest report through the shared state timeouts and become neutral `Inactive` when that clock reaches sleep. Hooks repeat a running turn's state every 60 seconds, so a long task stays active.
 
 ## What it supports
 
