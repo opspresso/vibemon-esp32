@@ -76,7 +76,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
+          # This job has no checkout, so read the annotated tag message through the API.
+          tag="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq 'select(.object.type == "tag") | .object.sha')"
+          test -n "$tag" || { echo "::error::$GITHUB_REF_NAME must be an annotated tag"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag" --jq .message > notes.md
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "VibeMon Touch $version" \
-            --notes-from-tag --verify-tag \
+            --notes-file notes.md --verify-tag \
             "release/VibeMon-Touch-$version-ESP32-4848S040.zip" "release/VibeMon-Touch-$version-SHA256SUMS.txt" \
             release/firmware/manifest.json release/firmware/vibemon-esp32.ino.bin release/firmware/ota.json
