@@ -7,18 +7,22 @@ on:
   push:
     tags: ['v*.*.*']
 
+# Only the publish job can write. The build job runs third-party setup code,
+# so it holds a read-only token and keeps no credentials in .git/config.
 permissions:
-  contents: write
+  contents: read
 
 env:
   ARDUINO_CLI_VERSION: '1.5.1'
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
       - name: Install Arduino CLI
@@ -46,10 +50,33 @@ jobs:
           zip -qr "../$bundle" vibemon-esp32.ino.bin vibemon-esp32.ino.bootloader.bin vibemon-esp32.ino.partitions.bin \
             boot_app0.bin manifest.json LICENSE LICENSE-ESP-IDF LICENSE-Arduino OFL-NanumGothic.txt licenses
           (cd .. && sha256sum "$bundle" > "VibeMon-Touch-$VERSION-SHA256SUMS.txt")
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-files
+          if-no-files-found: error
+          path: |
+            build/VibeMon-Touch-${{ env.VERSION }}-ESP32-4848S040.zip
+            build/VibeMon-Touch-${{ env.VERSION }}-SHA256SUMS.txt
+            build/firmware/manifest.json
+            build/firmware/vibemon-esp32.ino.bin
+            build/firmware/ota.json
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: release-files
+          path: release
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "VibeMon Touch $VERSION" --notes-from-tag --verify-tag \
-            "build/VibeMon-Touch-$VERSION-ESP32-4848S040.zip" "build/VibeMon-Touch-$VERSION-SHA256SUMS.txt" \
-            build/firmware/manifest.json build/firmware/vibemon-esp32.ino.bin build/firmware/ota.json
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "VibeMon Touch $version" \
+            --notes-from-tag --verify-tag \
+            "release/VibeMon-Touch-$version-ESP32-4848S040.zip" "release/VibeMon-Touch-$version-SHA256SUMS.txt" \
+            release/firmware/manifest.json release/firmware/vibemon-esp32.ino.bin release/firmware/ota.json
