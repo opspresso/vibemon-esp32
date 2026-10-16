@@ -1,5 +1,6 @@
 #include "adapters/catalog_json.h"
 #include "fakes.h"
+#include <algorithm>
 #include <ctime>
 #include <fstream>
 #include <sstream>
@@ -78,6 +79,29 @@ int main(int argc, char** argv) {
       const auto expected = fixture["expected"].as<std::string>();
       const auto actual = metricValue(metric);
       if (actual != expected) throw std::runtime_error("Measurement " + fixture["value"].as<std::string>() + " " + metric.unit + ": expected " + expected + ", got " + actual);
+    }
+    for (JsonObjectConst fixture : fixtures["resetCountdowns"].as<JsonArrayConst>()) {
+      JsonDocument response;
+      response["serverTime"] = timestamp(0);
+      auto source = response["sources"].to<JsonArray>().add<JsonObject>();
+      source["sourceId"] = "agent"; source["kind"] = "agent"; source["displayName"] = "Source";
+      source["receivedAt"] = timestamp(fixture["eventAgeMs"].as<std::uint32_t>());
+      source["observedAt"] = timestamp(fixture["eventAgeMs"].as<std::uint32_t>());
+      source["health"] = "ok"; source["stale"] = false;
+      for (const char* key : {"contextPercent", "usageSessionPercent", "usageWeekPercent"}) source["metrics"][key] = 50;
+      source["agent"].set(fixture["agent"]);
+      source["agent"]["state"] = "working"; source["agent"]["project"] = "Project";
+      source["account"]["id"] = "work"; source["account"]["provider"] = "codex"; source["account"]["displayName"] = "Account";
+      std::string body; serializeJson(response, body);
+      Catalog catalog;
+      CHECK(decodeCatalog(body, catalog).ok && catalog.items.size() == 1);
+      const auto& item = catalog.items.front();
+      const auto metric = std::find_if(item.metrics.begin(), item.metrics.end(), [&](const Metric& m) { return m.key == fixture["metric"].as<std::string>(); });
+      CHECK(metric != item.metrics.end());
+      const auto expected = fixture["expected"].isNull() ? std::string() : fixture["expected"].as<std::string>();
+      const auto actual = resetCountdown(*metric, static_cast<std::uint64_t>(item.activityAgeMs) + fixture["elapsedMs"].as<std::uint32_t>());
+      if (actual != expected) throw std::runtime_error(fixture["name"].as<std::string>() + ": expected '" + expected + "', got '" + actual + "'");
+      ++count;
     }
     std::cout << "PASS " << count << " shared App/Web/ESP32 monitoring cases through the actual JSON adapter\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

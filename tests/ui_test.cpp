@@ -84,7 +84,7 @@ Catalog demo() {
     item.name = name; item.category = item.selection.id == "spark" ? "DGX Spark" : "Kubernetes";
     item.health = item.selection.id == "k3s" ? Health::Warning : Health::Ok;
     item.ageMs = 1000;
-    item.metrics = {{"cpu", "CPU", "%", 12.4, MetricDisplay::Bar, 0, 100}, {"memory", "Memory", "%", 68.2, MetricDisplay::Bar, 0, 100}, {"nodes", "Ready nodes", "", 4, MetricDisplay::Number, 0, {}}};
+    item.metrics = {{"cpu", "CPU", "%", 12.4, MetricDisplay::Bar, 0, 100, {}}, {"memory", "Memory", "%", 68.2, MetricDisplay::Bar, 0, 100, {}}, {"nodes", "Ready nodes", "", 4, MetricDisplay::Number, 0, {}, {}}};
     value.items.push_back(item);
   }
   Monitor agent;
@@ -93,7 +93,7 @@ Catalog demo() {
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
   agent.projects = {agent, review};
-  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100}, {"week", "Weekly", "%", 24, MetricDisplay::Bar, 0, 100}};
+  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}};
   value.items.push_back(agent);
   return value;
 }
@@ -215,7 +215,7 @@ int main() {
       resource.statusMessage = "A long status explanation stays available with every reading.";
       resource.metrics.clear();
       std::string longLabel; for (int i = 0; i < 24; ++i) longLabel += "메트릭";
-      for (int i = 0; i < 32; ++i) resource.metrics.push_back({"metric" + std::to_string(i), longLabel + std::to_string(i), "requests/second!", 9007199254740991.0, MetricDisplay::Number, 0, {}});
+      for (int i = 0; i < 32; ++i) resource.metrics.push_back({"metric" + std::to_string(i), longLabel + std::to_string(i), "requests/second!", 9007199254740991.0, MetricDisplay::Number, 0, {}, {}});
       cloud.complete(catalog); app.tick(++timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("long-dashboard");
       tap(ui, "panel-0"); CHECK(ui.page() == Page::Details);

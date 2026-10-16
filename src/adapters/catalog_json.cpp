@@ -71,13 +71,21 @@ bool customMetrics(JsonObjectConst source, Monitor& monitor) {
   return true;
 }
 
+// A reset countdown is absent or a whole number of minutes within the JSON safe-integer range.
+bool resetMinutes(JsonVariantConst raw, std::optional<std::uint64_t>& out) {
+  if (raw.isNull()) { out.reset(); return true; }
+  if (raw.is<bool>() || !raw.is<std::uint64_t>() || raw.as<std::uint64_t>() > 9007199254740991ULL) return false;
+  out = raw.as<std::uint64_t>();
+  return true;
+}
+
 bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& monitor) {
   const auto values = source["metrics"].as<JsonObjectConst>();
   if (values.isNull()) return false;
-  struct Preset { const char* key; const char* label; const char* unit; bool gauge; };
+  struct Preset { const char* key; const char* label; const char* unit; bool gauge; const char* reset = nullptr; };
   const Preset host[] = {{"cpuPercent", "CPU", "%", true}, {"memoryPercent", "Memory", "%", true}, {"gpuPercent", "GPU", "%", true}, {"gpuTemperatureC", "GPU temperature", "°C", false}};
   const Preset cluster[] = {{"cpuPercent", "CPU", "%", true}, {"memoryPercent", "Memory", "%", true}, {"nodesReady", "Ready nodes", "", false}, {"nodesTotal", "Total nodes", "", false}, {"podsUnhealthy", "Unhealthy pods", "", false}};
-  const Preset agent[] = {{"contextPercent", "Context", "%", true}, {"usageSessionPercent", "Session", "%", true}, {"usageWeekPercent", "Weekly", "%", true}};
+  const Preset agent[] = {{"contextPercent", "Context", "%", true}, {"usageSessionPercent", "Session", "%", true, "usage5hResetsIn"}, {"usageWeekPercent", "Weekly", "%", true, "usageWeekResetsIn"}};
   const Preset* presets = kind == "agent" ? agent : kind == "cluster" ? cluster : host;
   const std::size_t count = kind == "agent" ? 3 : kind == "cluster" ? 5 : 4;
   for (std::size_t i = 0; i < count; ++i) {
@@ -88,6 +96,7 @@ bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& mon
     metric.display = preset.gauge ? MetricDisplay::Bar : MetricDisplay::Number;
     if (preset.gauge) metric.maximum = 100;
     if (!numeric(values[preset.key], metric.value)) return false;
+    if (preset.reset && !resetMinutes(source["agent"][preset.reset], metric.resetMinutes)) return false;
     monitor.metrics.push_back(std::move(metric));
   }
   return true;
@@ -106,6 +115,8 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
   for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account", "statusMessage"}) fields[name] = true;
   fields["agent"]["state"] = true;
   fields["agent"]["project"] = true;
+  fields["agent"]["usage5hResetsIn"] = true;
+  fields["agent"]["usageWeekResetsIn"] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
   const auto error = deserializeJson(document, body.data(), body.size(), DeserializationOption::Filter(filter), DeserializationOption::NestingLimit(12));
   if (error) return {false, "The server returned an invalid or oversized workspace."};
