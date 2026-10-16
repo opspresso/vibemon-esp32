@@ -296,8 +296,15 @@ void DashboardUi::updateCards(std::uint32_t now) {
       visible(card.labels[m], available); visible(card.values[m], available);
       if (!available) { visible(card.bars[m], false); continue; }
       const auto& metric = item->metrics[m];
+      // Account labels are short words, so plan usage and its reset time get the wider value column.
+      const bool account = item->selection.kind == ItemKind::Account;
+      const int labelWidth = account ? 61 : 101, valueX = account ? 74 : 114, valueWidth = account ? 128 : 88;
+      if (lv_obj_get_style_width(card.labels[m], LV_PART_MAIN) != labelWidth) lv_obj_set_width(card.labels[m], labelWidth);
+      if (lv_obj_get_x(card.values[m]) != valueX) { lv_obj_set_x(card.values[m], valueX); lv_obj_set_width(card.values[m], valueWidth); }
       setText(card.labels[m], metric.label);
-      setText(card.values[m], metricText(metric));
+      // Plan usage reads like the companion bubble: "38% · 2h5m".
+      const auto reset = resetCountdown(metric, static_cast<std::uint64_t>(item->activityAgeMs) + elapsed);
+      setText(card.values[m], reset.empty() ? metricText(metric) : metricText(metric) + " · " + reset);
       const bool bar = metric.display == MetricDisplay::Bar && metric.value && metric.maximum;
       visible(card.bars[m], bar);
       if (bar) {
@@ -403,8 +410,12 @@ void DashboardUi::updateDetails(std::uint32_t now) {
       setText(rows[i].name, name(values[i])); setText(rows[i].value, value(values[i]));
     }
   };
+  const auto observationAge = static_cast<std::uint64_t>(item->activityAgeMs) + elapsed;
   updateRows(detailReadings_, detailMetrics_, item->metrics, [](const Metric& metric) { return metric.key; },
-      [](const Metric& metric) { return metric.label; }, [](const Metric& metric) { return metricText(metric, false); }, false);
+      [](const Metric& metric) { return metric.label; }, [observationAge](const Metric& metric) {
+        const auto reset = describeReset(resetCountdown(metric, observationAge));
+        return reset.empty() ? metricText(metric, false) : metricText(metric, false) + " · " + reset;
+      }, false);
   updateRows(detailProjects_, detailMembers_, item->projects, [](const ReportState& project) { return project.sourceId; },
       [](const ReportState& project) { return project.project.empty() ? project.sourceId : project.project; },
       [elapsed](const ReportState& project) { return stateLabel(projectState(project, elapsed)); }, true);

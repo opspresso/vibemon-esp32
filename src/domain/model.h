@@ -45,6 +45,8 @@ struct Metric {
   MetricDisplay display = MetricDisplay::Number;
   double minimum = 0;
   std::optional<double> maximum;
+  // Minutes until a plan usage limit resets, measured at the report's observation time.
+  std::optional<std::uint64_t> resetMinutes;
 };
 
 struct ReportState {
@@ -103,6 +105,10 @@ bool needsAttention(const std::string& state);
 std::string metricValue(const Metric& metric, bool compact = true);
 std::string metricText(const Metric& metric, bool compact = true);
 std::string ageLabel(std::uint64_t milliseconds);
+// Time left until a measured plan usage limit resets, `observationAgeMs` after
+// the report was observed: "now", "24m", "2h5m" or "3d4h". Empty when unknown.
+std::string resetCountdown(const Metric& metric, std::uint64_t observationAgeMs);
+std::string describeReset(const std::string& countdown);
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog);
 
 }  // namespace vibemon

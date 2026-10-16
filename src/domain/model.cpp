@@ -308,6 +308,23 @@ std::string ageLabel(std::uint64_t milliseconds) {
   return std::to_string(milliseconds / 86400000) + "d ago";
 }
 
+std::string resetCountdown(const Metric& metric, std::uint64_t observationAgeMs) {
+  if (!metric.resetMinutes || !metric.value || !std::isfinite(*metric.value)) return {};
+  const auto elapsed = observationAgeMs / 60000;
+  const auto minutes = *metric.resetMinutes > elapsed ? *metric.resetMinutes - elapsed : 0;
+  if (minutes == 0) return "now";
+  if (minutes < 60) return std::to_string(minutes) + "m";
+  const bool days = minutes >= 1440;
+  const auto large = days ? minutes / 1440 : minutes / 60;
+  const auto small = days ? minutes % 1440 / 60 : minutes % 60;
+  return std::to_string(large) + (days ? "d" : "h") + (small ? std::to_string(small) + (days ? "h" : "m") : "");
+}
+
+std::string describeReset(const std::string& countdown) {
+  if (countdown.empty()) return {};
+  return countdown == "now" ? "Resets now" : "Resets in " + countdown;
+}
+
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog) {
   std::array<Selection, PanelCount> result{};
   std::size_t next = 0;
