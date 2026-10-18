@@ -1,4 +1,5 @@
 #include "fakes.h"
+#include "adapters/cloud_http.h"
 
 int main() {
   try {
@@ -65,7 +66,8 @@ int main() {
              {CloudError::Unauthorized, Connection::TokenRejected}, {CloudError::Forbidden, Connection::TokenRejected},
              {CloudError::Network, Connection::CloudUnavailable}, {CloudError::Tls, Connection::CloudUnavailable},
              {CloudError::InvalidResponse, Connection::CloudUnavailable}, {CloudError::TooLarge, Connection::CloudUnavailable},
-             {CloudError::Memory, Connection::CloudUnavailable}, {CloudError::Server, Connection::CloudUnavailable}}) {
+             {CloudError::Memory, Connection::CloudUnavailable}, {CloudError::Server, Connection::CloudUnavailable},
+             {CloudError::RateLimited, Connection::CloudUnavailable}, {CloudError::Redirected, Connection::CloudUnavailable}}) {
       // Without a saved token, a failed first setup keeps its cause instead of asking for setup again.
       Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
       Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
@@ -91,6 +93,26 @@ int main() {
       app.refresh(); app.tick(5); cloud.complete({}, CloudError::TooLarge, "This device supports up to 128 reporting sources."); app.tick(6);
       CHECK(app.workspace().message == "The workspace exceeds this device's limits. This device supports up to 128 reporting sources.");
     }
+    {
+      // Retry-After lengthens the backoff; a redirect asks for the server address.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      CHECK(app.workspace().message == "The server is limiting requests. Your last readings are shown.");
+      app.tick(120001); CHECK(cloud.requests.size() == 1);
+      app.tick(120002); CHECK(cloud.requests.size() == 2);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 1000; app.tick(120003);
+      app.tick(120003 + 39999); CHECK(cloud.requests.size() == 2);
+      app.tick(120003 + 40000); CHECK(cloud.requests.size() == 3);
+      cloud.complete({}, CloudError::Redirected); app.tick(200000);
+      CHECK(app.workspace().message == "The server redirected the request. Check the server address.");
+    }
+    CHECK(cloudStatusError(200) == CloudError::None && cloudStatusError(401) == CloudError::Unauthorized);
+    CHECK(cloudStatusError(403) == CloudError::Forbidden && cloudStatusError(429) == CloudError::RateLimited);
+    CHECK(cloudStatusError(301) == CloudError::Redirected && cloudStatusError(308) == CloudError::Redirected);
+    CHECK(cloudStatusError(404) == CloudError::InvalidResponse && cloudStatusError(503) == CloudError::Server);
+    CHECK(retryAfterMs("120") == 120000u && retryAfterMs(" 0 ") == 0u && retryAfterMs("9999999999") == MaxRetryAfterMs);
+    CHECK(!retryAfterMs("") && !retryAfterMs("-1") && !retryAfterMs("1.5") && !retryAfterMs("Wed, 21 Oct 2026 07:28:00 GMT"));
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);

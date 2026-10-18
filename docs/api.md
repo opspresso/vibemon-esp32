@@ -2,7 +2,7 @@
 
 ## Cloud reads
 
-The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. Tokens are never placed in URLs.
+The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
 
 The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. `agent.usage5hResetsIn` and `agent.usageWeekResetsIn` are whole minutes until the session and weekly limits reset, measured at `observedAt`. The device subtracts the observation age and shows the countdown only beside a reported value. Other values make the response invalid. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
 
@@ -19,6 +19,7 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
+| Retry delay after HTTP 429 | The longer of that delay and `Retry-After` in seconds, at most 15 minutes |
 | Resource stale boundary | 120 seconds since the server received it |
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. The connection message names the first rule that the snapshot breaks, such as an invalid timestamp or more than 128 sources. It never quotes response content. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.

@@ -151,12 +151,15 @@ void Controller::failure(const CloudResult& result, bool validating) {
         error == CloudError::TooLarge ? "The workspace exceeds this device's limits." :
         error == CloudError::Memory ? "Not enough memory to load the workspace. Restart this device." :
         error == CloudError::Server ? "The server is unavailable. Your last readings are shown." :
+        error == CloudError::RateLimited ? "The server is limiting requests. Your last readings are shown." :
+        error == CloudError::Redirected ? "The server redirected the request. Check the server address." :
         "Could not reach the server. Your last readings are shown.";
     if (!result.detail.empty() && (error == CloudError::InvalidResponse || error == CloudError::TooLarge)) message += " " + result.detail;
     state(Connection::CloudUnavailable, message);
   }
   failures_ = std::min(failures_ + 1, 3u);
-  nextPoll_ = now_ + std::min<std::uint32_t>(60000, PollIntervalMs << failures_);
+  // A server's Retry-After can only lengthen the backoff.
+  nextPoll_ = now_ + std::max(result.retryAfterMs, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
 }
 
 void Controller::accept(CloudResult& result) {

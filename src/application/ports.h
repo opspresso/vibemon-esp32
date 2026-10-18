@@ -38,13 +38,15 @@ struct CloudRequest {
   std::string origin;
   std::string token;
 };
-enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server };
+enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server, RateLimited, Redirected };
 struct CloudResult {
   std::uint32_t generation = 0;
   CloudError error = CloudError::None;
   Catalog catalog;
   // One sentence that explains InvalidResponse or TooLarge. It never contains response content.
   std::string detail;
+  // The server's requested delay before the next request. 0 when it gave none.
+  std::uint32_t retryAfterMs = 0;
 };
 class CloudPort {
  public:

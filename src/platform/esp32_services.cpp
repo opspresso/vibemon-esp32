@@ -1,5 +1,6 @@
 #include "esp32_services.h"
 #include "../adapters/catalog_json.h"
+#include "../adapters/cloud_http.h"
 #include "../adapters/settings_json.h"
 
 #include <HTTPClient.h>
@@ -230,13 +231,17 @@ std::unique_ptr<CloudResult> EspCloud::fetch(const Job& job) {
   if (!http.begin(client, (std::string(job.origin) + "/api/v1/sources").c_str())) { result->error = CloudError::Network; return result; }
   http.addHeader("Authorization", (std::string("Bearer ") + job.token).c_str());
   http.addHeader("Accept", "application/json");
+  const char* collected[] = {"Retry-After"};
+  http.collectHeaders(collected, 1);
   const int status = http.GET();
   if (status != 200) {
-    char error[128];
-    const int tlsError = client.lastError(error, sizeof(error));
-    result->error = status == 401 ? CloudError::Unauthorized : status == 403 ? CloudError::Forbidden :
-        status >= 500 || status == 429 ? CloudError::Server : status > 0 ? CloudError::InvalidResponse :
-        tlsError == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
+    if (status > 0) {
+      result->error = cloudStatusError(status);
+      if (result->error == CloudError::RateLimited) result->retryAfterMs = retryAfterMs(http.header("Retry-After").c_str()).value_or(0);
+    } else {
+      char error[128];
+      result->error = client.lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
+    }
     http.end(); return result;
   }
   const int expected = http.getSize();
