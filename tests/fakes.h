@@ -38,8 +38,20 @@ struct Cloud final : CloudPort {
   std::unique_ptr<CloudResult> take() override { return std::move(reply); }
   void complete(Catalog catalog = {}, CloudError error = CloudError::None, std::string detail = {}) {
     CHECK(busy && !requests.empty());
-    reply = std::make_unique<CloudResult>(CloudResult{requests.back().generation, error, std::move(catalog), std::move(detail)});
+    reply = std::make_unique<CloudResult>();
+    reply->generation = requests.back().generation; reply->error = error;
+    reply->catalog = std::move(catalog); reply->detail = std::move(detail);
     busy = false;
+  }
+  // A 200 response with an ETag and the body's serverTime.
+  void tagged(Catalog catalog, const std::string& etag, std::int64_t serverTimeMs) {
+    complete(std::move(catalog));
+    reply->etag = etag; reply->serverTimeMs = serverTimeMs;
+  }
+  // A 304 response with a valid X-Server-Time.
+  void unchanged(std::int64_t serverTimeMs) {
+    complete();
+    reply->notModified = true; reply->serverTimeMs = serverTimeMs;
   }
 };
 struct Update final : UpdatePort {

@@ -157,6 +157,9 @@ void Controller::failure(const CloudResult& result, bool validating) {
     if (!result.detail.empty() && (error == CloudError::InvalidResponse || error == CloudError::TooLarge)) message += " " + result.detail;
     state(Connection::CloudUnavailable, message);
   }
+  // A reply that failed decoding or validation may have replaced the
+  // server's state; the next request must return the complete body.
+  if (error == CloudError::InvalidResponse || error == CloudError::TooLarge || error == CloudError::Memory) validator_.reset();
   failures_ = std::min(failures_ + 1, 3u);
   if (result.retryAfterMs) retryAfter_ = now_ + result.retryAfterMs;
   // A server's Retry-After can only lengthen the backoff.
@@ -165,7 +168,20 @@ void Controller::failure(const CloudResult& result, bool validating) {
 
 void Controller::accept(CloudResult& result) {
   const bool validating = pendingCloud_.has_value();
+  if (result.error == CloudError::None && result.notModified && (!conditional_ || !validator_)) {
+    result.error = CloudError::InvalidResponse;
+    result.detail = "It reported no change without a matching earlier reply.";
+  }
   if (result.error != CloudError::None) { failure(result, validating); return; }
+  if (result.notModified) {
+    // The displayed catalog is current. Its item ages were measured at the
+    // cached reply's serverTime, so the report clock restarts from there.
+    const auto elapsed = result.serverTimeMs - validator_->serverTimeMs;
+    workspace_.snapshotAgeMs = elapsed > 0 ? static_cast<std::uint64_t>(elapsed) : 0;
+    ++workspace_.revision;
+    online();
+    return;
+  }
   Config candidate = config_;
   bool needsSave = false;
   if (validating) {
@@ -195,7 +211,13 @@ void Controller::accept(CloudResult& result) {
   workspace_.catalogComplete = requestedAll_;
   workspace_.snapshotAgeMs = 0;
   workspace_.hasSnapshot = true;
+  if (result.etag.empty()) validator_.reset();
+  else validator_ = Validator{generation_, config_.origin, requestedScope_, std::move(result.etag), result.serverTimeMs};
   updateConfigView();
+  online();
+}
+
+void Controller::online() {
   failures_ = 0;
   retryAfter_.reset();
   tokenRejected_ = false;
@@ -287,9 +309,13 @@ void Controller::tick(std::uint32_t now) {
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   auto scope = requestScope();
-  const bool all = scope.empty();
-  if (cloud_.start({generation_, origin, token, std::move(scope)})) {
-    inFlight_ = true; workspace_.refreshing = true; requestedAll_ = all;
+  // Only the exact request that returned the displayed catalog sends its ETag.
+  if (validator_ && (validator_->generation != generation_ || validator_->origin != origin || validator_->scope != scope)) validator_.reset();
+  std::string tag = validator_ ? validator_->etag : std::string();
+  const bool conditional = !tag.empty();
+  if (cloud_.start({generation_, origin, token, scope, std::move(tag)})) {
+    inFlight_ = true; workspace_.refreshing = true; requestedAll_ = scope.empty();
+    requestedScope_ = std::move(scope); conditional_ = conditional;
     ++workspace_.revision;
     if (!workspace_.hasSnapshot || pendingCloud_) state(Connection::CheckingCloud, "Loading your workspace...");
   }
