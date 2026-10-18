@@ -86,6 +86,7 @@ Validation Controller::select(std::size_t panel, const Selection& selection) {
   if (!settings_.save(candidate)) return {false, "Panel selection could not be saved. Try again."};
   config_ = std::move(candidate);
   storageBlocked_ = false;
+  nextPoll_ = now_;
   updateConfigView();
   return {true, {}};
 }
@@ -134,6 +135,7 @@ void Controller::refresh() {
   tokenRejected_ = false;
   failures_ = 0;
   storageBlocked_ = false;
+  refreshRequested_ = true;
 }
 
 void Controller::failure(const CloudResult& result, bool validating) {
@@ -239,7 +241,8 @@ void Controller::browse(bool browsing) {
   if (browsing_ == browsing) return;
   browsing_ = browsing;
   // After a failure the backoff and any Retry-After still apply.
-  if (browsing && !workspace_.catalogComplete && failures_ == 0 && !retryAfter()) nextPoll_ = now_;
+  const bool emptyPanels = std::none_of(config_.panels.begin(), config_.panels.end(), [](const Selection& panel) { return !panel.id.empty(); });
+  if (browsing && (!workspace_.catalogComplete || emptyPanels) && failures_ == 0 && !retryAfter()) nextPoll_ = now_;
 }
 
 std::optional<std::uint32_t> Controller::retryAfter() {
@@ -296,7 +299,7 @@ void Controller::tick(std::uint32_t now) {
     updateConfigView();
   }
   if (wifi.ssid != config_.ssid) return;
-  if (!hadConnection_) { hadConnection_ = true; nextPoll_ = clockStartedAt_ = now; }
+  if (!hadConnection_) { hadConnection_ = true; nextPoll_ = clockStartedAt_ = now; refreshRequested_ = true; }
   if (!wifi.clockReady) {
     if (static_cast<std::uint32_t>(now - clockStartedAt_) >= 30000) {
       state(Connection::ClockUnavailable, "Network time is unavailable. Check this network's internet access.");
@@ -320,11 +323,15 @@ void Controller::tick(std::uint32_t now) {
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   auto scope = requestScope();
+  // Empty panels still get one initial connection check. Afterwards only an
+  // explicit refresh, workspace check or open picker needs a full catalog.
+  if (workspace_.hasSnapshot && config_.panelsInitialized && !pendingCloud_ && !browsing_ && !refreshRequested_ && scope.empty()) return;
   // Only the exact request that returned the displayed catalog sends its ETag.
   if (validator_ && (validator_->generation != generation_ || validator_->origin != origin || validator_->scope != scope)) validator_.reset();
   std::string tag = validator_ ? validator_->etag : std::string();
   const bool conditional = !tag.empty();
   if (cloud_.start({generation_, origin, token, scope, std::move(tag)})) {
+    refreshRequested_ = false;
     inFlight_ = true; workspace_.refreshing = true; requestedAll_ = scope.empty();
     requestedOrigin_ = origin; requestedScope_ = std::move(scope); conditional_ = conditional;
     ++workspace_.revision;

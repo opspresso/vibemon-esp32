@@ -89,6 +89,7 @@ class Controller {
   bool hadConnection_ = false;
   bool browsing_ = false;
   bool requestedAll_ = true;
+  bool refreshRequested_ = false;
   void updateConfigView();
   std::vector<Selection> requestScope() const;
   std::optional<std::uint32_t> retryAfter();

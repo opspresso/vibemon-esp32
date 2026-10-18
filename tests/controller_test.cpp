@@ -4,6 +4,35 @@
 int main() {
   try {
     {
+      // Empty initialized panels need no background data; explicit refresh and the picker still work.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      for (std::size_t panel = 0; panel < PanelCount; ++panel) CHECK(app.select(panel, {}).ok);
+      const auto requests = cloud.requests.size();
+      for (std::uint32_t now = 10002; now <= 60002; now += PollIntervalMs) {
+        app.tick(now);
+        if (cloud.busy) { cloud.complete(catalog()); app.tick(now + 1); }
+      }
+      std::cout << "Empty-panel requests over 60 seconds: " << cloud.requests.size() - requests << '\n';
+      CHECK(cloud.requests.size() == requests);
+      app.refresh(); app.tick(60004); CHECK(cloud.requests.size() == requests + 1 && cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(60005);
+      app.tick(70005); CHECK(cloud.requests.size() == requests + 1 && app.workspace().panels[0].id.empty());
+      wifi.current.link = WifiLink::Failed; app.tick(70006);
+      wifi.connected(); app.tick(70007);
+      CHECK(cloud.requests.size() == requests + 2);
+      cloud.complete(catalog()); app.tick(70008);
+      CHECK(app.workspace().connection == Connection::Online && app.workspace().panels[0].id.empty());
+      // A dormant poll deadline can be older than due()'s signed comparison range.
+      app.tick(30u * 86400000u);
+      app.browse(true); app.tick(30u * 86400000u + 1);
+      CHECK(cloud.requests.size() == requests + 3 && cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(30u * 86400000u + 2); app.browse(false);
+      CHECK(app.select(0, {ItemKind::Resource, "one"}).ok);
+      app.tick(30u * 86400000u + 3);
+      CHECK(cloud.requests.size() == requests + 4 && cloud.requests.back().scope == std::vector<Selection>({{ItemKind::Resource, "one"}}));
+    }
+    {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
       const auto savedPanels = store.saved.panels;
