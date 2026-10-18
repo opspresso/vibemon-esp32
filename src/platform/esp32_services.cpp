@@ -218,6 +218,7 @@ void EspWifi::connect(const std::string& ssid, const std::string& password) {
   clockRequested_ = false;
   if (scanning_) { WiFi.scanDelete(); scanning_ = false; }
   WiFi.disconnect(false, false);
+  publish();
 }
 
 void EspWifi::scan() { scanRequested_ = true; scanFailed_ = false; }
@@ -227,16 +228,15 @@ void EspWifi::disconnect() {
   disconnecting_ = joining_ = clockRequested_ = false;
   link_ = WifiLink::Offline;
   WiFi.disconnect(false, false);
+  publish();
 }
 
-WifiStatus EspWifi::status() const {
-  WifiStatus result;
-  result.link = link_;
-  result.clockReady = std::time(nullptr) >= 1735689600;
-  if (link_ == WifiLink::Connected) {
-    result.ssid = WiFi.SSID().c_str(); result.address = WiFi.localIP().toString().c_str();
-  }
-  return result;
+void EspWifi::publish() {
+  status_.link = link_;
+  status_.clockReady = std::time(nullptr) >= 1735689600;
+  // The join check verified that the connected network is ssid_.
+  if (link_ != WifiLink::Connected) status_.ssid.clear();
+  else if (status_.ssid != ssid_) status_.ssid = ssid_;
 }
 
 void EspWifi::tick(std::uint32_t now) {
@@ -246,6 +246,7 @@ void EspWifi::tick(std::uint32_t now) {
     joining_ = true;
     WiFi.begin(ssid_.c_str(), password_.c_str());
   } else if (joining_ && !disconnecting_ && physical == WL_CONNECTED && WiFi.SSID() == ssid_.c_str()) {
+    joining_ = false;
     link_ = WifiLink::Connected;
     if (!clockRequested_) {
       configTime(0, 0, "time.cloudflare.com", "pool.ntp.org", "time.google.com");
@@ -259,6 +260,7 @@ void EspWifi::tick(std::uint32_t now) {
   } else if (!ssid_.empty() && link_ != WifiLink::Connecting && link_ != WifiLink::Connected && !scanning_ && due(now, retryAt_)) {
     connect(ssid_, password_);
   }
+  publish();
   if (scanRequested_ && link_ != WifiLink::Connecting && !scanning_) {
     scanRequested_ = false;
     WiFi.scanDelete();

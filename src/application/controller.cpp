@@ -62,7 +62,7 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   const auto candidateToken = token.empty() && normalized == config_.origin ? config_.readToken : token;
   const auto checkedToken = validateToken(candidateToken);
   if (!checkedToken.ok) return checkedToken;
-  const auto wifi = wifi_.status();
+  const auto& wifi = wifi_.status();
   if (wifi.link != WifiLink::Connected || pendingWifi_) return {false, "Connect Wi-Fi before checking your workspace."};
   pendingCloud_ = CloudCredentials{normalized, candidateToken};
   storageBlocked_ = false;
@@ -220,7 +220,7 @@ void Controller::tick(std::uint32_t now) {
   // fresh again when the platform's 32-bit millisecond clock wraps.
   if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
-  const auto wifi = wifi_.status();
+  const auto& wifi = wifi_.status();
   if (updater_.tick(now, wifi.link == WifiLink::Connected && wifi.clockReady, workspace_.connection == Connection::Online)) {
     workspace_.firmware = updater_.view();
     ++workspace_.revision;
