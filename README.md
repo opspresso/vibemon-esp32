@@ -51,7 +51,6 @@ Version 3 targets the four-inch ESP32-S3 board. It replaces the C6 single-charac
 - [Board and pin assignments](docs/hardware.md)
 - [Data, security and USB contracts](docs/api.md)
 - [Architecture and verification](docs/architecture.md)
-- [2026-10-14 audit](docs/audit-2026-10-14.md)
 - [VibeMon Desktop](https://github.com/opspresso/vibemon-app) · [VibeMon Web](https://vibemon.io)
 
 MIT. The bundled Nanum Gothic font has its own [SIL Open Font License](assets/OFL-NanumGothic.txt).
