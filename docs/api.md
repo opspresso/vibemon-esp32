@@ -34,6 +34,8 @@ Plan usage bars (metric keys that start with `usage`) use the App contract's ton
 
 The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key and four selections. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.
 
+Server addresses use lowercase hostnames and numeric ports without leading zeros. The default HTTPS port `443` is omitted, so `https://vibemon.io:00443` and `https://vibemon.io` keep the same key and panel selections. Older stored addresses are normalized when read, without an automatic flash write.
+
 The default firmware does not enable flash or NVS encryption. Physical access to the device or a flash backup can expose stored credentials. Use a dedicated read token and keep firmware backups private. In RAM, the HTTPS worker and the USB console overwrite their temporary copies of the token and Wi-Fi password after use; copies inside the HTTP and TLS libraries are not overwritten. The optional USB console is a local setup interface, not an authenticated network service.
 
 The firmware has no inbound HTTP status server, captive portal or WebSocket connection. Collectors send reports to Web; the device only reads them.

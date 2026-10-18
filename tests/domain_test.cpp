@@ -29,6 +29,9 @@ int main() {
     CHECK(normalizeOrigin(" vibemon.io/ ", origin).ok && origin == "https://vibemon.io");
     CHECK(normalizeOrigin("https://DASH.example:8443", origin).ok && origin == "https://dash.example:8443");
     CHECK(normalizeOrigin("HTTPS://DASH.EXAMPLE", origin).ok && origin == "https://dash.example");
+    CHECK(normalizeOrigin("HTTPS://DASH.EXAMPLE:443/", origin).ok && origin == "https://dash.example");
+    CHECK(normalizeOrigin("https://dash.example:000443", origin).ok && origin == "https://dash.example");
+    CHECK(normalizeOrigin("https://dash.example:08443", origin).ok && origin == "https://dash.example:8443");
     const std::string longHost = std::string(63, 'a') + "." + std::string(63, 'b') + "." + std::string(63, 'c') + "." + std::string(61, 'd');
     CHECK(normalizeOrigin(longHost + ":65535", origin).ok);
     Config longOrigin; longOrigin.origin = origin; CHECK(validConfig(longOrigin));

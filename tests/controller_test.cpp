@@ -4,6 +4,15 @@
 int main() {
   try {
     {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      const auto savedPanels = store.saved.panels;
+      const auto writes = store.writes;
+      CHECK(app.saveCloud("HTTPS://VIBEMON.IO:00443/", "").ok);
+      app.tick(3); cloud.complete(catalog()); app.tick(4);
+      CHECK(store.saved.panels == savedPanels && store.writes == writes);
+    }
+    {
       // A candidate server's rate limit does not delay the saved server.
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);

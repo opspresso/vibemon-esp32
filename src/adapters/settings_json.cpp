@@ -16,6 +16,10 @@ bool decodeSettings(std::string_view json, Config& output) {
   config.ssid = document["ssid"].as<std::string>();
   config.wifiPassword = document["wifiPassword"].as<std::string>();
   config.origin = document["origin"].as<std::string>();
+  // Older firmware kept explicit default ports. Normalize without replacing credentials or panels.
+  std::string normalizedOrigin;
+  if (!normalizeOrigin(config.origin, normalizedOrigin).ok) return false;
+  config.origin = std::move(normalizedOrigin);
   config.readToken = document["readToken"].as<std::string>();
   config.panelsInitialized = document["panelsInitialized"].as<bool>();
   for (std::size_t i = 0; i < PanelCount; ++i) {
