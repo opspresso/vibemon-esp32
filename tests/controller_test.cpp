@@ -3,6 +3,33 @@
 
 int main() {
   try {
+    for (const auto error : {CloudError::Unauthorized, CloudError::Forbidden}) {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete({}, error); app.tick(2);
+      const auto reason = app.workspace().message;
+      wifi.current.link = WifiLink::Failed; app.tick(3);
+      wifi.connected("Workshop", false); app.tick(4); wifi.connected(); app.tick(5);
+      CHECK(app.workspace().connection == Connection::TokenRejected && app.workspace().message == reason);
+      CHECK(cloud.requests.size() == 1);
+      // A replacement may be checked, but cancelling it does not revive the rejected saved key.
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(6); CHECK(cloud.requests.size() == 2);
+      app.cancelSetup(); cloud.complete(catalog()); app.tick(7);
+      CHECK(app.workspace().connection == Connection::TokenRejected && cloud.requests.size() == 2);
+      app.refresh(); app.tick(8); CHECK(cloud.requests.size() == 3);
+      cloud.complete(catalog()); app.tick(9); CHECK(app.workspace().connection == Connection::Online);
+    }
+    {
+      // Cancelling a candidate restores even an intentionally empty saved workspace.
+      Store store; configured(store); store.saved.panelsInitialized = true;
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); app.cancelSetup(); cloud.complete(catalog("discarded")); app.tick(4);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(5);
+      CHECK(app.workspace().connection == Connection::Online && app.workspace().panels[0].id.empty());
+    }
     {
       // Empty initialized panels need no background data; explicit refresh and the picker still work.
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");

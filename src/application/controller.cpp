@@ -5,6 +5,11 @@
 #include <utility>
 
 namespace vibemon {
+namespace {
+const char* rejectionMessage(CloudError error) {
+  return error == CloudError::Forbidden ? "This token needs read permission." : "This token was rejected. Check or replace it.";
+}
+}  // namespace
 Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version)
     : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)) {}
 
@@ -68,7 +73,6 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   storageBlocked_ = false;
   ++generation_;
   inFlight_ = false;
-  tokenRejected_ = false;
   workspace_.refreshing = false;
   nextPoll_ = now_;
   state(Connection::CheckingCloud, "Checking your read token...");
@@ -113,6 +117,7 @@ void Controller::retryWifi() {
 void Controller::cancelSetup() {
   if (pendingWifi_) { retryWifi(); return; }
   if (!pendingCloud_) {
+    if (tokenRejected_) { state(Connection::TokenRejected, rejectionMessage(*tokenRejected_)); return; }
     // Leaving the form dismisses a failed first setup's cause.
     if (config_.readToken.empty() && (workspace_.connection == Connection::CloudUnavailable || workspace_.connection == Connection::TokenRejected)) needCloud();
     return;
@@ -121,10 +126,10 @@ void Controller::cancelSetup() {
   ++generation_;
   inFlight_ = false;
   workspace_.refreshing = false;
-  tokenRejected_ = false;
   nextPoll_ = now_;
   if (config_.readToken.empty()) needCloud();
-  else state(Connection::CheckingCloud, "Restoring your saved workspace...");
+  else if (tokenRejected_) state(Connection::TokenRejected, rejectionMessage(*tokenRejected_));
+  else { refreshRequested_ = true; state(Connection::CheckingCloud, "Restoring your saved workspace..."); }
 }
 
 void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server address and a read token."); }
@@ -132,7 +137,7 @@ void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server a
 void Controller::refresh() {
   // An explicit refresh skips the backoff, not the server's Retry-After.
   nextPoll_ = retryAfter().value_or(now_);
-  tokenRejected_ = false;
+  tokenRejected_.reset();
   failures_ = 0;
   storageBlocked_ = false;
   refreshRequested_ = true;
@@ -141,11 +146,12 @@ void Controller::refresh() {
 void Controller::failure(const CloudResult& result, bool validating) {
   const auto error = result.error;
   const auto failedOrigin = validating ? pendingCloud_->origin : config_.origin;
+  const bool savedCredential = !validating || (pendingCloud_->origin == config_.origin && pendingCloud_->token == config_.readToken);
   if (validating) pendingCloud_.reset();
   if (error == CloudError::Unauthorized || error == CloudError::Forbidden) {
     // A rejected replacement must not revoke the previous, still-valid connection.
-    tokenRejected_ = !validating || config_.readToken.empty();
-    state(Connection::TokenRejected, error == CloudError::Forbidden ? "This token needs read permission." : "This token was rejected. Check or replace it.");
+    if (savedCredential) tokenRejected_ = error;
+    state(Connection::TokenRejected, rejectionMessage(error));
   } else {
     std::string message = error == CloudError::Tls ? "The server certificate could not be verified." :
         error == CloudError::InvalidResponse ? "The server returned an invalid workspace." :
@@ -223,7 +229,7 @@ void Controller::accept(CloudResult& result) {
 void Controller::online() {
   failures_ = 0;
   retryAfter_.erase(config_.origin);
-  tokenRejected_ = false;
+  tokenRejected_.reset();
   // The picker needs every item; replace a panel-only snapshot at once.
   nextPoll_ = browsing_ && !requestedAll_ ? now_ : now_ + PollIntervalMs;
   state(Connection::Online, requestedAll_ && workspace_.catalog.items.empty() ? "Connected. Waiting for your first report." : "Connected");
@@ -320,8 +326,15 @@ void Controller::tick(std::uint32_t now) {
     if (current != Connection::CloudUnavailable && current != Connection::TokenRejected && current != Connection::StorageError) needCloud();
     return;
   }
+  if (tokenRejected_ && !pendingCloud_) {
+    // Wi-Fi recovery does not make a rejected credential usable again.
+    const auto connection = workspace_.connection;
+    if (connection == Connection::ConnectingWifi || connection == Connection::WifiUnavailable || connection == Connection::SettingClock || connection == Connection::ClockUnavailable)
+      state(Connection::TokenRejected, rejectionMessage(*tokenRejected_));
+    return;
+  }
   // A firmware download owns the network until the device restarts.
-  if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || retryAfter() || !due(now, nextPoll_)) return;
+  if (inFlight_ || storageBlocked_ || updater_.busy() || retryAfter() || !due(now, nextPoll_)) return;
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   auto scope = requestScope();

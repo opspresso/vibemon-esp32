@@ -30,6 +30,8 @@ Missing measurements remain unavailable; they do not become zero. Invalid or inc
 
 `Retry-After` belongs to the HTTPS origin that returned it. Checking another server does not delay the saved server or erase its existing wait. Cancelled setup replies cannot change the workspace, but their server's delay is still kept. Expired waits are removed even while the device is offline.
 
+Wi-Fi recovery and cancelling a replacement keep a saved token's rejection and its permission error. Only an explicit retry or a verified replacement resumes that connection. Cancelling a replacement of a usable connection checks the saved workspace once, including when all panels are empty.
+
 Plan usage bars (metric keys that start with `usage`) use the App contract's tones: warning from 70 and danger from 90, both inclusive. Other bars use the accent color. Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
 ## Persistent settings

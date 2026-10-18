@@ -86,7 +86,8 @@ class Controller {
   // Keep each server's delay while another workspace is checked or restored.
   std::map<std::string, std::uint32_t> retryAfter_;
   bool inFlight_ = false;
-  bool tokenRejected_ = false;
+  // Rejection of the saved credential; candidate checks do not replace it.
+  std::optional<CloudError> tokenRejected_;
   bool storageBlocked_ = false;
   bool hadConnection_ = false;
   bool browsing_ = false;
