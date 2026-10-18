@@ -107,8 +107,9 @@ std::uint32_t age(std::int64_t now, std::int64_t then) {
 }
 }  // namespace
 
-Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Allocator* allocator) {
-  if (body.size() > MaxResponseBytes) return {false, "Workspace response exceeds the device limit."};
+CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Allocator* allocator) {
+  const auto invalid = [](const char* message) { return CatalogDecode{false, false, message}; };
+  if (body.size() > MaxResponseBytes) return {false, true, "The response exceeds 1 MiB."};
   JsonDocument filter;
   filter["serverTime"] = true;
   auto fields = filter["sources"][0].to<JsonObject>();
@@ -119,13 +120,15 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
   fields["agent"]["usageWeekResetsIn"] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
   const auto error = deserializeJson(document, body.data(), body.size(), DeserializationOption::Filter(filter), DeserializationOption::NestingLimit(12));
-  if (error) return {false, "The server returned an invalid or oversized workspace."};
+  if (error == DeserializationError::NoMemory) return {false, true, "The response exceeds the device's JSON memory budget."};
+  if (error == DeserializationError::TooDeep) return invalid("The response is nested too deeply.");
+  if (error) return invalid("The response is not valid JSON.");
   const auto sources = document["sources"].as<JsonArrayConst>();
   std::string serverTime;
-  if (sources.isNull() || !text(document["serverTime"], serverTime, 24)) return {false, "The server response is not a VibeMon workspace."};
+  if (sources.isNull() || !text(document["serverTime"], serverTime, 24)) return invalid("The server response is not a VibeMon workspace.");
   const auto now = utcMilliseconds(serverTime);
-  if (!now) return {false, "The server returned an invalid timestamp."};
-  if (sources.size() > MaxSources) return {false, "This device supports up to 128 reporting sources."};
+  if (!now) return invalid("The server returned an invalid timestamp.");
+  if (sources.size() > MaxSources) return {false, true, "This device supports up to 128 reporting sources."};
   Catalog candidate;
   candidate.items.reserve(sources.size());
   std::set<std::string> seenSources;
@@ -136,25 +139,25 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
     if (!text(source["sourceId"], id, 128) || !validSourceId(id) || !seenSources.insert(id).second ||
         !text(source["kind"], kind, 16) || !text(source["displayName"], item.name, 512) ||
         !text(source["observedAt"], observedAt, 24) || !text(source["receivedAt"], receivedAt, 24) ||
-        !text(source["health"], health, 16) || !source["stale"].is<bool>()) return {false, "A source contains invalid identity or status fields."};
+        !text(source["health"], health, 16) || !source["stale"].is<bool>()) return invalid("A source contains invalid identity or status fields.");
     const auto observed = utcMilliseconds(observedAt), received = utcMilliseconds(receivedAt);
-    if (!observed || !received) return {false, "A source contains invalid timestamps."};
+    if (!observed || !received) return invalid("A source contains invalid timestamps.");
     item.ageMs = age(*now, *received); item.activityAgeMs = age(*now, *observed);
     item.sourceId = id; item.observedAtMs = *observed;
     item.reportedStale = source["stale"].as<bool>();
     if (health == "ok") item.health = Health::Ok;
     else if (health == "warning") item.health = Health::Warning;
     else if (health == "error") item.health = Health::Error;
-    else if (health != "unknown") return {false, "A source contains an unknown health status."};
+    else if (health != "unknown") return invalid("A source contains an unknown health status.");
     if (kind == "agent") {
       std::string provider, accountId;
       if (!text(source["account"]["provider"], provider, 32) || !text(source["account"]["id"], accountId, 128) ||
           !text(source["account"]["displayName"], item.name, 512) || !validAccountId(provider + ":" + accountId) ||
-          !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return {false, "A coding account contains invalid fields."};
+          !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return invalid("A coding account contains invalid fields.");
       item.selection = {ItemKind::Account, provider + ":" + accountId};
       item.category = provider + " · " + accountId;
       item.projects.push_back(item);
-      if (!presetMetrics(source, kind, item)) return {false, "A coding account contains invalid measurements."};
+      if (!presetMetrics(source, kind, item)) return invalid("A coding account contains invalid measurements.");
       auto previous = accounts.find(item.selection.id);
       if (previous != accounts.end()) {
         auto& current = candidate.items[previous->second];
@@ -167,14 +170,14 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
       accounts.emplace(item.selection.id, candidate.items.size());
     } else if (kind == "resource" || kind == "host" || kind == "cluster") {
       item.selection = {ItemKind::Resource, id};
-      if (!source["statusMessage"].isNull() && !text(source["statusMessage"], item.statusMessage, 640, true)) return {false, "A resource status message is invalid."};
+      if (!source["statusMessage"].isNull() && !text(source["statusMessage"], item.statusMessage, 640, true)) return invalid("A resource status message is invalid.");
       if (!source["resourceType"].isNull()) {
-        if (!text(source["resourceType"], item.category, 256)) return {false, "A resource type is invalid."};
+        if (!text(source["resourceType"], item.category, 256)) return invalid("A resource type is invalid.");
       } else item.category = kind == "cluster" ? "Kubernetes" : source["memoryType"] == "unified" ? "DGX Spark" : "Host";
       if (kind == "resource" || !source["metricDefinitions"].isNull()) {
-        if (!customMetrics(source, item)) return {false, "A resource contains invalid metric definitions or values."};
-      } else if (!presetMetrics(source, kind, item)) return {false, "A resource contains invalid measurements."};
-    } else return {false, "The server returned an unsupported source kind."};
+        if (!customMetrics(source, item)) return invalid("A resource contains invalid metric definitions or values.");
+      } else if (!presetMetrics(source, kind, item)) return invalid("A resource contains invalid measurements.");
+    } else return invalid("The server returned an unsupported source kind.");
     candidate.items.push_back(std::move(item));
   }
   for (auto& item : candidate.items) std::sort(item.projects.begin(), item.projects.end(), [](const ReportState& a, const ReportState& b) {
@@ -185,6 +188,6 @@ Validation decodeCatalog(std::string_view body, Catalog& output, ArduinoJson::Al
     return a.name == b.name ? a.selection.id < b.selection.id : a.name < b.name;
   });
   output = std::move(candidate);
-  return {true, {}};
+  return {true, false, {}};
 }
 }  // namespace vibemon

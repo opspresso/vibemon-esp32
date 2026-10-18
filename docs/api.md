@@ -21,7 +21,7 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
 | Resource stale boundary | 120 seconds since the server received it |
 
-Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
+Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. The connection message names the first rule that the snapshot breaks, such as an invalid timestamp or more than 128 sources. It never quotes response content. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
 Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
@@ -39,7 +39,7 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
+| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |

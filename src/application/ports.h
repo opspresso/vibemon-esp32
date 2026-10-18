@@ -43,6 +43,8 @@ struct CloudResult {
   std::uint32_t generation = 0;
   CloudError error = CloudError::None;
   Catalog catalog;
+  // One sentence that explains InvalidResponse or TooLarge. It never contains response content.
+  std::string detail;
 };
 class CloudPort {
  public:

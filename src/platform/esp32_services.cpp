@@ -248,7 +248,11 @@ std::unique_ptr<CloudResult> EspCloud::fetch(const Job& job) {
   if (body.oversized()) { result->error = CloudError::TooLarge; return result; }
   if (read < 0 || (expected >= 0 && read != expected)) { result->error = CloudError::Network; return result; }
   PsramJsonAllocator allocator;
-  if (!decodeCatalog(body.body(), result->catalog, &allocator).ok) result->error = CloudError::InvalidResponse;
+  const auto decoded = decodeCatalog(body.body(), result->catalog, &allocator);
+  if (!decoded.ok) {
+    result->error = decoded.exceedsLimit ? CloudError::TooLarge : CloudError::InvalidResponse;
+    result->detail = decoded.message;
+  }
   return result;
 }
 }  // namespace vibemon

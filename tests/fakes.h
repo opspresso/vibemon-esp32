@@ -36,9 +36,9 @@ struct Cloud final : CloudPort {
   bool busy = false;
   bool start(const CloudRequest& request) override { if (busy) return false; busy = true; requests.push_back(request); return true; }
   std::unique_ptr<CloudResult> take() override { return std::move(reply); }
-  void complete(Catalog catalog = {}, CloudError error = CloudError::None) {
+  void complete(Catalog catalog = {}, CloudError error = CloudError::None, std::string detail = {}) {
     CHECK(busy && !requests.empty());
-    reply = std::make_unique<CloudResult>(CloudResult{requests.back().generation, error, std::move(catalog)});
+    reply = std::make_unique<CloudResult>(CloudResult{requests.back().generation, error, std::move(catalog), std::move(detail)});
     busy = false;
   }
 };

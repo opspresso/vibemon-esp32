@@ -82,6 +82,16 @@ int main() {
       CHECK(app.workspace().connection == Connection::NeedCloud && store.writes == 0);
     }
     {
+      // A rejected snapshot keeps the previous readings and names the decoder's reason.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      app.refresh(); app.tick(3); cloud.complete({}, CloudError::InvalidResponse, "A source contains invalid timestamps."); app.tick(4);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable && app.workspace().catalog.items.size() == 2);
+      CHECK(app.workspace().message == "The server returned an invalid workspace. A source contains invalid timestamps.");
+      app.refresh(); app.tick(5); cloud.complete({}, CloudError::TooLarge, "This device supports up to 128 reporting sources."); app.tick(6);
+      CHECK(app.workspace().message == "The workspace exceeds this device's limits. This device supports up to 128 reporting sources.");
+    }
+    {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
       const auto before = store.saved;

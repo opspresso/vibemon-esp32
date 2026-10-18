@@ -80,7 +80,9 @@ int main() {
     auto malformed = sample();
     const auto at = malformed.find("\"gpu\":28.4");
     malformed.replace(at, std::string("\"gpu\":28.4").size(), "\"gpu\":\"unknown\"");
-    CHECK(!decodeCatalog(malformed, catalog).ok && catalog.items.size() == before);
+    const auto rejected = decodeCatalog(malformed, catalog);
+    CHECK(!rejected.ok && !rejected.exceedsLimit && catalog.items.size() == before);
+    CHECK(rejected.message == "A resource contains invalid metric definitions or values.");
     for (const char* invalid : {R"(First\nSecond)", R"(First\u0000Second)", R"(First\u007fSecond)", R"(\ud800)"}) {
       auto badName = sample();
       badName.replace(badName.find("DGX Spark"), 9, invalid);
@@ -96,8 +98,14 @@ int main() {
       CHECK(decodeCatalog(precise, catalog).ok);
       CHECK(catalog.find({ItemKind::Resource, "spark"})->metrics[1].value == reading.second);
     }
-    CHECK(!decodeCatalog("{\"sources\":[]}", catalog).ok);
-    CHECK(!decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog).ok);
+    CHECK(decodeCatalog("{\"sources\":[]}", catalog).message == "The server response is not a VibeMon workspace.");
+    CHECK(decodeCatalog("{\"sources\":", catalog).message == "The response is not valid JSON.");
+    const auto oversized = decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog);
+    CHECK(!oversized.ok && oversized.exceedsLimit);
+    std::string crowded = "{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[";
+    for (std::size_t i = 0; i <= MaxSources; ++i) crowded += i ? ",{}" : "{}";
+    const auto tooMany = decodeCatalog(crowded + "]}", catalog);
+    CHECK(!tooMany.ok && tooMany.exceedsLimit && tooMany.message == "This device supports up to 128 reporting sources.");
     CHECK(decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog).ok && catalog.items.empty());
     Metric metric;
     CHECK(metricValue(metric) == "—");

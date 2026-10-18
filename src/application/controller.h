@@ -69,7 +69,7 @@ class Controller {
   void state(Connection connection, const std::string& message);
   void needCloud();
   void accept(CloudResult& result);
-  void failure(CloudError error, bool validating);
+  void failure(const CloudResult& result, bool validating);
 };
 
 }  // namespace vibemon

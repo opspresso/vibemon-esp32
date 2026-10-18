@@ -41,6 +41,7 @@ void SerialConsole::command() {
       response["internalHeapMinimum"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
       response["psramFree"] = ESP.getFreePsram();
       response["connection"] = static_cast<int>(workspace.connection);
+      response["message"] = workspace.message;
       response["page"] = static_cast<int>(ui_.page());
       response["items"] = workspace.catalog.items.size();
       response["hasSnapshot"] = workspace.hasSnapshot;

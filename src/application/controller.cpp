@@ -138,19 +138,21 @@ void Controller::refresh() {
   storageBlocked_ = false;
 }
 
-void Controller::failure(CloudError error, bool validating) {
+void Controller::failure(const CloudResult& result, bool validating) {
+  const auto error = result.error;
   if (validating) pendingCloud_.reset();
   if (error == CloudError::Unauthorized || error == CloudError::Forbidden) {
     // A rejected replacement must not revoke the previous, still-valid connection.
     tokenRejected_ = !validating || config_.readToken.empty();
     state(Connection::TokenRejected, error == CloudError::Forbidden ? "This token needs read permission." : "This token was rejected. Check or replace it.");
   } else {
-    const char* message = error == CloudError::Tls ? "The server certificate could not be verified." :
+    std::string message = error == CloudError::Tls ? "The server certificate could not be verified." :
         error == CloudError::InvalidResponse ? "The server returned an invalid workspace." :
-        error == CloudError::TooLarge ? "The workspace exceeds the device's response or source limit." :
+        error == CloudError::TooLarge ? "The workspace exceeds this device's limits." :
         error == CloudError::Memory ? "Not enough memory to load the workspace. Restart this device." :
         error == CloudError::Server ? "The server is unavailable. Your last readings are shown." :
         "Could not reach the server. Your last readings are shown.";
+    if (!result.detail.empty() && (error == CloudError::InvalidResponse || error == CloudError::TooLarge)) message += " " + result.detail;
     state(Connection::CloudUnavailable, message);
   }
   failures_ = std::min(failures_ + 1, 3u);
@@ -159,7 +161,7 @@ void Controller::failure(CloudError error, bool validating) {
 
 void Controller::accept(CloudResult& result) {
   const bool validating = pendingCloud_.has_value();
-  if (result.error != CloudError::None) { failure(result.error, validating); return; }
+  if (result.error != CloudError::None) { failure(result, validating); return; }
   Config candidate = config_;
   bool needsSave = false;
   if (validating) {
