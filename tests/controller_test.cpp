@@ -99,11 +99,13 @@ int main() {
       app.begin(0); wifi.connected(); app.tick(1);
       cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
       CHECK(app.workspace().message == "The server is limiting requests. Your last readings are shown.");
+      // Neither a picker nor an explicit refresh asks before the server allows it.
+      app.browse(true); app.refresh(); app.tick(3); app.browse(false); app.tick(4);
       app.tick(120001); CHECK(cloud.requests.size() == 1);
       app.tick(120002); CHECK(cloud.requests.size() == 2);
       cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 1000; app.tick(120003);
-      app.tick(120003 + 39999); CHECK(cloud.requests.size() == 2);
-      app.tick(120003 + 40000); CHECK(cloud.requests.size() == 3);
+      app.tick(120003 + 19999); CHECK(cloud.requests.size() == 2);
+      app.tick(120003 + 20000); CHECK(cloud.requests.size() == 3);
       cloud.complete({}, CloudError::Redirected); app.tick(200000);
       CHECK(app.workspace().message == "The server redirected the request. Check the server address.");
     }

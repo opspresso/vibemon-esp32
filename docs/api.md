@@ -19,7 +19,7 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
-| Retry delay after HTTP 429 | The longer of that delay and `Retry-After` in seconds, at most 15 minutes |
+| Retry delay after HTTP 429 | The longer of that delay and `Retry-After` in seconds, at most 15 minutes. **Refresh** and the item picker also wait for `Retry-After`. |
 | Resource stale boundary | 120 seconds since the server received it |
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. The connection message names the first rule that the snapshot breaks, such as an invalid timestamp or more than 128 sources. It never quotes response content. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.

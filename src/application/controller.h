@@ -66,6 +66,8 @@ class Controller {
   std::uint32_t nextPoll_ = 0;
   std::uint32_t clockStartedAt_ = 0;
   unsigned failures_ = 0;
+  // The earliest request time that the server's last Retry-After allows.
+  std::optional<std::uint32_t> retryAfter_;
   bool inFlight_ = false;
   bool tokenRejected_ = false;
   bool storageBlocked_ = false;

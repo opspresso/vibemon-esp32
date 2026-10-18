@@ -129,7 +129,8 @@ void Controller::cancelSetup() {
 void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server address and a read token."); }
 
 void Controller::refresh() {
-  nextPoll_ = now_;
+  // An explicit refresh skips the backoff, not the server's Retry-After.
+  nextPoll_ = retryAfter_ && !due(now_, *retryAfter_) ? *retryAfter_ : now_;
   tokenRejected_ = false;
   failures_ = 0;
   storageBlocked_ = false;
@@ -155,6 +156,7 @@ void Controller::failure(const CloudResult& result, bool validating) {
     state(Connection::CloudUnavailable, message);
   }
   failures_ = std::min(failures_ + 1, 3u);
+  if (result.retryAfterMs) retryAfter_ = now_ + result.retryAfterMs;
   // A server's Retry-After can only lengthen the backoff.
   nextPoll_ = now_ + std::max(result.retryAfterMs, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
 }
@@ -193,6 +195,7 @@ void Controller::accept(CloudResult& result) {
   workspace_.hasSnapshot = true;
   updateConfigView();
   failures_ = 0;
+  retryAfter_.reset();
   tokenRejected_ = false;
   // The picker needs every item; replace a panel-only snapshot at once.
   nextPoll_ = browsing_ && !requestedAll_ ? now_ : now_ + PollIntervalMs;
@@ -212,7 +215,8 @@ std::vector<Selection> Controller::requestScope() const {
 void Controller::browse(bool browsing) {
   if (browsing_ == browsing) return;
   browsing_ = browsing;
-  if (browsing && !workspace_.catalogComplete) nextPoll_ = now_;
+  // After a failure the backoff and any Retry-After still apply.
+  if (browsing && !workspace_.catalogComplete && failures_ == 0) nextPoll_ = now_;
 }
 
 void Controller::tick(std::uint32_t now) {
