@@ -272,6 +272,15 @@ std::string decimalValue(double value, int precision) {
 }
 }  // namespace
 
+MetricTone metricTone(const std::string& key, std::optional<double> value) {
+  for (const auto& rule : contract::MeasurementTones) {
+    if (key.compare(0, std::char_traits<char>::length(rule.keyPrefix), rule.keyPrefix) != 0) continue;
+    if (!value || !(*value >= rule.warningFrom)) return MetricTone::Normal;
+    return *value >= rule.dangerFrom ? MetricTone::Danger : MetricTone::Warning;
+  }
+  return MetricTone::Normal;
+}
+
 std::string metricValue(const Metric& metric, bool compact) {
   if (!metric.value || !std::isfinite(*metric.value)) return "—";
   const double value = *metric.value;

@@ -59,20 +59,20 @@ std::string shortConnection(Connection connection, bool hasSnapshot) {
   }
   return "Not connected";
 }
-std::uint32_t blendColor(std::uint32_t first, std::uint32_t second, unsigned percent) {
-  std::uint32_t result = 0;
-  for (unsigned shift : {0u, 8u, 16u}) result |= ((((first >> shift) & 255) * percent + ((second >> shift) & 255) * (100 - percent) + 50) / 100) << shift;
-  return result;
-}
+// App's agent-card.css: three states have their own edge color; the others use their tone color.
 std::uint32_t statusColor(const std::string& state) {
-  if (state == "thinking") return Accent;
-  if (state == "planning") return blendColor(Info, Good, 65);
-  if (state == "packing") return blendColor(Accent, Danger, 65);
+  if (state == "thinking") return StateThinking;
+  if (state == "planning") return StatePlanning;
+  if (state == "packing") return StatePacking;
   const auto tone = stateTone(state);
   if (tone == "warning") return Warning;
   if (tone == "danger") return Danger;
   if (tone == "good") return Good;
   return tone == "active" ? Info : Muted;
+}
+// Gauge fill, as in App, Web and iOS.
+std::uint32_t toneColor(MetricTone tone) {
+  return tone == MetricTone::Danger ? Danger : tone == MetricTone::Warning ? Warning : Accent;
 }
 
 lv_point_t edgePoint(float phase) {
@@ -215,6 +215,7 @@ void DashboardUi::dashboard() {
       card.values[metric] = label(card.box, "", 114, y + 3, 88, fonts_.small());
       lv_obj_set_style_text_align(card.values[metric], LV_TEXT_ALIGN_RIGHT, 0);
       card.bars[metric] = lv_bar_create(card.box);
+      widgets_["panel-bar-" + std::to_string(i) + "-" + std::to_string(metric)] = card.bars[metric];
       box(card.bars[metric], 14, y + 23, 188, 2, Border, 1);
       lv_bar_set_range(card.bars[metric], 0, 1000);
       lv_obj_set_style_bg_color(card.bars[metric], lv_color_hex(Accent), LV_PART_INDICATOR);
@@ -311,6 +312,8 @@ void DashboardUi::updateCards(std::uint32_t now) {
       if (bar) {
         const auto progress = static_cast<int>(std::lround(std::clamp((*metric.value - metric.minimum) / (*metric.maximum - metric.minimum), 0.0, 1.0) * 1000));
         if (lv_bar_get_value(card.bars[m]) != progress) lv_bar_set_value(card.bars[m], progress, LV_ANIM_OFF);
+        const auto fill = lv_color_hex(toneColor(metricTone(metric.key, metric.value)));
+        if (!lv_color_eq(lv_obj_get_style_bg_color(card.bars[m], LV_PART_INDICATOR), fill)) lv_obj_set_style_bg_color(card.bars[m], fill, LV_PART_INDICATOR);
       }
     }
   }
