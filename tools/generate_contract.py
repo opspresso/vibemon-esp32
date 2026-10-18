@@ -17,7 +17,8 @@ def palette():
     css = (ROOT / "contracts/tokens.css").read_text()
     names = {"Background": "background", "Surface": "surface", "SurfaceRaised": "surface-raised",
              "Border": "border", "Foreground": "foreground", "Muted": "muted", "Accent": "accent",
-             "AccentForeground": "accent-foreground", "Info": "info", "Good": "good", "Warning": "warning", "Danger": "danger"}
+             "AccentForeground": "accent-foreground", "Info": "info", "Good": "good", "Warning": "warning", "Danger": "danger",
+             "StateThinking": "state-thinking", "StatePlanning": "state-planning", "StatePacking": "state-packing"}
     lines = ["// Generated from the pinned App dark palette; do not edit.", "#pragma once", "#include <cstdint>", "namespace vibemon::design {"]
     for name, token in names.items():
         values = re.findall(r"--vm-" + re.escape(token) + r"\s*:\s*light-dark\(#[0-9a-fA-F]{6},\s*#([0-9a-fA-F]{6})\)\s*;", css)
@@ -50,6 +51,14 @@ def generate():
         if not isinstance(digits, int) or isinstance(digits, bool) or not 0 <= digits <= 6:
             raise ValueError("Invalid measurement precision")
         lines.append("  {" + json.dumps(unit) + ", " + str(digits) + "},")
+    lines += ["};", "struct MeasurementTone { const char* keyPrefix; double warningFrom; double dangerFrom; };",
+              "inline constexpr MeasurementTone MeasurementTones[] = {"]
+    for tone in policy["measurements"]["tones"]:
+        bounds = [tone["warningFrom"], tone["dangerFrom"]]
+        if not isinstance(tone["keyPrefix"], str) or not tone["keyPrefix"] or \
+                any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in bounds) or bounds[0] > bounds[1]:
+            raise ValueError("Invalid measurement tone")
+        lines.append("  {" + json.dumps(tone["keyPrefix"]) + ", " + repr(float(bounds[0])) + ", " + repr(float(bounds[1])) + "},")
     lines += ["};", "}  // namespace vibemon::contract", ""]
     write_generated("monitoring_policy.h", "\n".join(lines))
     write_generated("design_tokens.h", palette())

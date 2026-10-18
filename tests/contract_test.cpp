@@ -103,6 +103,15 @@ int main(int argc, char** argv) {
       if (actual != expected) throw std::runtime_error(fixture["name"].as<std::string>() + ": expected '" + expected + "', got '" + actual + "'");
       ++count;
     }
+    for (JsonObjectConst fixture : fixtures["metricTones"].as<JsonArrayConst>()) {
+      std::optional<double> value;
+      if (!fixture["value"].isNull()) value = fixture["value"].as<double>();
+      const auto tone = metricTone(fixture["key"].as<std::string>(), value);
+      const auto actual = tone == MetricTone::Danger ? "danger" : tone == MetricTone::Warning ? "warning" : "normal";
+      if (fixture["expected"].as<std::string>() != actual) throw std::runtime_error("Metric tone " + fixture["key"].as<std::string>() + ": expected " + fixture["expected"].as<std::string>() + ", got " + actual);
+      ++count;
+    }
+    CHECK(fixtures["metricTones"].size() > 0);
     std::cout << "PASS " << count << " shared App/Web/ESP32 monitoring cases through the actual JSON adapter\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

@@ -20,6 +20,7 @@ constexpr std::uint32_t PollIntervalMs = 10000;
 enum class ItemKind { Resource, Account };
 enum class Health { Ok, Warning, Error, Unknown };
 enum class MetricDisplay { Number, Bar };
+enum class MetricTone { Normal, Warning, Danger };
 
 struct Selection {
   ItemKind kind = ItemKind::Resource;
@@ -102,6 +103,9 @@ std::string projectState(const ReportState& item, std::uint64_t elapsedMs);
 std::string stateLabel(const std::string& state);
 std::string stateTone(const std::string& state);
 bool needsAttention(const std::string& state);
+// Plan usage warns before its limit; the pinned App policy sets the inclusive
+// bounds. Other and missing measurements are Normal.
+MetricTone metricTone(const std::string& key, std::optional<double> value);
 std::string metricValue(const Metric& metric, bool compact = true);
 std::string metricText(const Metric& metric, bool compact = true);
 std::string ageLabel(std::uint64_t milliseconds);
