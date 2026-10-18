@@ -122,7 +122,8 @@ int main() {
     for (std::size_t i = 0; i <= MaxSources; ++i) crowded += i ? ",{}" : "{}";
     const auto tooMany = decodeCatalog(crowded + "]}", catalog);
     CHECK(!tooMany.ok && tooMany.exceedsLimit && tooMany.message == "This device supports up to 128 reporting sources.");
-    CHECK(decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog).ok && catalog.items.empty());
+    const auto empty = decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog);
+    CHECK(empty.ok && catalog.items.empty() && empty.serverTimeMs == *utcMilliseconds("2026-10-11T00:00:00Z"));
     Metric metric;
     CHECK(metricValue(metric) == "—");
     metric.value = 0; CHECK(metricValue(metric) == "0");
