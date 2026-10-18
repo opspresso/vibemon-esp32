@@ -126,6 +126,7 @@ void DashboardUi::clear(Page page) {
   detailMetrics_.clear(); detailMembers_.clear();
   waitingWifi_ = waitingCloud_ = pendingPickerRefresh_ = false;
   page_ = page;
+  controller_.browse(page == Page::Picker);
   box(root_, 0, 0, 480, 480, Background, 0);
   lv_obj_set_style_text_color(root_, lv_color_hex(Foreground), 0);
   lv_obj_set_style_text_font(root_, fonts_.normal(), 0);
@@ -582,6 +583,8 @@ void DashboardUi::picker(std::size_t panel) {
   widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] { controller_.refresh(); pendingPickerRefresh_ = true; });
   formMessage_ = label(root_, "", 20, 382, 440, fonts_.small(), Danger);
   wrap(formMessage_);
+  // Polls between pickers read only the selected panels; list the rest when they arrive.
+  pendingPickerRefresh_ = !controller_.workspace().catalogComplete;
   updatePicker();
 }
 
@@ -612,7 +615,7 @@ void DashboardUi::updatePicker() {
     widgets_["item-" + std::to_string(rowIndex++)] = row;
   }
   if (!rowIndex) {
-    auto* empty = label(list_, "No items yet.\nSend reports to this account, then refresh.", 12, 8, 420, fonts_.normal(), Muted);
+    auto* empty = label(list_, workspace.catalogComplete ? "No items yet.\nSend reports to this account, then refresh." : "Loading your items...", 12, 8, 420, fonts_.normal(), Muted);
     wrap(empty);
   }
 }
@@ -651,7 +654,8 @@ void DashboardUi::update(std::uint32_t now) {
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
   else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
-  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
+  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed &&
+           (workspace.catalogComplete || workspace.connection != Connection::Online)) {
     pendingPickerRefresh_ = false; updatePicker();
   }
 }

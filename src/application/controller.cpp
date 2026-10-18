@@ -191,13 +191,31 @@ void Controller::accept(CloudResult& result) {
   config_ = std::move(candidate);
   pendingCloud_.reset();
   workspace_.catalog = std::move(result.catalog);
+  workspace_.catalogComplete = requestedAll_;
   workspace_.snapshotAgeMs = 0;
   workspace_.hasSnapshot = true;
   updateConfigView();
   failures_ = 0;
   tokenRejected_ = false;
-  nextPoll_ = now_ + PollIntervalMs;
-  state(Connection::Online, workspace_.catalog.items.empty() ? "Connected. Waiting for your first report." : "Connected");
+  // The picker needs every item; replace a panel-only snapshot at once.
+  nextPoll_ = browsing_ && !requestedAll_ ? now_ : now_ + PollIntervalMs;
+  state(Connection::Online, requestedAll_ && workspace_.catalog.items.empty() ? "Connected. Waiting for your first report." : "Connected");
+}
+
+std::vector<Selection> Controller::requestScope() const {
+  // Validation, first panel defaults and the picker need every item.
+  if (pendingCloud_ || !config_.panelsInitialized || browsing_) return {};
+  std::vector<Selection> scope;
+  for (const auto& selection : config_.panels) {
+    if (!selection.id.empty() && std::find(scope.begin(), scope.end(), selection) == scope.end()) scope.push_back(selection);
+  }
+  return scope;
+}
+
+void Controller::browse(bool browsing) {
+  if (browsing_ == browsing) return;
+  browsing_ = browsing;
+  if (browsing && !workspace_.catalogComplete) nextPoll_ = now_;
 }
 
 void Controller::tick(std::uint32_t now) {
@@ -258,8 +276,10 @@ void Controller::tick(std::uint32_t now) {
   if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || !due(now, nextPoll_)) return;
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
-  if (cloud_.start({generation_, origin, token})) {
-    inFlight_ = true; workspace_.refreshing = true;
+  auto scope = requestScope();
+  const bool all = scope.empty();
+  if (cloud_.start({generation_, origin, token, std::move(scope)})) {
+    inFlight_ = true; workspace_.refreshing = true; requestedAll_ = all;
     ++workspace_.revision;
     if (!workspace_.hasSnapshot || pendingCloud_) state(Connection::CheckingCloud, "Loading your workspace...");
   }

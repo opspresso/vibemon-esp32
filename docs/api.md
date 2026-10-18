@@ -2,7 +2,7 @@
 
 ## Cloud reads
 
-The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
+The device requests `GET /api/v1/sources` every 10 seconds while connected. Polls add the `ids` and `accounts` filters, so Web returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
 
 The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. `agent.usage5hResetsIn` and `agent.usageWeekResetsIn` are whole minutes until the session and weekly limits reset, measured at `observedAt`. The device subtracts the observation age and shows the countdown only beside a reported value. `agent.usageWeekModel` is the weekly usage of one model family, from 0 to 100. When the newest project reports it, the account shows it after the weekly limit as `Weekly {usageWeekModelLabel}`, or `Weekly model` without a label, with the `usageWeekModelResetsIn` countdown. Other values make the response invalid. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
 
@@ -40,7 +40,7 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
+| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts (items in the last reply, which can hold only the selected panels), touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |

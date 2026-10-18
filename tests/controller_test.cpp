@@ -107,6 +107,40 @@ int main() {
       cloud.complete({}, CloudError::Redirected); app.tick(200000);
       CHECK(app.workspace().message == "The server redirected the request. Check the server address.");
     }
+    {
+      // Polls read only the selected panels; the picker and first defaults read every item.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      CHECK(cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(2);
+      CHECK(app.workspace().catalogComplete && app.workspace().panels[0].id == "one");
+      app.tick(2 + PollIntervalMs);
+      const std::vector<Selection> panels{{ItemKind::Resource, "one"}, {ItemKind::Account, "codex:work"}};
+      CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope == panels);
+      Catalog selected = catalog(); selected.items.pop_back();
+      app.browse(true);
+      cloud.complete(selected); app.tick(3 + PollIntervalMs);
+      CHECK(!app.workspace().catalogComplete && app.workspace().message == "Connected");
+      // The panel-only reply arrived while browsing, so the full list follows at once.
+      app.tick(4 + PollIntervalMs);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(5 + PollIntervalMs);
+      CHECK(app.workspace().catalogComplete && app.workspace().catalog.items.size() == 2);
+      app.tick(5 + 2 * PollIntervalMs); CHECK(cloud.requests.back().scope.empty());
+      app.browse(false); cloud.complete(catalog()); app.tick(6 + 2 * PollIntervalMs);
+      app.tick(6 + 3 * PollIntervalMs); CHECK(cloud.requests.back().scope == panels);
+      cloud.complete({}); app.tick(7 + 3 * PollIntervalMs);
+      CHECK(app.workspace().message == "Connected" && !app.workspace().catalogComplete);
+      app.browse(true); app.tick(8 + 3 * PollIntervalMs);
+      CHECK(cloud.requests.back().scope.empty());
+      cloud.complete({}); app.tick(9 + 3 * PollIntervalMs);
+      CHECK(app.workspace().message == "Connected. Waiting for your first report.");
+    }
+    CHECK(sourcesPath({}) == "/api/v1/sources");
+    CHECK(sourcesPath({{ItemKind::Resource, "spark"}, {ItemKind::Resource, "k3s.main"}}) == "/api/v1/sources?ids=spark,k3s.main");
+    CHECK(sourcesPath({{ItemKind::Account, "codex:work"}}) == "/api/v1/sources?accounts=codex:work");
+    CHECK(sourcesPath({{ItemKind::Account, "codex:work"}, {ItemKind::Resource, "spark"}, {ItemKind::Account, "claude:me"}}) ==
+          "/api/v1/sources?ids=spark&accounts=codex:work,claude:me");
     CHECK(cloudStatusError(200) == CloudError::None && cloudStatusError(401) == CloudError::Unauthorized);
     CHECK(cloudStatusError(403) == CloudError::Forbidden && cloudStatusError(429) == CloudError::RateLimited);
     CHECK(cloudStatusError(301) == CloudError::Redirected && cloudStatusError(308) == CloudError::Redirected);

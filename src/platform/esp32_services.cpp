@@ -96,6 +96,7 @@ struct CloudJob {
   std::uint32_t generation;
   std::string origin;
   std::string token;
+  std::string path;
   ~CloudJob() { wipe(token); }
 };
 
@@ -139,7 +140,7 @@ class CloudSession {
   std::unique_ptr<CloudResult> request(const CloudJob& job) {
     auto result = std::make_unique<CloudResult>();
     result->generation = job.generation;
-    if (WiFi.status() != WL_CONNECTED || !http_.begin(client_, (job.origin + "/api/v1/sources").c_str())) {
+    if (WiFi.status() != WL_CONNECTED || !http_.begin(client_, (job.origin + job.path).c_str())) {
       result->error = CloudError::Network;
       return result;
     }
@@ -298,7 +299,7 @@ bool EspCloud::start(const CloudRequest& request) {
   bool expected = false;
   if (!busy_.compare_exchange_strong(expected, true)) return false;
   // The queue holds only a pointer, so the token exists in one wiped copy.
-  auto* job = new CloudJob{request.generation, request.origin, request.token};
+  auto* job = new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope)};
   if (xQueueSend(jobs_, &job, 0) == pdTRUE) return true;
   delete job;
   busy_ = false;

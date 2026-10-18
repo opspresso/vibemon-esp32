@@ -1,6 +1,20 @@
 #include "cloud_http.h"
 
 namespace vibemon {
+std::string sourcesPath(const std::vector<Selection>& scope) {
+  std::string ids, accounts;
+  for (const auto& selection : scope) {
+    // Source and account IDs contain only URL-safe characters.
+    auto& list = selection.kind == ItemKind::Account ? accounts : ids;
+    if (!list.empty()) list += ',';
+    list += selection.id;
+  }
+  std::string path = "/api/v1/sources";
+  if (!ids.empty()) path += "?ids=" + ids;
+  if (!accounts.empty()) path += (ids.empty() ? "?accounts=" : "&accounts=") + accounts;
+  return path;
+}
+
 CloudError cloudStatusError(int status) {
   if (status == 200) return CloudError::None;
   if (status == 401) return CloudError::Unauthorized;

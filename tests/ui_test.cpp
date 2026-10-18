@@ -273,6 +273,24 @@ int main() {
       CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Workspace connected");
     }
     {
+      // The dashboard reads only its panels; the picker loads every item when it opens.
+      Store store; configured(store);
+      store.saved.panelsInitialized = true; store.saved.panels[0] = {ItemKind::Resource, "spark"};
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs);
+      CHECK(cloud.requests.back().scope.size() == 1);
+      auto selected = demo(); selected.items.erase(selected.items.begin()); selected.items.resize(1);
+      cloud.complete(selected); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui);
+      ui.picker(1); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      app.tick(++timeMs); CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope.empty());
+      advance(ui); CHECK(!ui.widget("item-1"));
+      cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-3") && ui.page() == Page::Picker);
+      tap(ui, "back"); app.tick(timeMs + PollIntervalMs);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.size() == 1);
+    }
+    {
       // The first workspace setup shows the server's failure, not the setup prompt again.
       Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
       Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");

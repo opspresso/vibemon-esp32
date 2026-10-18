@@ -37,6 +37,8 @@ struct CloudRequest {
   std::uint32_t generation = 0;
   std::string origin;
   std::string token;
+  // Sources and accounts to read. Empty reads every source.
+  std::vector<Selection> scope;
 };
 enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server, RateLimited, Redirected };
 struct CloudResult {
