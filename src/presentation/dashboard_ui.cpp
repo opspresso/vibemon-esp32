@@ -656,7 +656,8 @@ void DashboardUi::update(std::uint32_t now) {
   else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
   else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed &&
            (workspace.catalogComplete || workspace.connection != Connection::Online)) {
-    pendingPickerRefresh_ = false; updatePicker();
+    // A failed read shows the items at hand; keep waiting for the full list.
+    pendingPickerRefresh_ = !workspace.catalogComplete; updatePicker();
   }
 }
 

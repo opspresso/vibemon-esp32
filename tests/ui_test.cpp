@@ -285,10 +285,14 @@ int main() {
       ui.picker(1); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
       app.tick(++timeMs); CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope.empty());
       advance(ui); CHECK(!ui.widget("item-1"));
+      // A failed full read keeps the picker waiting for the complete list.
+      cloud.complete({}, CloudError::Network); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      app.refresh(); app.tick(++timeMs); CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.empty());
       cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
       CHECK(ui.widget("item-3") && ui.page() == Page::Picker);
       tap(ui, "back"); app.tick(timeMs + PollIntervalMs);
-      CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.size() == 1);
+      CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.size() == 1);
     }
     {
       // The first workspace setup shows the server's failure, not the setup prompt again.
