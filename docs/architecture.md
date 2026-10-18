@@ -46,7 +46,7 @@ The device installs new releases over Wi-Fi. Two 7 MB application slots hold the
 2. **Accept.** The device accepts the release only when the board is `ESP32-4848S040`, the version is a newer `MAJOR.MINOR.PATCH`, the image fits one slot and the URL is in this repository's releases. Prereleases are never "latest", so they are not installed.
 3. **Install.** The update worker on core 0 streams the image into the slot that is not running. Workspace polling pauses until the restart. The dashboard status line shows the version and progress.
 4. **Verify.** The next boot selects the new slot only when the SHA-256 digest from `ota.json` matches and ESP-IDF validates the image. Otherwise the running image stays selected, and the device retries at the next 6-hour check.
-5. **Confirm or roll back.** The new image starts on trial. It confirms itself when it reaches the workspace or the release server. If it restarts before that, the bootloader starts the previous image again.
+5. **Confirm or roll back.** The new image starts on trial. It confirms itself when it reaches the workspace or the release server and the SDK stores the confirmation. If that write fails, device settings show **Confirm failed · tap to retry** and another firmware check retries it. Further installs wait for confirmation. The UI loop never repeatedly writes the failed confirmation. If the device restarts before confirmation, the bootloader starts the previous image again.
 
 TLS to GitHub authenticates the release files; the firmware images are not signed. The partition table and bootloader do not change over Wi-Fi. A change to either needs a USB upload.
 

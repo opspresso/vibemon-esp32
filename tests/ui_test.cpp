@@ -114,6 +114,21 @@ int main() {
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(pointer, [](lv_indev_t*, lv_indev_data_t* data) { data->point = position; data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED; });
     {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; update.confirmationOk = false;
+      Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); tap(ui, "settings");
+      CHECK(app.workspace().firmware.confirmationFailed && update.confirms == 1);
+      CHECK(findText(lv_screen_active(), "Confirm failed · tap to retry"));
+      CHECK(lv_color_eq(lv_obj_get_style_text_color(ui.widget("firmware-status"), LV_PART_MAIN), lv_color_hex(design::Warning)));
+      screenshot("firmware-confirmation-failed");
+      update.confirmationOk = true; tap(ui, "firmware"); app.tick(++timeMs);
+      update.complete(firmwareRelease("3.6.1")); app.tick(++timeMs); advance(ui);
+      CHECK(!app.workspace().firmware.confirmationFailed && update.confirms == 2);
+      CHECK(findText(lv_screen_active(), "Up to date"));
+      CHECK(lv_color_eq(lv_obj_get_style_text_color(ui.widget("firmware-status"), LV_PART_MAIN), lv_color_hex(design::Muted)));
+    }
+    {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(demo()); app.tick(2);
       timeMs = 2;

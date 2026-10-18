@@ -2,14 +2,18 @@
 #include "../domain/clock.h"
 
 namespace vibemon {
-void Updater::confirm() {
-  if (confirmed_) return;
-  port_.confirm();
-  confirmed_ = true;
+bool Updater::confirm() {
+  if (confirmed_ || confirmationAttempted_) return false;
+  confirmationAttempted_ = true;
+  const auto failedBefore = view_.confirmationFailed;
+  confirmed_ = port_.confirm();
+  view_.confirmationFailed = !confirmed_;
+  return failedBefore != view_.confirmationFailed;
 }
 
 void Updater::checkNow() {
   if (inFlight_ || busy()) return;
+  confirmationAttempted_ = false;
   scheduled_ = true;
   nextCheck_ = now_;
 }
@@ -33,7 +37,13 @@ void Updater::finish(UpdateResult& result) {
     return;
   }
   // The release server answered over TLS, so this image can receive a fix.
+  confirmationAttempted_ = false;
   confirm();
+  if (!confirmed_) {
+    view_.state = FirmwareState::Unavailable;
+    nextCheck_ = now_ + RetryDelayMs;
+    return;
+  }
   nextCheck_ = now_ + CheckIntervalMs;
   if (!newerVersion(version_, result.release.version)) {
     view_.state = FirmwareState::Current;
@@ -52,12 +62,11 @@ void Updater::finish(UpdateResult& result) {
 
 bool Updater::tick(std::uint32_t now, bool networkReady, bool healthy) {
   now_ = now;
-  if (healthy) confirm();
+  bool changed = healthy && confirm();
   if (view_.state == FirmwareState::Restarting) {
     if (due(now, restartAt_)) port_.restart();
-    return false;
+    return changed;
   }
-  bool changed = false;
   if (auto result = port_.take()) {
     finish(*result);
     changed = true;

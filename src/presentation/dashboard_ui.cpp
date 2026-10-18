@@ -30,6 +30,7 @@ void wrap(lv_obj_t* object) {
   lv_obj_set_height(object, LV_SIZE_CONTENT);
 }
 std::string firmwareStatus(const FirmwareView& firmware) {
+  if (firmware.confirmationFailed) return "Confirm failed · tap to retry";
   switch (firmware.state) {
     case FirmwareState::Waiting: return "Update check pending";
     case FirmwareState::Checking: return "Checking for updates";
@@ -452,7 +453,7 @@ void DashboardUi::settings() {
   auto* firmware = button(root_, "", 16, 426, 448, 46, [this] { controller_.checkFirmware(); });
   widgets_["firmware"] = firmware;
   label(firmware, "VibeMon Touch " + controller_.firmwareVersion(), 16, 13, 160, fonts_.small());
-  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), Muted);
+  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), workspace.firmware.confirmationFailed ? Warning : Muted);
   lv_obj_set_style_text_align(widgets_["firmware-status"], LV_TEXT_ALIGN_RIGHT, 0);
 }
 
@@ -660,7 +661,10 @@ void DashboardUi::update(std::uint32_t now) {
     updateCards(now);
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
-  else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
+  else if (page_ == Page::Settings && changed) {
+    setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
+    lv_obj_set_style_text_color(widget("firmware-status"), lv_color_hex(workspace.firmware.confirmationFailed ? Warning : Muted), 0);
+  }
   else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
     if (workspace.catalogComplete && workspace.catalogRevision != pickerRevision_) {
       pendingPickerRefresh_ = false; formStatus(""); updatePicker();

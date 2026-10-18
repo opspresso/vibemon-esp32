@@ -89,6 +89,7 @@ void SerialConsole::command() {
       response["firmwareState"] = static_cast<int>(workspace.firmware.state);
       response["firmwareAvailable"] = workspace.firmware.available;
       response["firmwareProgress"] = workspace.firmware.progress;
+      response["firmwareConfirmationFailed"] = workspace.firmware.confirmationFailed;
       response["panelsSelected"] = std::count_if(workspace.panels.begin(), workspace.panels.end(), [](const Selection& selection) { return !selection.id.empty(); });
     } else if (name == "display-clock") {
       response["ok"] = request["hz"].is<std::uint32_t>() && display_.setPixelClock(request["hz"].as<std::uint32_t>());

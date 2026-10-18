@@ -18,7 +18,7 @@ class EspUpdate final : public UpdatePort {
   bool install(const FirmwareRelease& release) override;
   std::unique_ptr<UpdateResult> take() override;
   std::uint8_t progress() const override { return progress_; }
-  void confirm() override;
+  bool confirm() override;
   void restart() override;
   // The running slot name, for diagnostics.
   const char* runningSlot() const;

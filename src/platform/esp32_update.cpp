@@ -71,11 +71,11 @@ std::unique_ptr<UpdateResult> EspUpdate::take() {
   return std::unique_ptr<UpdateResult>(result);
 }
 
-void EspUpdate::confirm() {
+bool EspUpdate::confirm() {
   esp_ota_img_states_t state;
-  if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY) {
-    esp_ota_mark_app_valid_cancel_rollback();
-  }
+  if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) != ESP_OK) return false;
+  if (state == ESP_OTA_IMG_VALID) return true;
+  return state == ESP_OTA_IMG_PENDING_VERIFY && esp_ota_mark_app_valid_cancel_rollback() == ESP_OK;
 }
 
 void EspUpdate::restart() { esp_restart(); }

@@ -9,6 +9,7 @@ struct FirmwareView {
   FirmwareState state = FirmwareState::Waiting;
   std::string available;  // the newer version that is installing or failed
   std::uint8_t progress = 0;
+  bool confirmationFailed = false;
 };
 
 // Checks for a newer release, installs it and restarts into it.
@@ -40,7 +41,8 @@ class Updater {
   bool scheduled_ = false;
   bool inFlight_ = false;
   bool confirmed_ = false;
-  void confirm();
+  bool confirmationAttempted_ = false;
+  bool confirm();
   void finish(UpdateResult& result);
 };
 

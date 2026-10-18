@@ -64,7 +64,8 @@ struct Update final : UpdatePort {
   bool install(const FirmwareRelease& release) override { if (busy) return false; busy = true; installs.push_back(release); return true; }
   std::unique_ptr<UpdateResult> take() override { return std::move(reply); }
   std::uint8_t progress() const override { return percent; }
-  void confirm() override { ++confirms; }
+  bool confirmationOk = true;
+  bool confirm() override { ++confirms; return confirmationOk; }
   void restart() override { ++restarts; }
   void complete(FirmwareRelease release = {}, UpdateError error = UpdateError::None) {
     CHECK(busy);

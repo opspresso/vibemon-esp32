@@ -3,6 +3,21 @@
 
 int main() {
   try {
+    {
+      Update update; update.confirmationOk = false;
+      Updater updater(update, "3.6.1");
+      CHECK(updater.tick(1, true, true) && updater.view().confirmationFailed && update.confirms == 1);
+      for (std::uint32_t now = 2; now < Updater::FirstCheckDelayMs; ++now) updater.tick(now, true, true);
+      CHECK(update.confirms == 1);  // A storage failure must not write flash on every UI tick.
+      updater.tick(Updater::FirstCheckDelayMs + 1, true, true);
+      update.complete(firmwareRelease("3.6.2")); updater.tick(Updater::FirstCheckDelayMs + 2, true, true);
+      CHECK(updater.view().confirmationFailed && update.installs.empty());
+      update.confirmationOk = true; updater.checkNow();
+      updater.tick(Updater::FirstCheckDelayMs + 3, true, true);
+      CHECK(!updater.view().confirmationFailed && update.confirms == 3);
+      update.complete(firmwareRelease("3.6.2")); updater.tick(Updater::FirstCheckDelayMs + 4, true, true);
+      CHECK(update.installs.size() == 1 && update.confirms == 3);
+    }
     for (const auto error : {CloudError::Unauthorized, CloudError::Forbidden}) {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete({}, error); app.tick(2);
