@@ -14,6 +14,8 @@ struct Workspace {
   bool tokenConfigured = false;
   bool refreshing = false;
   bool hasSnapshot = false;
+  // False while the catalog holds only the selected panels' items.
+  bool catalogComplete = false;
   std::uint32_t revision = 0;
   std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};
@@ -33,6 +35,9 @@ class Controller {
   void retryWifi();
   void cancelSetup();
   void scanWifi();
+  // While browsing, polls read every item for the picker. Otherwise they read
+  // only the selected panels' items.
+  void browse(bool browsing);
   void checkFirmware() { updater_.checkNow(); }
   const std::string& firmwareVersion() const { return updater_.version(); }
   const Workspace& workspace() const { return workspace_; }
@@ -61,14 +66,21 @@ class Controller {
   std::uint32_t nextPoll_ = 0;
   std::uint32_t clockStartedAt_ = 0;
   unsigned failures_ = 0;
+  // The earliest request time that the server's last Retry-After allows.
+  std::optional<std::uint32_t> retryAfter_;
   bool inFlight_ = false;
   bool tokenRejected_ = false;
   bool storageBlocked_ = false;
   bool hadConnection_ = false;
+  bool browsing_ = false;
+  bool requestedAll_ = true;
   void updateConfigView();
+  std::vector<Selection> requestScope() const;
+  bool retryAfterPending();
   void state(Connection connection, const std::string& message);
+  void needCloud();
   void accept(CloudResult& result);
-  void failure(CloudError error, bool validating);
+  void failure(const CloudResult& result, bool validating);
 };
 
 }  // namespace vibemon

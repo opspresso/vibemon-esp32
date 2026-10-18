@@ -12,6 +12,7 @@ import sys
 from sdk_toolchain import ROOT, IDF, load
 from collect_licenses import collect
 from firmware_release import update_description
+from flash_firmware import verify_images
 
 
 def configuration(base, overrides, arduino_kconfig):
@@ -73,8 +74,6 @@ def main():
              ('boot_app0.bin', 'ota_data_initial.bin', 0xe000), ('vibemon-esp32.ino.bin', 'vibemon_touch.bin', 0x10000)]
     for destination, source, offset in files:
         data = (build / source).read_bytes()
-        if not data or (offset < 0xe000 and offset + len(data) > 0x9000) or offset + len(data) > 0x710000:
-            raise ValueError('Firmware image exceeds its partition or overlaps NVS')
         (output / destination).write_bytes(data)
         images[destination] = {'offset': offset, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
     for source, destination in [(ROOT / 'LICENSE', 'LICENSE'), (ROOT / 'assets/OFL-NanumGothic.txt', 'OFL-NanumGothic.txt'),
@@ -89,6 +88,8 @@ def main():
                 'display': {'pixelClockHz': 16000000, 'dataCacheBytes': 65536, 'cacheLineBytes': 64,
                             'forcedVsyncRestart': False, 'psramInstructionsAndRodata': True, 'cacheSafeInterrupts': True}}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    # Apply the upload checks now: hashes, NVS preservation and the application slot.
+    verify_images(output)
     # Devices read this file from the latest release to find and verify an update.
     (output / 'ota.json').write_text(json.dumps(update_description(description['project_version'], binary)) + '\n')
     # An old Arduino merged image would overwrite NVS and use the wrong SDK.

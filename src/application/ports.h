@@ -19,7 +19,6 @@ struct WifiStatus {
   WifiLink link = WifiLink::Offline;
   bool clockReady = false;
   std::string ssid;
-  std::string address;
 };
 class WifiPort {
  public:
@@ -27,7 +26,7 @@ class WifiPort {
   virtual void connect(const std::string& ssid, const std::string& password) = 0;
   virtual void disconnect() = 0;
   virtual void scan() = 0;
-  virtual WifiStatus status() const = 0;
+  virtual const WifiStatus& status() const = 0;
   virtual bool scanning() const = 0;
   virtual bool scanFailed() const = 0;
   virtual const std::vector<WifiNetwork>& networks() const = 0;
@@ -37,12 +36,18 @@ struct CloudRequest {
   std::uint32_t generation = 0;
   std::string origin;
   std::string token;
+  // Sources and accounts to read. Empty reads every source.
+  std::vector<Selection> scope;
 };
-enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server };
+enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server, RateLimited, Redirected };
 struct CloudResult {
   std::uint32_t generation = 0;
   CloudError error = CloudError::None;
   Catalog catalog;
+  // One sentence that explains InvalidResponse or TooLarge. It never contains response content.
+  std::string detail;
+  // The server's requested delay before the next request. 0 when it gave none.
+  std::uint32_t retryAfterMs = 0;
 };
 class CloudPort {
  public:

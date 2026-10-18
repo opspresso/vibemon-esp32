@@ -93,7 +93,7 @@ Catalog demo() {
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
   agent.projects = {agent, review};
-  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}};
+  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}, {"usageWeekModel", "Weekly Opus", "%", 37, MetricDisplay::Bar, 0, 100, 2880}};
   value.items.push_back(agent);
   return value;
 }
@@ -252,6 +252,7 @@ int main() {
       list = ui.widget("detail-list");
       CHECK(findText(list, "web-console") && findText(list, "release-review"));
       CHECK(findText(list, "Working") && findText(list, "Needs input"));
+      CHECK(findText(list, "Weekly Opus") && findText(list, "37% · Resets in 2d"));
       screenshot("account-details");
       lv_obj_scroll_to_view_recursive(findText(list, "Needs input"), LV_ANIM_OFF); advance(ui);
       screenshot("account-details-end");
@@ -270,6 +271,44 @@ int main() {
       wifi.connected(); app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); advance(ui);
       CHECK(ui.page() == Page::Dashboard && app.workspace().connection == Connection::Online);
       CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Workspace connected");
+    }
+    {
+      // The dashboard reads only its panels; the picker loads every item when it opens.
+      Store store; configured(store);
+      store.saved.panelsInitialized = true; store.saved.panels[0] = {ItemKind::Resource, "spark"};
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs);
+      CHECK(cloud.requests.back().scope.size() == 1);
+      auto selected = demo(); selected.items.erase(selected.items.begin()); selected.items.resize(1);
+      cloud.complete(selected); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui);
+      ui.picker(1); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      app.tick(++timeMs); CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope.empty());
+      advance(ui); CHECK(!ui.widget("item-1"));
+      // A failed full read keeps the picker waiting for the complete list.
+      cloud.complete({}, CloudError::Network); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      app.refresh(); app.tick(++timeMs); CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.empty());
+      cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-3") && ui.page() == Page::Picker);
+      tap(ui, "back"); app.tick(timeMs + PollIntervalMs);
+      CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.size() == 1);
+    }
+    {
+      // The first workspace setup shows the server's failure, not the setup prompt again.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs);
+      DashboardUi ui(app); CHECK(ui.begin());
+      wifi.connected(); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::CloudForm);
+      lv_textarea_set_text(ui.widget("read-token"), ("vm_" + std::string(60, 'c')).c_str()); tap(ui, "connect-cloud");
+      CHECK(app.changingCloud()); app.tick(++timeMs);
+      cloud.complete({}, CloudError::Tls); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::CloudForm && findText(lv_screen_active(), "The server certificate could not be verified."));
+      app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.page() == Page::CloudForm && findText(lv_screen_active(), "The server certificate could not be verified."));
+      screenshot("cloud-setup-failed");
     }
     for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "inactive"}) {
       Store store; configured(store);

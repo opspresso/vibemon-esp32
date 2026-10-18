@@ -1,4 +1,5 @@
 #include "fakes.h"
+#include "adapters/cloud_http.h"
 
 int main() {
   try {
@@ -61,6 +62,120 @@ int main() {
       app.tick(600000); CHECK(cloud.requests.size() == count);
       CHECK(app.workspace().connection == Connection::TokenRejected);
     }
+    for (const auto& [error, expected] : std::initializer_list<std::pair<CloudError, Connection>>{
+             {CloudError::Unauthorized, Connection::TokenRejected}, {CloudError::Forbidden, Connection::TokenRejected},
+             {CloudError::Network, Connection::CloudUnavailable}, {CloudError::Tls, Connection::CloudUnavailable},
+             {CloudError::InvalidResponse, Connection::CloudUnavailable}, {CloudError::TooLarge, Connection::CloudUnavailable},
+             {CloudError::Memory, Connection::CloudUnavailable}, {CloudError::Server, Connection::CloudUnavailable},
+             {CloudError::RateLimited, Connection::CloudUnavailable}, {CloudError::Redirected, Connection::CloudUnavailable}}) {
+      // Without a saved token, a failed first setup keeps its cause instead of asking for setup again.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      CHECK(app.workspace().connection == Connection::NeedCloud);
+      CHECK(app.saveCloud("vibemon.io", "vm_" + std::string(60, 'b')).ok);
+      app.tick(2); cloud.complete({}, error); app.tick(3);
+      const auto message = app.workspace().message;
+      CHECK(app.workspace().connection == expected && !app.changingCloud());
+      CHECK(message != "Enter your server address and a read token.");
+      app.tick(100000);
+      CHECK(app.workspace().connection == expected && app.workspace().message == message && cloud.requests.size() == 1);
+      app.cancelSetup();
+      CHECK(app.workspace().connection == Connection::NeedCloud && store.writes == 0);
+    }
+    {
+      // A rejected snapshot keeps the previous readings and names the decoder's reason.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      app.refresh(); app.tick(3); cloud.complete({}, CloudError::InvalidResponse, "A source contains invalid timestamps."); app.tick(4);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable && app.workspace().catalog.items.size() == 2);
+      CHECK(app.workspace().message == "The server returned an invalid workspace. A source contains invalid timestamps.");
+      app.refresh(); app.tick(5); cloud.complete({}, CloudError::TooLarge, "This device supports up to 128 reporting sources."); app.tick(6);
+      CHECK(app.workspace().message == "The workspace exceeds this device's limits. This device supports up to 128 reporting sources.");
+    }
+    {
+      // Retry-After lengthens the backoff; a redirect asks for the server address.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      CHECK(app.workspace().message == "The server is limiting requests. Your last readings are shown.");
+      // Neither a picker nor an explicit refresh asks before the server allows it.
+      app.browse(true); app.refresh(); app.tick(3); app.browse(false); app.tick(4);
+      app.tick(120001); CHECK(cloud.requests.size() == 1);
+      app.tick(120002); CHECK(cloud.requests.size() == 2);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 1000; app.tick(120003);
+      app.tick(120003 + 19999); CHECK(cloud.requests.size() == 2);
+      app.tick(120003 + 20000); CHECK(cloud.requests.size() == 3);
+      cloud.complete({}, CloudError::Redirected); app.tick(200000);
+      CHECK(app.workspace().message == "The server redirected the request. Check the server address.");
+    }
+    {
+      // Polls read only the selected panels; the picker and first defaults read every item.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      CHECK(cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(2);
+      CHECK(app.workspace().catalogComplete && app.workspace().panels[0].id == "one");
+      app.tick(2 + PollIntervalMs);
+      const std::vector<Selection> panels{{ItemKind::Resource, "one"}, {ItemKind::Account, "codex:work"}};
+      CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope == panels);
+      Catalog selected = catalog(); selected.items.pop_back();
+      app.browse(true);
+      cloud.complete(selected); app.tick(3 + PollIntervalMs);
+      CHECK(!app.workspace().catalogComplete && app.workspace().message == "Connected");
+      // The panel-only reply arrived while browsing, so the full list follows at once.
+      app.tick(4 + PollIntervalMs);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(5 + PollIntervalMs);
+      CHECK(app.workspace().catalogComplete && app.workspace().catalog.items.size() == 2);
+      app.tick(5 + 2 * PollIntervalMs); CHECK(cloud.requests.back().scope.empty());
+      app.browse(false); cloud.complete(catalog()); app.tick(6 + 2 * PollIntervalMs);
+      app.tick(6 + 3 * PollIntervalMs); CHECK(cloud.requests.back().scope == panels);
+      cloud.complete({}); app.tick(7 + 3 * PollIntervalMs);
+      CHECK(app.workspace().message == "Connected" && !app.workspace().catalogComplete);
+      app.browse(true); app.tick(8 + 3 * PollIntervalMs);
+      CHECK(cloud.requests.back().scope.empty());
+      cloud.complete({}); app.tick(9 + 3 * PollIntervalMs);
+      CHECK(app.workspace().message == "Connected. Waiting for your first report.");
+    }
+    CHECK(sourcesPath({}) == "/api/v1/sources");
+    CHECK(sourcesPath({{ItemKind::Resource, "spark"}, {ItemKind::Resource, "k3s.main"}}) == "/api/v1/sources?ids=spark,k3s.main");
+    CHECK(sourcesPath({{ItemKind::Account, "codex:work"}}) == "/api/v1/sources?accounts=codex:work");
+    CHECK(sourcesPath({{ItemKind::Account, "codex:work"}, {ItemKind::Resource, "spark"}, {ItemKind::Account, "claude:me"}}) ==
+          "/api/v1/sources?ids=spark&accounts=codex:work,claude:me");
+    {
+      // Refresh then picker, in that order, still waits for Retry-After.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      app.tick(2 + PollIntervalMs); CHECK(cloud.requests.size() == 2 && !cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(3 + PollIntervalMs); CHECK(!app.workspace().catalogComplete);
+      app.tick(3 + 2 * PollIntervalMs); CHECK(cloud.requests.size() == 3);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4 + 2 * PollIntervalMs);
+      app.refresh(); app.browse(true); app.tick(5 + 2 * PollIntervalMs);
+      app.tick(3 + 2 * PollIntervalMs + 120000); CHECK(cloud.requests.size() == 3);
+      app.tick(4 + 2 * PollIntervalMs + 120000); CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.empty());
+    }
+    {
+      // An expired Retry-After is forgotten, so Refresh works after a long stop.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      app.refresh(); app.tick(3); CHECK(cloud.requests.size() == 1);
+      app.tick(120002); CHECK(cloud.requests.size() == 2);
+      cloud.complete({}, CloudError::Unauthorized); app.tick(120003);
+      CHECK(app.workspace().connection == Connection::TokenRejected);
+      // 30 days later the old deadline would read as 18 days in the future.
+      std::uint32_t now = 120003;
+      for (int day = 0; day < 30; ++day) { now += 86400000; app.tick(now); }
+      CHECK(cloud.requests.size() == 2);
+      app.refresh(); app.tick(now + 1); CHECK(cloud.requests.size() == 3);
+    }
+    CHECK(cloudStatusError(200) == CloudError::None && cloudStatusError(401) == CloudError::Unauthorized);
+    CHECK(cloudStatusError(403) == CloudError::Forbidden && cloudStatusError(429) == CloudError::RateLimited);
+    CHECK(cloudStatusError(301) == CloudError::Redirected && cloudStatusError(308) == CloudError::Redirected);
+    CHECK(cloudStatusError(404) == CloudError::InvalidResponse && cloudStatusError(503) == CloudError::Server);
+    CHECK(retryAfterMs("120") == 120000u && retryAfterMs(" 0 ") == 0u && retryAfterMs("9999999999") == MaxRetryAfterMs);
+    CHECK(!retryAfterMs("") && !retryAfterMs("-1") && !retryAfterMs("1.5") && !retryAfterMs("Wed, 21 Oct 2026 07:28:00 GMT"));
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);

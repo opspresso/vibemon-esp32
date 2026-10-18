@@ -17,7 +17,7 @@ std::string sample() {
     {"sourceId":"coding-one","kind":"agent","displayName":"Editor","observedAt":"2026-10-11T09:58:00.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,
      "metrics":{"contextPercent":12,"usageSessionPercent":null,"usageWeekPercent":24},"account":{"id":"work","provider":"codex","displayName":"Work account"},"agent":{"state":"thinking","project":"web"}},
     {"sourceId":"coding-two","kind":"agent","displayName":"Editor","observedAt":"2026-10-11T09:59:59.000Z","receivedAt":"2026-10-11T09:59:59.000Z","health":"ok","stale":false,
-     "metrics":{"contextPercent":43,"usageSessionPercent":0,"usageWeekPercent":24},"account":{"id":"work","provider":"codex","displayName":"Work account"},"agent":{"state":"working","project":"api"}},
+     "metrics":{"contextPercent":43,"usageSessionPercent":0,"usageWeekPercent":24},"account":{"id":"work","provider":"codex","displayName":"Work account"},"agent":{"state":"working","project":"api","usageWeekModel":31.5,"usageWeekModelLabel":"Opus","usageWeekModelResetsIn":90}},
     {"sourceId":"coding-three","kind":"agent","displayName":"Editor","observedAt":"2026-10-11T09:59:58.000Z","receivedAt":"2026-10-11T09:59:58.000Z","health":"ok","stale":false,
      "metrics":{"contextPercent":7,"usageSessionPercent":8,"usageWeekPercent":18},"account":{"id":"personal","provider":"codex","displayName":"Personal"},"agent":{"state":"idle","project":"tools"}}
   ],"accounts":[{"ignored":"The firmware groups source identities without retaining duplicate server data."}]})";
@@ -66,6 +66,22 @@ int main() {
     CHECK(account && account->project == "api" && account->projects.size() == 2 && account->metrics[0].value == 43);
     CHECK(account->projects[0].project == "api" && account->projects[1].project == "web");
     CHECK(account->metrics[1].value == 0);
+    CHECK(account->metrics.size() == 4 && account->metrics[3].key == "usageWeekModel" && account->metrics[3].label == "Weekly Opus");
+    CHECK(account->metrics[3].value == 31.5 && account->metrics[3].resetMinutes == 90u && account->metrics[3].display == MetricDisplay::Bar);
+    CHECK(catalog.find({ItemKind::Account, "codex:personal"})->metrics.size() == 3);
+    for (const auto& [from, to] : std::initializer_list<std::pair<std::string, std::string>>{
+             {"\"usageWeekModelLabel\":\"Opus\"", "\"usageWeekModelLabel\":\"\""}, {"\"usageWeekModel\":31.5", "\"usageWeekModel\":null"}}) {
+      auto variant = sample(); variant.replace(variant.find(from), from.size(), to);
+      Catalog decoded; CHECK(decodeCatalog(variant, decoded).ok);
+      const auto& metrics = decoded.find({ItemKind::Account, "codex:work"})->metrics;
+      CHECK(to.find("null") != std::string::npos ? metrics.size() == 3 : metrics[3].label == "Weekly model");
+    }
+    for (const auto& [from, to] : std::initializer_list<std::pair<std::string, std::string>>{
+             {"\"usageWeekModel\":31.5", "\"usageWeekModel\":100.5"}, {"\"usageWeekModel\":31.5", "\"usageWeekModel\":\"31\""},
+             {"\"Opus\"", "\"Op\\nus\""}, {"\"usageWeekModelResetsIn\":90", "\"usageWeekModelResetsIn\":-1"}}) {
+      auto variant = sample(); variant.replace(variant.find(from), from.size(), to);
+      Catalog decoded; CHECK(!decodeCatalog(variant, decoded).ok);
+    }
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
     CHECK(stateLabel(monitorState(*account, 180000)) == "Working");
     CHECK(stateLabel(monitorState(*account, 600000)) == "Inactive");
@@ -80,7 +96,9 @@ int main() {
     auto malformed = sample();
     const auto at = malformed.find("\"gpu\":28.4");
     malformed.replace(at, std::string("\"gpu\":28.4").size(), "\"gpu\":\"unknown\"");
-    CHECK(!decodeCatalog(malformed, catalog).ok && catalog.items.size() == before);
+    const auto rejected = decodeCatalog(malformed, catalog);
+    CHECK(!rejected.ok && !rejected.exceedsLimit && catalog.items.size() == before);
+    CHECK(rejected.message == "A resource contains invalid metric definitions or values.");
     for (const char* invalid : {R"(First\nSecond)", R"(First\u0000Second)", R"(First\u007fSecond)", R"(\ud800)"}) {
       auto badName = sample();
       badName.replace(badName.find("DGX Spark"), 9, invalid);
@@ -96,8 +114,14 @@ int main() {
       CHECK(decodeCatalog(precise, catalog).ok);
       CHECK(catalog.find({ItemKind::Resource, "spark"})->metrics[1].value == reading.second);
     }
-    CHECK(!decodeCatalog("{\"sources\":[]}", catalog).ok);
-    CHECK(!decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog).ok);
+    CHECK(decodeCatalog("{\"sources\":[]}", catalog).message == "The server response is not a VibeMon workspace.");
+    CHECK(decodeCatalog("{\"sources\":", catalog).message == "The response is not valid JSON.");
+    const auto oversized = decodeCatalog(std::string(MaxResponseBytes + 1, 'x'), catalog);
+    CHECK(!oversized.ok && oversized.exceedsLimit);
+    std::string crowded = "{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[";
+    for (std::size_t i = 0; i <= MaxSources; ++i) crowded += i ? ",{}" : "{}";
+    const auto tooMany = decodeCatalog(crowded + "]}", catalog);
+    CHECK(!tooMany.ok && tooMany.exceedsLimit && tooMany.message == "This device supports up to 128 reporting sources.");
     CHECK(decodeCatalog("{\"serverTime\":\"2026-10-11T00:00:00Z\",\"sources\":[]}", catalog).ok && catalog.items.empty());
     Metric metric;
     CHECK(metricValue(metric) == "—");

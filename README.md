@@ -18,7 +18,7 @@ The first successful non-empty response fills up to four cards, alternating reso
 
 - Custom resources, Kubernetes clusters, DGX Spark and other host metrics.
 - Multiple Codex, Claude, Kiro or other provider accounts, grouped by provider and account ID.
-- Session and weekly plan usage with the time until each limit resets, for example `38% · 2h5m` on a card and `Resets in 2h5m` in details. The countdown continues between polls.
+- Session, weekly and model-specific weekly plan usage with the time until each limit resets, for example `38% · 2h5m` on a card and `Resets in 2h5m` in details. The countdown continues between polls.
 - Resource metric labels, units, ranges and order from Web. Cards show the first three metrics; scrollable details show all readings, full names, units, status messages and reporting projects.
 - On-screen Wi-Fi scanning, password input and a large read-token keypad.
 - Korean and Latin names, without downloading fonts at runtime.
@@ -51,7 +51,6 @@ Version 3 targets the four-inch ESP32-S3 board. It replaces the C6 single-charac
 - [Board and pin assignments](docs/hardware.md)
 - [Data, security and USB contracts](docs/api.md)
 - [Architecture and verification](docs/architecture.md)
-- [2026-10-14 audit](docs/audit-2026-10-14.md)
 - [VibeMon Desktop](https://github.com/opspresso/vibemon-app) · [VibeMon Web](https://vibemon.io)
 
 MIT. The bundled Nanum Gothic font has its own [SIL Open Font License](assets/OFL-NanumGothic.txt).

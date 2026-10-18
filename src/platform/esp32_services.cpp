@@ -1,9 +1,11 @@
 #include "esp32_services.h"
+#include "https.h"
+#include "secrets.h"
 #include "../adapters/catalog_json.h"
+#include "../adapters/cloud_http.h"
 #include "../adapters/settings_json.h"
+#include "../domain/clock.h"
 
-#include <HTTPClient.h>
-#include <NetworkClientSecure.h>
 #include <Preferences.h>
 #include <algorithm>
 #include <cstring>
@@ -18,8 +20,11 @@ namespace {
 constexpr std::uint32_t ConnectTimeoutMs = 20000;
 constexpr std::uint32_t ReconnectDelayMs = 30000;
 constexpr std::uint32_t RequestBudgetMs = 15000;
+// Release the idle TLS session when polling pauses, for example during a
+// firmware install or after a rejected token. Polls arrive every 10 seconds.
+constexpr std::uint32_t IdleSessionMs = 15000;
+constexpr std::size_t InitialBodyBytes = 16 * 1024;
 constexpr std::size_t JsonBudgetBytes = 512 * 1024;
-bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
 
 class PsramJsonAllocator final : public ArduinoJson::Allocator {
   struct alignas(std::max_align_t) Header { std::size_t size; };
@@ -47,14 +52,16 @@ class PsramJsonAllocator final : public ArduinoJson::Allocator {
   }
 };
 
+// Collects one response body in PSRAM. A body without Content-Length grows the
+// buffer by doubling, up to the response limit.
 class ResponseBuffer final : public Stream {
  public:
-  explicit ResponseBuffer(std::size_t capacity) : capacity_(capacity), startedAt_(millis()) {
-    data_ = static_cast<char*>(heap_caps_malloc(capacity, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-  }
+  explicit ResponseBuffer(std::size_t limit) : limit_(limit), startedAt_(millis()) {}
   ~ResponseBuffer() override { heap_caps_free(data_); }
-  bool ready() const { return data_ != nullptr; }
+  ResponseBuffer(const ResponseBuffer&) = delete;
+  ResponseBuffer& operator=(const ResponseBuffer&) = delete;
   bool oversized() const { return oversized_; }
+  bool outOfMemory() const { return outOfMemory_; }
   std::string_view body() const { return {data_, size_}; }
   int available() override { return 0; }
   int read() override { return -1; }
@@ -62,16 +69,121 @@ class ResponseBuffer final : public Stream {
   void flush() override {}
   std::size_t write(std::uint8_t byte) override { return write(&byte, 1); }
   std::size_t write(const std::uint8_t* data, std::size_t size) override {
-    if (size > capacity_ - size_) { oversized_ = true; return 0; }
-    if (!data_ || static_cast<std::uint32_t>(millis() - startedAt_) > RequestBudgetMs) return 0;
+    if (size > limit_ - size_) { oversized_ = true; return 0; }
+    if (static_cast<std::uint32_t>(millis() - startedAt_) > RequestBudgetMs || !reserve(size_ + size)) return 0;
     std::memcpy(data_ + size_, data, size); size_ += size; return size;
   }
  private:
   char* data_ = nullptr;
-  std::size_t capacity_;
+  std::size_t limit_;
+  std::size_t capacity_ = 0;
   std::size_t size_ = 0;
   std::uint32_t startedAt_;
   bool oversized_ = false;
+  bool outOfMemory_ = false;
+  bool reserve(std::size_t needed) {
+    if (needed <= capacity_) return true;
+    auto capacity = std::max(capacity_, std::min(limit_, InitialBodyBytes));
+    while (capacity < needed) capacity = std::min(limit_, capacity * 2);
+    auto* grown = static_cast<char*>(heap_caps_realloc(data_, capacity, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!grown) { outOfMemory_ = true; return false; }
+    data_ = grown; capacity_ = capacity;
+    return true;
+  }
+};
+
+struct CloudJob {
+  std::uint32_t generation;
+  std::string origin;
+  std::string token;
+  std::string path;
+  ~CloudJob() { wipe(token); }
+};
+
+// Owned by the worker task. HTTP keep-alive reuses the TLS connection while
+// the origin stays the same and every response is read completely.
+class CloudSession {
+ public:
+  CloudSession() {
+    http_.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http_.setReuse(true);
+    const char* collected[] = {"Retry-After"};
+    http_.collectHeaders(collected, 1);
+  }
+  // Frees the TLS session's internal-RAM buffers. The next request starts a
+  // new client, so its error state cannot describe an earlier connection.
+  void close() {
+    if (!client_) return;
+    http_.end();
+    client_.reset();
+    origin_.clear();
+  }
+  std::unique_ptr<CloudResult> fetch(const CloudJob& job) {
+    if (origin_ != job.origin) close();
+    const bool reused = client_ && client_->connected();
+    auto result = request(job);
+    // The server may close an idle connection as the request starts. Retry
+    // once on a new connection, which also reports certificate failures.
+    if (reused && (result->error == CloudError::Network || result->error == CloudError::Tls)) {
+      close();
+      result = request(job);
+    }
+    if (result->error != CloudError::None) close();
+    return result;
+  }
+ private:
+  std::unique_ptr<NetworkClientSecure> client_;
+  HTTPClient http_;
+  std::string origin_;  // the origin of client_
+
+  std::unique_ptr<CloudResult> request(const CloudJob& job) {
+    auto result = std::make_unique<CloudResult>();
+    result->generation = job.generation;
+    if (!client_) {
+      client_ = std::make_unique<NetworkClientSecure>();
+      prepareHttps(*client_, http_, 4000);
+      origin_ = job.origin;
+    }
+    if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + job.path).c_str())) {
+      result->error = CloudError::Network;
+      return result;
+    }
+    String authorization;
+    authorization.reserve(7 + job.token.size());
+    authorization += "Bearer ";
+    authorization += job.token.c_str();
+    http_.addHeader("Authorization", authorization);
+    wipe(authorization.begin(), authorization.length());
+    http_.addHeader("Accept", "application/json");
+    const int status = http_.GET();
+    if (status != 200) {
+      if (status > 0) {
+        result->error = cloudStatusError(status);
+        if (result->error == CloudError::RateLimited) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
+      } else {
+        char error[128];
+        result->error = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
+      }
+      http_.end();
+      return result;
+    }
+    const int expected = http_.getSize();
+    if (expected > static_cast<int>(MaxResponseBytes)) { result->error = CloudError::TooLarge; http_.end(); return result; }
+    ResponseBuffer body(expected >= 0 ? static_cast<std::size_t>(expected) : MaxResponseBytes);
+    const int read = http_.writeToStream(&body);
+    http_.end();
+    if (body.oversized()) result->error = CloudError::TooLarge;
+    else if (body.outOfMemory()) result->error = CloudError::Memory;
+    else if (read < 0 || (expected >= 0 && read != expected)) result->error = CloudError::Network;
+    if (result->error != CloudError::None) return result;
+    PsramJsonAllocator allocator;
+    const auto decoded = decodeCatalog(body.body(), result->catalog, &allocator);
+    if (!decoded.ok) {
+      result->error = decoded.exceedsLimit ? CloudError::TooLarge : CloudError::InvalidResponse;
+      result->detail = decoded.message;
+    }
+    return result;
+  }
 };
 }  // namespace
 
@@ -110,6 +222,7 @@ void EspWifi::connect(const std::string& ssid, const std::string& password) {
   clockRequested_ = false;
   if (scanning_) { WiFi.scanDelete(); scanning_ = false; }
   WiFi.disconnect(false, false);
+  publish();
 }
 
 void EspWifi::scan() { scanRequested_ = true; scanFailed_ = false; }
@@ -119,16 +232,15 @@ void EspWifi::disconnect() {
   disconnecting_ = joining_ = clockRequested_ = false;
   link_ = WifiLink::Offline;
   WiFi.disconnect(false, false);
+  publish();
 }
 
-WifiStatus EspWifi::status() const {
-  WifiStatus result;
-  result.link = link_;
-  result.clockReady = std::time(nullptr) >= 1735689600;
-  if (link_ == WifiLink::Connected) {
-    result.ssid = WiFi.SSID().c_str(); result.address = WiFi.localIP().toString().c_str();
-  }
-  return result;
+void EspWifi::publish() {
+  status_.link = link_;
+  status_.clockReady = std::time(nullptr) >= 1735689600;
+  // The join check verified that the connected network is ssid_.
+  if (link_ != WifiLink::Connected) status_.ssid.clear();
+  else if (status_.ssid != ssid_) status_.ssid = ssid_;
 }
 
 void EspWifi::tick(std::uint32_t now) {
@@ -138,6 +250,7 @@ void EspWifi::tick(std::uint32_t now) {
     joining_ = true;
     WiFi.begin(ssid_.c_str(), password_.c_str());
   } else if (joining_ && !disconnecting_ && physical == WL_CONNECTED && WiFi.SSID() == ssid_.c_str()) {
+    joining_ = false;
     link_ = WifiLink::Connected;
     if (!clockRequested_) {
       configTime(0, 0, "time.cloudflare.com", "pool.ntp.org", "time.google.com");
@@ -151,6 +264,7 @@ void EspWifi::tick(std::uint32_t now) {
   } else if (!ssid_.empty() && link_ != WifiLink::Connecting && link_ != WifiLink::Connected && !scanning_ && due(now, retryAt_)) {
     connect(ssid_, password_);
   }
+  publish();
   if (scanRequested_ && link_ != WifiLink::Connecting && !scanning_) {
     scanRequested_ = false;
     WiFi.scanDelete();
@@ -180,20 +294,20 @@ void EspWifi::tick(std::uint32_t now) {
 }
 
 bool EspCloud::begin() {
-  jobs_ = xQueueCreate(1, sizeof(Job));
+  jobs_ = xQueueCreate(1, sizeof(CloudJob*));
   results_ = xQueueCreate(1, sizeof(CloudResult*));
   if (!jobs_ || !results_) return false;
   return xTaskCreatePinnedToCore(work, "vibemon-https", 12288, this, 1, &worker_, 0) == pdPASS;
 }
 
 bool EspCloud::start(const CloudRequest& request) {
-  if (!jobs_ || request.origin.size() >= sizeof(Job::origin) || request.token.size() >= sizeof(Job::token)) return false;
+  if (!jobs_ || request.origin.size() > MaxOriginBytes) return false;
   bool expected = false;
   if (!busy_.compare_exchange_strong(expected, true)) return false;
-  Job job{}; job.generation = request.generation;
-  std::memcpy(job.origin, request.origin.data(), request.origin.size());
-  std::memcpy(job.token, request.token.data(), request.token.size());
+  // The queue holds only a pointer, so the token exists in one wiped copy.
+  auto* job = new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope)};
   if (xQueueSend(jobs_, &job, 0) == pdTRUE) return true;
+  delete job;
   busy_ = false;
   return false;
 }
@@ -207,48 +321,12 @@ std::unique_ptr<CloudResult> EspCloud::take() {
 
 void EspCloud::work(void* context) {
   auto& self = *static_cast<EspCloud*>(context);
-  Job job{};
+  CloudSession session;
+  CloudJob* job = nullptr;
   for (;;) {
-    if (xQueueReceive(self.jobs_, &job, portMAX_DELAY) != pdTRUE) continue;
-    auto result = fetch(job);
-    std::memset(job.token, 0, sizeof(job.token));
-    auto* owned = result.release();
-    if (xQueueSend(self.results_, &owned, portMAX_DELAY) != pdTRUE) delete owned;
+    if (xQueueReceive(self.jobs_, &job, pdMS_TO_TICKS(IdleSessionMs)) != pdTRUE) { session.close(); continue; }
+    auto* result = session.fetch(*std::unique_ptr<CloudJob>(job)).release();
+    if (xQueueSend(self.results_, &result, portMAX_DELAY) != pdTRUE) delete result;
   }
-}
-
-std::unique_ptr<CloudResult> EspCloud::fetch(const Job& job) {
-  auto result = std::make_unique<CloudResult>();
-  result->generation = job.generation;
-  if (WiFi.status() != WL_CONNECTED) { result->error = CloudError::Network; return result; }
-  NetworkClientSecure client;
-  client.useBuiltinCACertBundle();
-  client.setHandshakeTimeout(8);
-  HTTPClient http;
-  http.setConnectTimeout(4000); http.setTimeout(4000);
-  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-  if (!http.begin(client, (std::string(job.origin) + "/api/v1/sources").c_str())) { result->error = CloudError::Network; return result; }
-  http.addHeader("Authorization", (std::string("Bearer ") + job.token).c_str());
-  http.addHeader("Accept", "application/json");
-  const int status = http.GET();
-  if (status != 200) {
-    char error[128];
-    const int tlsError = client.lastError(error, sizeof(error));
-    result->error = status == 401 ? CloudError::Unauthorized : status == 403 ? CloudError::Forbidden :
-        status >= 500 || status == 429 ? CloudError::Server : status > 0 ? CloudError::InvalidResponse :
-        tlsError == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
-    http.end(); return result;
-  }
-  const int expected = http.getSize();
-  if (expected > static_cast<int>(MaxResponseBytes)) { result->error = CloudError::TooLarge; http.end(); return result; }
-  ResponseBuffer body(expected > 0 ? static_cast<std::size_t>(expected) : MaxResponseBytes);
-  if (!body.ready()) { result->error = CloudError::Memory; http.end(); return result; }
-  const int read = http.writeToStream(&body);
-  http.end();
-  if (body.oversized()) { result->error = CloudError::TooLarge; return result; }
-  if (read < 0 || (expected >= 0 && read != expected)) { result->error = CloudError::Network; return result; }
-  PsramJsonAllocator allocator;
-  if (!decodeCatalog(body.body(), result->catalog, &allocator).ok) result->error = CloudError::InvalidResponse;
-  return result;
 }
 }  // namespace vibemon

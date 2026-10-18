@@ -23,7 +23,7 @@ class EspWifi final : public WifiPort {
   void connect(const std::string& ssid, const std::string& password) override;
   void disconnect() override;
   void scan() override;
-  WifiStatus status() const override;
+  const WifiStatus& status() const override { return status_; }
   bool scanning() const override { return scanning_ || scanRequested_; }
   bool scanFailed() const override { return scanFailed_; }
   const std::vector<WifiNetwork>& networks() const override { return networks_; }
@@ -31,6 +31,8 @@ class EspWifi final : public WifiPort {
   std::string ssid_;
   std::string password_;
   std::vector<WifiNetwork> networks_;
+  // Updated by tick(), connect() and disconnect(), so status() does not allocate.
+  WifiStatus status_;
   WifiLink link_ = WifiLink::Offline;
   std::uint32_t startedAt_ = 0;
   std::uint32_t retryAt_ = 0;
@@ -40,21 +42,22 @@ class EspWifi final : public WifiPort {
   bool scanRequested_ = false;
   bool scanFailed_ = false;
   bool clockRequested_ = false;
+  void publish();
 };
 
+// One worker on core 0 runs requests in order and keeps the TLS connection
+// between polls, so a poll normally skips the full handshake.
 class EspCloud final : public CloudPort {
  public:
   bool begin();
   bool start(const CloudRequest& request) override;
   std::unique_ptr<CloudResult> take() override;
  private:
-  struct Job { std::uint32_t generation; char origin[MaxOriginBytes + 1]; char token[64]; };
   QueueHandle_t jobs_ = nullptr;
   QueueHandle_t results_ = nullptr;
   TaskHandle_t worker_ = nullptr;
   std::atomic<bool> busy_{false};
   static void work(void* context);
-  static std::unique_ptr<CloudResult> fetch(const Job& job);
 };
 
 }  // namespace vibemon

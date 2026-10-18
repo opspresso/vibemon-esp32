@@ -2,9 +2,9 @@
 
 ## Cloud reads
 
-The device requests `GET /api/v1/sources` every 10 seconds while connected. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. Tokens are never placed in URLs.
+The device requests `GET /api/v1/sources` every 10 seconds while connected. Polls add the `ids` and `accounts` filters, so Web returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
 
-The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. `agent.usage5hResetsIn` and `agent.usageWeekResetsIn` are whole minutes until the session and weekly limits reset, measured at `observedAt`. The device subtracts the observation age and shows the countdown only beside a reported value. Other values make the response invalid. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
+The response must contain `sources` and `serverTime`. Resources retain their metric definitions and order. Agent sources are grouped by `account.provider` and `account.id`. The newest observation supplies account measurements; equal timestamps use ascending ASCII source IDs. `agent.usage5hResetsIn` and `agent.usageWeekResetsIn` are whole minutes until the session and weekly limits reset, measured at `observedAt`. The device subtracts the observation age and shows the countdown only beside a reported value. `agent.usageWeekModel` is the weekly usage of one model family, from 0 to 100. When the newest project reports it, the account shows it after the weekly limit as `Weekly {usageWeekModelLabel}`, or `Weekly model` without a label, with the `usageWeekModelResetsIn` countdown. Other values make the response invalid. Account status considers every reporting project, so a newer working project cannot hide another project's input request or error. A provider can have multiple accounts.
 
 Resources become `Stale` after 120 seconds without a receipt. Coding hooks report events and repeat a running turn's state every 60 seconds as a heartbeat, so a long tool call or response stays active. A coding project's state follows its newest report through the shared state timeouts and becomes neutral `Inactive` when that clock reaches `sleep`; an event's health ages with its state. The device reevaluates each resource's receipt age and each project's event age while offline. State labels, attention priorities and timers come from the pinned public App contract, shared with Web.
 
@@ -19,9 +19,10 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | Visible metrics per card | First 3, following the Web order; details show all |
 | Poll interval | 10 seconds |
 | Retry delay for transient failures | 20, 40, then at most 60 seconds |
+| Retry delay after HTTP 429 | The longer of that delay and `Retry-After` in seconds, at most 15 minutes. **Refresh** and the item picker also wait for `Retry-After`. |
 | Resource stale boundary | 120 seconds since the server received it |
 
-Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
+Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. The connection message names the first rule that the snapshot breaks, such as an invalid timestamp or more than 128 sources. It never quotes response content. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
 Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
@@ -29,7 +30,7 @@ Percentage and GiB readings use the shared App/Web precision: at most two decima
 
 The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key and four selections. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.
 
-The default firmware does not enable flash or NVS encryption. Physical access to the device or a flash backup can expose stored credentials. Use a dedicated read token and keep firmware backups private. The optional USB console is a local setup interface, not an authenticated network service.
+The default firmware does not enable flash or NVS encryption. Physical access to the device or a flash backup can expose stored credentials. Use a dedicated read token and keep firmware backups private. In RAM, the HTTPS worker and the USB console overwrite their temporary copies of the token and Wi-Fi password after use; copies inside the HTTP and TLS libraries are not overwritten. The optional USB console is a local setup interface, not an authenticated network service.
 
 The firmware has no inbound HTTP status server, captive portal or WebSocket connection. Collectors send reports to Web; the device only reads them.
 
@@ -39,7 +40,7 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, item/selection counts, touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
+| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts (items in the last reply, which can hold only the selected panels), touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |

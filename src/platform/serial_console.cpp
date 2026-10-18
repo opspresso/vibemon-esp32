@@ -1,13 +1,46 @@
 #include "serial_console.h"
 #include "esp32_display.h"
 #include "esp32_update.h"
+#include "secrets.h"
 #include "../version.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <algorithm>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
 #include <esp_heap_caps.h>
 
 namespace vibemon {
+namespace {
+// Setup commands carry a Wi-Fi password or read token. Overwrite every JSON
+// block before it returns to the heap.
+class WipingAllocator final : public ArduinoJson::Allocator {
+  struct alignas(std::max_align_t) Header { std::size_t size; };
+ public:
+  void* allocate(std::size_t size) override {
+    auto* block = static_cast<Header*>(std::malloc(sizeof(Header) + size));
+    if (!block) return nullptr;
+    block->size = size;
+    return block + 1;
+  }
+  void deallocate(void* pointer) override {
+    if (!pointer) return;
+    auto* block = static_cast<Header*>(pointer) - 1;
+    wipe(static_cast<char*>(pointer), block->size);
+    std::free(block);
+  }
+  void* reallocate(void* pointer, std::size_t size) override {
+    if (!pointer) return allocate(size);
+    auto* moved = allocate(size);
+    if (!moved) return nullptr;
+    std::memcpy(moved, pointer, std::min(size, (static_cast<Header*>(pointer) - 1)->size));
+    deallocate(pointer);
+    return moved;
+  }
+};
+}  // namespace
+
 void SerialConsole::tick() {
   // Bound work per loop so a serial sender cannot monopolize touch processing.
   for (unsigned i = 0; i < 256 && Serial.available(); ++i) {
@@ -24,7 +57,8 @@ void SerialConsole::tick() {
 }
 
 void SerialConsole::command() {
-  JsonDocument request;
+  WipingAllocator allocator;
+  JsonDocument request(&allocator);
   JsonDocument response;
   if (deserializeJson(request, input_.data(), used_, DeserializationOption::NestingLimit(3))) {
     response["ok"] = false; response["error"] = "Invalid JSON command";
@@ -41,7 +75,8 @@ void SerialConsole::command() {
       response["internalHeapMinimum"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
       response["psramFree"] = ESP.getFreePsram();
       response["connection"] = static_cast<int>(workspace.connection);
-      response["page"] = static_cast<int>(ui_.page());
+      response["message"] = workspace.message;
+      response["page"] = screen_.page();
       response["items"] = workspace.catalog.items.size();
       response["hasSnapshot"] = workspace.hasSnapshot;
       response["tokenConfigured"] = workspace.tokenConfigured;
@@ -64,14 +99,16 @@ void SerialConsole::command() {
       if (!request[first].is<const char*>() || !request[secret].is<const char*>()) {
         response["ok"] = false; response["error"] = "Missing setup fields";
       } else {
-        const auto result = name == "configure-wifi" ? controller_.saveWifi(request[first].as<std::string>(), request[secret].as<std::string>()) :
-            controller_.saveCloud(request[first].as<std::string>(), request[secret].as<std::string>());
+        auto value = request[secret].as<std::string>();
+        const auto result = name == "configure-wifi" ? controller_.saveWifi(request[first].as<std::string>(), value) :
+            controller_.saveCloud(request[first].as<std::string>(), value);
+        wipe(value);
         response["ok"] = result.ok;
-        if (result.ok) { response["queued"] = true; ui_.dashboard(); }
+        if (result.ok) { response["queued"] = true; screen_.showDashboard(); }
         else response["error"] = result.message;
       }
     } else if (name == "dashboard") {
-      ui_.dashboard(); response["ok"] = true;
+      screen_.showDashboard(); response["ok"] = true;
     } else if (name == "refresh") {
       controller_.refresh(); response["ok"] = true;
     } else if (name == "update-check") {

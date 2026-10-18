@@ -1,13 +1,10 @@
 #include "controller.h"
+#include "../domain/clock.h"
 
 #include <algorithm>
 #include <utility>
 
 namespace vibemon {
-namespace {
-bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
-}  // namespace
-
 Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version)
     : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)) {}
 
@@ -65,8 +62,10 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   const auto candidateToken = token.empty() && normalized == config_.origin ? config_.readToken : token;
   const auto checkedToken = validateToken(candidateToken);
   if (!checkedToken.ok) return checkedToken;
-  const auto wifi = wifi_.status();
+  const auto& wifi = wifi_.status();
   if (wifi.link != WifiLink::Connected || pendingWifi_) return {false, "Connect Wi-Fi before checking your workspace."};
+  // Retry-After belongs to the server that sent it.
+  if (normalized != config_.origin) retryAfter_.reset();
   pendingCloud_ = CloudCredentials{normalized, candidateToken};
   storageBlocked_ = false;
   ++generation_;
@@ -114,46 +113,59 @@ void Controller::retryWifi() {
 
 void Controller::cancelSetup() {
   if (pendingWifi_) { retryWifi(); return; }
-  if (!pendingCloud_) return;
+  if (!pendingCloud_) {
+    // Leaving the form dismisses a failed first setup's cause.
+    if (config_.readToken.empty() && (workspace_.connection == Connection::CloudUnavailable || workspace_.connection == Connection::TokenRejected)) needCloud();
+    return;
+  }
   pendingCloud_.reset();
   ++generation_;
   inFlight_ = false;
   workspace_.refreshing = false;
   tokenRejected_ = false;
   nextPoll_ = now_;
-  state(config_.readToken.empty() ? Connection::NeedCloud : Connection::CheckingCloud,
-        config_.readToken.empty() ? "Enter your server address and a read token." : "Restoring your saved workspace...");
+  if (config_.readToken.empty()) needCloud();
+  else state(Connection::CheckingCloud, "Restoring your saved workspace...");
 }
 
+void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server address and a read token."); }
+
 void Controller::refresh() {
-  nextPoll_ = now_;
+  // An explicit refresh skips the backoff, not the server's Retry-After.
+  nextPoll_ = retryAfterPending() ? *retryAfter_ : now_;
   tokenRejected_ = false;
   failures_ = 0;
   storageBlocked_ = false;
 }
 
-void Controller::failure(CloudError error, bool validating) {
+void Controller::failure(const CloudResult& result, bool validating) {
+  const auto error = result.error;
   if (validating) pendingCloud_.reset();
   if (error == CloudError::Unauthorized || error == CloudError::Forbidden) {
     // A rejected replacement must not revoke the previous, still-valid connection.
     tokenRejected_ = !validating || config_.readToken.empty();
     state(Connection::TokenRejected, error == CloudError::Forbidden ? "This token needs read permission." : "This token was rejected. Check or replace it.");
   } else {
-    const char* message = error == CloudError::Tls ? "The server certificate could not be verified." :
+    std::string message = error == CloudError::Tls ? "The server certificate could not be verified." :
         error == CloudError::InvalidResponse ? "The server returned an invalid workspace." :
-        error == CloudError::TooLarge ? "The workspace exceeds the device's response or source limit." :
+        error == CloudError::TooLarge ? "The workspace exceeds this device's limits." :
         error == CloudError::Memory ? "Not enough memory to load the workspace. Restart this device." :
         error == CloudError::Server ? "The server is unavailable. Your last readings are shown." :
+        error == CloudError::RateLimited ? "The server is limiting requests. Your last readings are shown." :
+        error == CloudError::Redirected ? "The server redirected the request. Check the server address." :
         "Could not reach the server. Your last readings are shown.";
+    if (!result.detail.empty() && (error == CloudError::InvalidResponse || error == CloudError::TooLarge)) message += " " + result.detail;
     state(Connection::CloudUnavailable, message);
   }
   failures_ = std::min(failures_ + 1, 3u);
-  nextPoll_ = now_ + std::min<std::uint32_t>(60000, PollIntervalMs << failures_);
+  if (result.retryAfterMs) retryAfter_ = now_ + result.retryAfterMs;
+  // A server's Retry-After can only lengthen the backoff.
+  nextPoll_ = now_ + std::max(result.retryAfterMs, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
 }
 
 void Controller::accept(CloudResult& result) {
   const bool validating = pendingCloud_.has_value();
-  if (result.error != CloudError::None) { failure(result.error, validating); return; }
+  if (result.error != CloudError::None) { failure(result, validating); return; }
   Config candidate = config_;
   bool needsSave = false;
   if (validating) {
@@ -180,13 +192,39 @@ void Controller::accept(CloudResult& result) {
   config_ = std::move(candidate);
   pendingCloud_.reset();
   workspace_.catalog = std::move(result.catalog);
+  workspace_.catalogComplete = requestedAll_;
   workspace_.snapshotAgeMs = 0;
   workspace_.hasSnapshot = true;
   updateConfigView();
   failures_ = 0;
+  retryAfter_.reset();
   tokenRejected_ = false;
-  nextPoll_ = now_ + PollIntervalMs;
-  state(Connection::Online, workspace_.catalog.items.empty() ? "Connected. Waiting for your first report." : "Connected");
+  // The picker needs every item; replace a panel-only snapshot at once.
+  nextPoll_ = browsing_ && !requestedAll_ ? now_ : now_ + PollIntervalMs;
+  state(Connection::Online, requestedAll_ && workspace_.catalog.items.empty() ? "Connected. Waiting for your first report." : "Connected");
+}
+
+std::vector<Selection> Controller::requestScope() const {
+  // Validation, first panel defaults and the picker need every item.
+  if (pendingCloud_ || !config_.panelsInitialized || browsing_) return {};
+  std::vector<Selection> scope;
+  for (const auto& selection : config_.panels) {
+    if (!selection.id.empty() && std::find(scope.begin(), scope.end(), selection) == scope.end()) scope.push_back(selection);
+  }
+  return scope;
+}
+
+void Controller::browse(bool browsing) {
+  if (browsing_ == browsing) return;
+  browsing_ = browsing;
+  // After a failure the backoff and any Retry-After still apply.
+  if (browsing && !workspace_.catalogComplete && failures_ == 0 && !retryAfterPending()) nextPoll_ = now_;
+}
+
+bool Controller::retryAfterPending() {
+  // Forget an expired deadline at once, so it never ages beyond due()'s range.
+  if (retryAfter_ && due(now_, *retryAfter_)) retryAfter_.reset();
+  return retryAfter_.has_value();
 }
 
 void Controller::tick(std::uint32_t now) {
@@ -194,7 +232,8 @@ void Controller::tick(std::uint32_t now) {
   // fresh again when the platform's 32-bit millisecond clock wraps.
   if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
-  const auto wifi = wifi_.status();
+  retryAfterPending();
+  const auto& wifi = wifi_.status();
   if (updater_.tick(now, wifi.link == WifiLink::Connected && wifi.clockReady, workspace_.connection == Connection::Online)) {
     workspace_.firmware = updater_.view();
     ++workspace_.revision;
@@ -238,15 +277,19 @@ void Controller::tick(std::uint32_t now) {
     }
   }
   if (!pendingCloud_ && config_.readToken.empty()) {
-    if (workspace_.connection != Connection::TokenRejected && workspace_.connection != Connection::StorageError) state(Connection::NeedCloud, "Enter your server address and a read token.");
+    // Keep a failed first setup's cause on screen until the user tries again.
+    const auto current = workspace_.connection;
+    if (current != Connection::CloudUnavailable && current != Connection::TokenRejected && current != Connection::StorageError) needCloud();
     return;
   }
   // A firmware download owns the network until the device restarts.
   if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || !due(now, nextPoll_)) return;
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
-  if (cloud_.start({generation_, origin, token})) {
-    inFlight_ = true; workspace_.refreshing = true;
+  auto scope = requestScope();
+  const bool all = scope.empty();
+  if (cloud_.start({generation_, origin, token, std::move(scope)})) {
+    inFlight_ = true; workspace_.refreshing = true; requestedAll_ = all;
     ++workspace_.revision;
     if (!workspace_.hasSnapshot || pendingCloud_) state(Connection::CheckingCloud, "Loading your workspace...");
   }

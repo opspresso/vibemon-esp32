@@ -20,6 +20,14 @@ int main() {
     invalid = store.saved; invalid.origin = "https://host.example/path";
     CHECK(encodeSettings(invalid).empty());
     CHECK(!decodeSettings(std::string(MaxSettingsBytes + 1, 'x'), recovered));
+    // Every valid configuration fits one NVS string, including JSON escapes.
+    Config largest; largest.ssid = std::string(32, '"'); largest.wifiPassword = std::string(63, '\\');
+    std::string origin; CHECK(normalizeOrigin(std::string(63, 'a') + "." + std::string(63, 'b') + "." + std::string(63, 'c') + "." + std::string(61, 'd') + ":65535", origin).ok);
+    largest.origin = origin; largest.readToken = "vm_" + std::string(60, 'f'); largest.panelsInitialized = true;
+    largest.panels.fill({ItemKind::Account, std::string(32, 'a') + ":" + std::string(128, 'b')});
+    CHECK(validConfig(largest));
+    const auto encoded = encodeSettings(largest);
+    CHECK(!encoded.empty() && encoded.size() <= MaxSettingsBytes && decodeSettings(encoded, recovered) && recovered.ssid == largest.ssid);
     Config empty; CHECK(decodeSettings(encodeSettings(empty), recovered));
     CHECK(recovered.ssid.empty() && recovered.readToken.empty() && !recovered.panelsInitialized);
     std::cout << "PASS settings: complete atomic document, Unicode, four selections, masked-key backing value and invalid-version preservation\n";
