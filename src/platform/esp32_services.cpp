@@ -105,42 +105,46 @@ struct CloudJob {
 class CloudSession {
  public:
   CloudSession() {
-    prepareHttps(client_, http_, 4000);
     http_.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
     http_.setReuse(true);
     const char* collected[] = {"Retry-After"};
     http_.collectHeaders(collected, 1);
   }
-  // Frees the TLS session's internal-RAM buffers.
+  // Frees the TLS session's internal-RAM buffers. The next request starts a
+  // new client, so its error state cannot describe an earlier connection.
   void close() {
-    if (origin_.empty()) return;
-    client_.stop();
+    if (!client_) return;
+    http_.end();
+    client_.reset();
     origin_.clear();
   }
   std::unique_ptr<CloudResult> fetch(const CloudJob& job) {
     if (origin_ != job.origin) close();
-    const bool reused = !origin_.empty() && client_.connected();
-    origin_ = job.origin;
+    const bool reused = client_ && client_->connected();
     auto result = request(job);
     // The server may close an idle connection as the request starts. Retry
     // once on a new connection, which also reports certificate failures.
     if (reused && (result->error == CloudError::Network || result->error == CloudError::Tls)) {
       close();
-      origin_ = job.origin;
       result = request(job);
     }
     if (result->error != CloudError::None) close();
     return result;
   }
  private:
-  NetworkClientSecure client_;
+  std::unique_ptr<NetworkClientSecure> client_;
   HTTPClient http_;
-  std::string origin_;  // empty while no connection is open
+  std::string origin_;  // the origin of client_
 
   std::unique_ptr<CloudResult> request(const CloudJob& job) {
     auto result = std::make_unique<CloudResult>();
     result->generation = job.generation;
-    if (WiFi.status() != WL_CONNECTED || !http_.begin(client_, (job.origin + job.path).c_str())) {
+    if (!client_) {
+      client_ = std::make_unique<NetworkClientSecure>();
+      prepareHttps(*client_, http_, 4000);
+      origin_ = job.origin;
+    }
+    if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + job.path).c_str())) {
       result->error = CloudError::Network;
       return result;
     }
@@ -158,7 +162,7 @@ class CloudSession {
         if (result->error == CloudError::RateLimited) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
       } else {
         char error[128];
-        result->error = client_.lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
+        result->error = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
       }
       http_.end();
       return result;
