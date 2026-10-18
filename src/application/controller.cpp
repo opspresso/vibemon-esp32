@@ -64,8 +64,6 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   if (!checkedToken.ok) return checkedToken;
   const auto& wifi = wifi_.status();
   if (wifi.link != WifiLink::Connected || pendingWifi_) return {false, "Connect Wi-Fi before checking your workspace."};
-  // Retry-After belongs to the server that sent it.
-  if (normalized != config_.origin) retryAfter_.reset();
   pendingCloud_ = CloudCredentials{normalized, candidateToken};
   storageBlocked_ = false;
   ++generation_;
@@ -132,7 +130,7 @@ void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server a
 
 void Controller::refresh() {
   // An explicit refresh skips the backoff, not the server's Retry-After.
-  nextPoll_ = retryAfterPending() ? *retryAfter_ : now_;
+  nextPoll_ = retryAfter().value_or(now_);
   tokenRejected_ = false;
   failures_ = 0;
   storageBlocked_ = false;
@@ -140,6 +138,7 @@ void Controller::refresh() {
 
 void Controller::failure(const CloudResult& result, bool validating) {
   const auto error = result.error;
+  const auto failedOrigin = validating ? pendingCloud_->origin : config_.origin;
   if (validating) pendingCloud_.reset();
   if (error == CloudError::Unauthorized || error == CloudError::Forbidden) {
     // A rejected replacement must not revoke the previous, still-valid connection.
@@ -161,9 +160,9 @@ void Controller::failure(const CloudResult& result, bool validating) {
   // server's state; the next request must return the complete body.
   if (error == CloudError::InvalidResponse || error == CloudError::TooLarge || error == CloudError::Memory) validator_.reset();
   failures_ = std::min(failures_ + 1, 3u);
-  if (result.retryAfterMs) retryAfter_ = now_ + result.retryAfterMs;
   // A server's Retry-After can only lengthen the backoff.
-  nextPoll_ = now_ + std::max(result.retryAfterMs, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
+  const auto delay = failedOrigin == config_.origin ? result.retryAfterMs : 0;
+  nextPoll_ = now_ + std::max(delay, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
 }
 
 void Controller::accept(CloudResult& result) {
@@ -219,7 +218,7 @@ void Controller::accept(CloudResult& result) {
 
 void Controller::online() {
   failures_ = 0;
-  retryAfter_.reset();
+  retryAfter_.erase(config_.origin);
   tokenRejected_ = false;
   // The picker needs every item; replace a panel-only snapshot at once.
   nextPoll_ = browsing_ && !requestedAll_ ? now_ : now_ + PollIntervalMs;
@@ -240,13 +239,25 @@ void Controller::browse(bool browsing) {
   if (browsing_ == browsing) return;
   browsing_ = browsing;
   // After a failure the backoff and any Retry-After still apply.
-  if (browsing && !workspace_.catalogComplete && failures_ == 0 && !retryAfterPending()) nextPoll_ = now_;
+  if (browsing && !workspace_.catalogComplete && failures_ == 0 && !retryAfter()) nextPoll_ = now_;
 }
 
-bool Controller::retryAfterPending() {
-  // Forget an expired deadline at once, so it never ages beyond due()'s range.
-  if (retryAfter_ && due(now_, *retryAfter_)) retryAfter_.reset();
-  return retryAfter_.has_value();
+std::optional<std::uint32_t> Controller::retryAfter() {
+  // Expire every origin, even while offline, before its deadline ages beyond due()'s range.
+  for (auto entry = retryAfter_.begin(); entry != retryAfter_.end();) {
+    if (due(now_, entry->second)) entry = retryAfter_.erase(entry);
+    else ++entry;
+  }
+  const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
+  const auto found = retryAfter_.find(origin);
+  return found == retryAfter_.end() ? std::nullopt : std::optional<std::uint32_t>(found->second);
+}
+
+std::unique_ptr<CloudResult> Controller::takeCloudResult() {
+  auto result = cloud_.take();
+  // Cancelled or disconnected requests still carry the contacted server's delay.
+  if (result && result->retryAfterMs) retryAfter_[requestedOrigin_] = now_ + result->retryAfterMs;
+  return result;
 }
 
 void Controller::tick(std::uint32_t now) {
@@ -254,7 +265,7 @@ void Controller::tick(std::uint32_t now) {
   // fresh again when the platform's 32-bit millisecond clock wraps.
   if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
-  retryAfterPending();
+  retryAfter();
   const auto& wifi = wifi_.status();
   if (updater_.tick(now, wifi.link == WifiLink::Connected && wifi.clockReady, workspace_.connection == Connection::Online)) {
     workspace_.firmware = updater_.view();
@@ -265,7 +276,7 @@ void Controller::tick(std::uint32_t now) {
       ++generation_; inFlight_ = false; workspace_.refreshing = false; hadConnection_ = false;
     }
     // Drain outdated work without applying data from a previous connection.
-    cloud_.take();
+    takeCloudResult();
     if (wifi.link == WifiLink::Connecting) state(Connection::ConnectingWifi, "Connecting to Wi-Fi...");
     else if (pendingWifi_ || !config_.ssid.empty()) state(Connection::WifiUnavailable, "Wi-Fi is unavailable. Check the network name and password.");
     return;
@@ -292,7 +303,7 @@ void Controller::tick(std::uint32_t now) {
     } else state(Connection::SettingClock, "Setting the clock for a secure connection...");
     return;
   }
-  if (auto result = cloud_.take()) {
+  if (auto result = takeCloudResult()) {
     if (result->generation == generation_) {
       inFlight_ = false; workspace_.refreshing = false;
       accept(*result);
@@ -305,7 +316,7 @@ void Controller::tick(std::uint32_t now) {
     return;
   }
   // A firmware download owns the network until the device restarts.
-  if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || !due(now, nextPoll_)) return;
+  if (inFlight_ || tokenRejected_ || storageBlocked_ || updater_.busy() || retryAfter() || !due(now, nextPoll_)) return;
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   auto scope = requestScope();
@@ -315,7 +326,7 @@ void Controller::tick(std::uint32_t now) {
   const bool conditional = !tag.empty();
   if (cloud_.start({generation_, origin, token, scope, std::move(tag)})) {
     inFlight_ = true; workspace_.refreshing = true; requestedAll_ = scope.empty();
-    requestedScope_ = std::move(scope); conditional_ = conditional;
+    requestedOrigin_ = origin; requestedScope_ = std::move(scope); conditional_ = conditional;
     ++workspace_.revision;
     if (!workspace_.hasSnapshot || pendingCloud_) state(Connection::CheckingCloud, "Loading your workspace...");
   }

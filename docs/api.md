@@ -26,6 +26,8 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 
 Missing measurements remain unavailable; they do not become zero. Invalid or incomplete snapshots do not replace the displayed catalog. The connection message names the first rule that the snapshot breaks, such as an invalid timestamp or more than 128 sources. It never quotes response content. Network failures retain the last accepted values. Rejected saved credentials stop automatic polling until the user retries or changes the key. A rejected replacement does not overwrite the previous saved connection. A verified server/key change clears old account selections before accepting the new workspace.
 
+`Retry-After` belongs to the HTTPS origin that returned it. Checking another server does not delay the saved server or erase its existing wait. Cancelled setup replies cannot change the workspace, but their server's delay is still kept. Expired waits are removed even while the device is offline.
+
 Plan usage bars (metric keys that start with `usage`) use the App contract's tones: warning from 70 and danger from 90, both inclusive. Other bars use the accent color. Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
 ## Persistent settings

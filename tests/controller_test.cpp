@@ -4,6 +4,58 @@
 int main() {
   try {
     {
+      // A candidate server's rate limit does not delay the saved server.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      app.refresh(); app.tick(5);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(6);
+      // Restoring the saved server must not forget the candidate's delay.
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(7); CHECK(cloud.requests.size() == 3);
+      app.tick(120003); CHECK(cloud.requests.size() == 3);
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
+      // Trying and cancelling another server cannot bypass the saved server's delay.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); CHECK(cloud.requests.size() == 2);
+      app.cancelSetup(); cloud.complete(catalog()); app.tick(4);
+      CHECK(cloud.requests.size() == 2);
+      app.refresh(); app.tick(120001); CHECK(cloud.requests.size() == 2);
+      app.tick(120002); CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+    }
+    {
+      // A cancelled request still carries its server's delay, but cannot change the workspace.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); app.cancelSetup();
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(5);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(6); CHECK(cloud.requests.size() == 3 && store.saved.origin == "https://vibemon.io");
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
+      // Losing Wi-Fi while a limited reply waits must not discard its server's delay.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); wifi.current.link = WifiLink::Failed;
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      app.cancelSetup(); wifi.connected(); app.tick(5); cloud.complete(catalog()); app.tick(6);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(7); CHECK(cloud.requests.size() == 3);
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
       Store store; Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0);
       CHECK(app.workspace().connection == Connection::NeedWifi && wifi.scans == 1);
