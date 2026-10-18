@@ -42,19 +42,19 @@ class EspWifi final : public WifiPort {
   bool clockRequested_ = false;
 };
 
+// One worker on core 0 runs requests in order and keeps the TLS connection
+// between polls, so a poll normally skips the full handshake.
 class EspCloud final : public CloudPort {
  public:
   bool begin();
   bool start(const CloudRequest& request) override;
   std::unique_ptr<CloudResult> take() override;
  private:
-  struct Job { std::uint32_t generation; char origin[MaxOriginBytes + 1]; char token[64]; };
   QueueHandle_t jobs_ = nullptr;
   QueueHandle_t results_ = nullptr;
   TaskHandle_t worker_ = nullptr;
   std::atomic<bool> busy_{false};
   static void work(void* context);
-  static std::unique_ptr<CloudResult> fetch(const Job& job);
 };
 
 }  // namespace vibemon
