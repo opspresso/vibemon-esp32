@@ -64,6 +64,8 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   if (!checkedToken.ok) return checkedToken;
   const auto& wifi = wifi_.status();
   if (wifi.link != WifiLink::Connected || pendingWifi_) return {false, "Connect Wi-Fi before checking your workspace."};
+  // Retry-After belongs to the server that sent it.
+  if (normalized != config_.origin) retryAfter_.reset();
   pendingCloud_ = CloudCredentials{normalized, candidateToken};
   storageBlocked_ = false;
   ++generation_;
@@ -130,7 +132,7 @@ void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server a
 
 void Controller::refresh() {
   // An explicit refresh skips the backoff, not the server's Retry-After.
-  nextPoll_ = retryAfter_ && !due(now_, *retryAfter_) ? *retryAfter_ : now_;
+  nextPoll_ = retryAfterPending() ? *retryAfter_ : now_;
   tokenRejected_ = false;
   failures_ = 0;
   storageBlocked_ = false;
@@ -216,7 +218,13 @@ void Controller::browse(bool browsing) {
   if (browsing_ == browsing) return;
   browsing_ = browsing;
   // After a failure the backoff and any Retry-After still apply.
-  if (browsing && !workspace_.catalogComplete && failures_ == 0) nextPoll_ = now_;
+  if (browsing && !workspace_.catalogComplete && failures_ == 0 && !retryAfterPending()) nextPoll_ = now_;
+}
+
+bool Controller::retryAfterPending() {
+  // Forget an expired deadline at once, so it never ages beyond due()'s range.
+  if (retryAfter_ && due(now_, *retryAfter_)) retryAfter_.reset();
+  return retryAfter_.has_value();
 }
 
 void Controller::tick(std::uint32_t now) {
@@ -224,6 +232,7 @@ void Controller::tick(std::uint32_t now) {
   // fresh again when the platform's 32-bit millisecond clock wraps.
   if (workspace_.hasSnapshot) workspace_.snapshotAgeMs += static_cast<std::uint32_t>(now - now_);
   now_ = now;
+  retryAfterPending();
   const auto& wifi = wifi_.status();
   if (updater_.tick(now, wifi.link == WifiLink::Connected && wifi.clockReady, workspace_.connection == Connection::Online)) {
     workspace_.firmware = updater_.view();

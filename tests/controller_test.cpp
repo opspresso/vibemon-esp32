@@ -143,6 +143,33 @@ int main() {
     CHECK(sourcesPath({{ItemKind::Account, "codex:work"}}) == "/api/v1/sources?accounts=codex:work");
     CHECK(sourcesPath({{ItemKind::Account, "codex:work"}, {ItemKind::Resource, "spark"}, {ItemKind::Account, "claude:me"}}) ==
           "/api/v1/sources?ids=spark&accounts=codex:work,claude:me");
+    {
+      // Refresh then picker, in that order, still waits for Retry-After.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      app.tick(2 + PollIntervalMs); CHECK(cloud.requests.size() == 2 && !cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(3 + PollIntervalMs); CHECK(!app.workspace().catalogComplete);
+      app.tick(3 + 2 * PollIntervalMs); CHECK(cloud.requests.size() == 3);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4 + 2 * PollIntervalMs);
+      app.refresh(); app.browse(true); app.tick(5 + 2 * PollIntervalMs);
+      app.tick(3 + 2 * PollIntervalMs + 120000); CHECK(cloud.requests.size() == 3);
+      app.tick(4 + 2 * PollIntervalMs + 120000); CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.empty());
+    }
+    {
+      // An expired Retry-After is forgotten, so Refresh works after a long stop.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      app.refresh(); app.tick(3); CHECK(cloud.requests.size() == 1);
+      app.tick(120002); CHECK(cloud.requests.size() == 2);
+      cloud.complete({}, CloudError::Unauthorized); app.tick(120003);
+      CHECK(app.workspace().connection == Connection::TokenRejected);
+      // 30 days later the old deadline would read as 18 days in the future.
+      std::uint32_t now = 120003;
+      for (int day = 0; day < 30; ++day) { now += 86400000; app.tick(now); }
+      CHECK(cloud.requests.size() == 2);
+      app.refresh(); app.tick(now + 1); CHECK(cloud.requests.size() == 3);
+    }
     CHECK(cloudStatusError(200) == CloudError::None && cloudStatusError(401) == CloudError::Unauthorized);
     CHECK(cloudStatusError(403) == CloudError::Forbidden && cloudStatusError(429) == CloudError::RateLimited);
     CHECK(cloudStatusError(301) == CloudError::Redirected && cloudStatusError(308) == CloudError::Redirected);

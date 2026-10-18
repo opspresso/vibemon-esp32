@@ -76,6 +76,7 @@ class Controller {
   bool requestedAll_ = true;
   void updateConfigView();
   std::vector<Selection> requestScope() const;
+  bool retryAfterPending();
   void state(Connection connection, const std::string& message);
   void needCloud();
   void accept(CloudResult& result);
