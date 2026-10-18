@@ -93,7 +93,7 @@ Catalog demo() {
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
   agent.projects = {agent, review};
-  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}, {"usageWeekModel", "Weekly Opus", "%", 37, MetricDisplay::Bar, 0, 100, 2880}};
+  agent.metrics = {{"contextPercent", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"usageSessionPercent", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"usageWeekPercent", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}, {"usageWeekModel", "Weekly Opus", "%", 37, MetricDisplay::Bar, 0, 100, 2880}};
   value.items.push_back(agent);
   return value;
 }
@@ -144,6 +144,9 @@ int main() {
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
+      // Plan usage at its limit fills in danger; context is not plan usage and keeps the accent.
+      CHECK(lv_color_eq(lv_obj_get_style_bg_color(ui.widget("panel-bar-3-2"), LV_PART_INDICATOR), lv_color_hex(design::Danger)));
+      CHECK(lv_color_eq(lv_obj_get_style_bg_color(ui.widget("panel-bar-3-0"), LV_PART_INDICATOR), lv_color_hex(design::Accent)));
       CHECK(lv_obj_get_style_outline_width(ui.widget("panel-3"), LV_PART_MAIN) == 1);
       CHECK(lv_obj_get_style_shadow_width(ui.widget("panel-3"), LV_PART_MAIN) == 20);
       lv_area_t activeTitleBounds; lv_obj_get_coords(ui.widget("panel-name-3"), &activeTitleBounds);
@@ -315,6 +318,7 @@ int main() {
       auto account = demo().items.back();
       account.activity = state == "inactive" ? "working" : state;
       if (state == "inactive") account.activityAgeMs = 600000;
+      if (state == "idle") account.metrics[1].value = 70;
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
       store.saved.panels.fill(account.selection); store.saved.panelsInitialized = true;
@@ -322,6 +326,9 @@ int main() {
       app.begin(timeMs); wifi.connected(); app.tick(timeMs); cloud.complete(catalog); app.tick(++timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui, 250);
       auto* light = ui.widget("panel-light-0-0"); CHECK(light);
+      const auto stateColor = state == "thinking" ? design::StateThinking : state == "planning" ? design::StatePlanning : state == "packing" ? design::StatePacking : 0;
+      if (stateColor) CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-0"), LV_PART_MAIN), lv_color_hex(stateColor)));
+      if (state == "idle") CHECK(lv_color_eq(lv_obj_get_style_bg_color(ui.widget("panel-bar-0-1"), LV_PART_INDICATOR), lv_color_hex(design::Warning)));
       const bool active = state != "idle" && state != "inactive";
       CHECK(lv_obj_is_hidden(light) != active);
       const auto x = lv_obj_get_x(light), y = lv_obj_get_y(light);
