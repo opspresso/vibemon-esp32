@@ -67,6 +67,7 @@ class Controller {
   bool hadConnection_ = false;
   void updateConfigView();
   void state(Connection connection, const std::string& message);
+  void needCloud();
   void accept(CloudResult& result);
   void failure(CloudError error, bool validating);
 };

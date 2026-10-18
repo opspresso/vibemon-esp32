@@ -114,16 +114,22 @@ void Controller::retryWifi() {
 
 void Controller::cancelSetup() {
   if (pendingWifi_) { retryWifi(); return; }
-  if (!pendingCloud_) return;
+  if (!pendingCloud_) {
+    // Leaving the form dismisses a failed first setup's cause.
+    if (config_.readToken.empty() && (workspace_.connection == Connection::CloudUnavailable || workspace_.connection == Connection::TokenRejected)) needCloud();
+    return;
+  }
   pendingCloud_.reset();
   ++generation_;
   inFlight_ = false;
   workspace_.refreshing = false;
   tokenRejected_ = false;
   nextPoll_ = now_;
-  state(config_.readToken.empty() ? Connection::NeedCloud : Connection::CheckingCloud,
-        config_.readToken.empty() ? "Enter your server address and a read token." : "Restoring your saved workspace...");
+  if (config_.readToken.empty()) needCloud();
+  else state(Connection::CheckingCloud, "Restoring your saved workspace...");
 }
+
+void Controller::needCloud() { state(Connection::NeedCloud, "Enter your server address and a read token."); }
 
 void Controller::refresh() {
   nextPoll_ = now_;
@@ -238,7 +244,9 @@ void Controller::tick(std::uint32_t now) {
     }
   }
   if (!pendingCloud_ && config_.readToken.empty()) {
-    if (workspace_.connection != Connection::TokenRejected && workspace_.connection != Connection::StorageError) state(Connection::NeedCloud, "Enter your server address and a read token.");
+    // Keep a failed first setup's cause on screen until the user tries again.
+    const auto current = workspace_.connection;
+    if (current != Connection::CloudUnavailable && current != Connection::TokenRejected && current != Connection::StorageError) needCloud();
     return;
   }
   // A firmware download owns the network until the device restarts.

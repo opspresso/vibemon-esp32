@@ -271,6 +271,22 @@ int main() {
       CHECK(ui.page() == Page::Dashboard && app.workspace().connection == Connection::Online);
       CHECK(std::string(lv_label_get_text(ui.widget("connection"))) == "Workspace connected");
     }
+    {
+      // The first workspace setup shows the server's failure, not the setup prompt again.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs);
+      DashboardUi ui(app); CHECK(ui.begin());
+      wifi.connected(); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::CloudForm);
+      lv_textarea_set_text(ui.widget("read-token"), ("vm_" + std::string(60, 'c')).c_str()); tap(ui, "connect-cloud");
+      CHECK(app.changingCloud()); app.tick(++timeMs);
+      cloud.complete({}, CloudError::Tls); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::CloudForm && findText(lv_screen_active(), "The server certificate could not be verified."));
+      app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.page() == Page::CloudForm && findText(lv_screen_active(), "The server certificate could not be verified."));
+      screenshot("cloud-setup-failed");
+    }
     for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "inactive"}) {
       Store store; configured(store);
       auto account = demo().items.back();

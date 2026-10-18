@@ -61,6 +61,26 @@ int main() {
       app.tick(600000); CHECK(cloud.requests.size() == count);
       CHECK(app.workspace().connection == Connection::TokenRejected);
     }
+    for (const auto& [error, expected] : std::initializer_list<std::pair<CloudError, Connection>>{
+             {CloudError::Unauthorized, Connection::TokenRejected}, {CloudError::Forbidden, Connection::TokenRejected},
+             {CloudError::Network, Connection::CloudUnavailable}, {CloudError::Tls, Connection::CloudUnavailable},
+             {CloudError::InvalidResponse, Connection::CloudUnavailable}, {CloudError::TooLarge, Connection::CloudUnavailable},
+             {CloudError::Memory, Connection::CloudUnavailable}, {CloudError::Server, Connection::CloudUnavailable}}) {
+      // Without a saved token, a failed first setup keeps its cause instead of asking for setup again.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      CHECK(app.workspace().connection == Connection::NeedCloud);
+      CHECK(app.saveCloud("vibemon.io", "vm_" + std::string(60, 'b')).ok);
+      app.tick(2); cloud.complete({}, error); app.tick(3);
+      const auto message = app.workspace().message;
+      CHECK(app.workspace().connection == expected && !app.changingCloud());
+      CHECK(message != "Enter your server address and a read token.");
+      app.tick(100000);
+      CHECK(app.workspace().connection == expected && app.workspace().message == message && cloud.requests.size() == 1);
+      app.cancelSetup();
+      CHECK(app.workspace().connection == Connection::NeedCloud && store.writes == 0);
+    }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
