@@ -17,6 +17,8 @@ struct Workspace {
   bool hasSnapshot = false;
   // False while the catalog holds only the selected panels' items.
   bool catalogComplete = false;
+  // Changes only when a complete HTTP response accepts or revalidates the catalog.
+  std::uint32_t catalogRevision = 0;
   std::uint32_t revision = 0;
   std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};

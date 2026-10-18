@@ -179,6 +179,7 @@ void Controller::accept(CloudResult& result) {
     // cached reply's serverTime, so the report clock restarts from there.
     const auto elapsed = result.serverTimeMs - validator_->serverTimeMs;
     workspace_.snapshotAgeMs = elapsed > 0 ? static_cast<std::uint64_t>(elapsed) : 0;
+    ++workspace_.catalogRevision;
     ++workspace_.revision;
     online();
     return;
@@ -212,6 +213,7 @@ void Controller::accept(CloudResult& result) {
   workspace_.catalogComplete = requestedAll_;
   workspace_.snapshotAgeMs = 0;
   workspace_.hasSnapshot = true;
+  ++workspace_.catalogRevision;
   if (result.etag.empty()) validator_.reset();
   else validator_ = Validator{generation_, config_.origin, requestedScope_, std::move(result.etag), result.serverTimeMs};
   updateConfigView();

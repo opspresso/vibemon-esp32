@@ -298,6 +298,25 @@ int main() {
       CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.size() == 1);
     }
     {
+      // Opening an empty panel refreshes a complete catalog retained while polling was paused.
+      Store store; configured(store); store.saved.panelsInitialized = true;
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs);
+      auto old = catalog(); old.items.resize(1); cloud.complete(old); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui);
+      tap(ui, "panel-0"); CHECK(ui.page() == Page::Picker && ui.widget("item-0") && !ui.widget("item-1"));
+      app.tick(++timeMs); CHECK(cloud.requests.size() == 2);
+      cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-3"));
+      tap(ui, "refresh-list"); app.tick(++timeMs);
+      cloud.complete({}, CloudError::Network); app.tick(++timeMs); advance(ui, 300);
+      CHECK(findText(lv_screen_active(), app.workspace().message)); screenshot("picker-refresh-error");
+      auto refreshed = demo(); auto extra = refreshed.items.front(); extra.selection.id = "new"; extra.name = "New resource"; refreshed.items.push_back(extra);
+      app.refresh(); app.tick(++timeMs); cloud.complete(refreshed); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-4") && !findText(lv_screen_active(), "Could not reach the server. Your last readings are shown."));
+      screenshot("picker-refreshed");
+    }
+    {
       // The first workspace setup shows the server's failure, not the setup prompt again.
       Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
       Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");

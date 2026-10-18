@@ -583,11 +583,15 @@ void DashboardUi::picker(std::size_t panel) {
     const auto result = controller_.select(selectedPanel_, {});
     if (result.ok) dashboard(); else formStatus(result.message, true);
   });
-  widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] { controller_.refresh(); pendingPickerRefresh_ = true; });
+  widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] {
+    controller_.refresh(); pendingPickerRefresh_ = true; pickerRevision_ = controller_.workspace().catalogRevision;
+  });
   formMessage_ = label(root_, "", 20, 382, 440, fonts_.small(), Danger);
   wrap(formMessage_);
   // Polls between pickers read only the selected panels; list the rest when they arrive.
-  pendingPickerRefresh_ = !controller_.workspace().catalogComplete;
+  const auto& workspace = controller_.workspace();
+  pendingPickerRefresh_ = !workspace.catalogComplete || std::none_of(workspace.panels.begin(), workspace.panels.end(), [](const Selection& panel) { return !panel.id.empty(); });
+  pickerRevision_ = workspace.catalogRevision;
   updatePicker();
 }
 
@@ -657,10 +661,13 @@ void DashboardUi::update(std::uint32_t now) {
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
   else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
-  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed &&
-           (workspace.catalogComplete || workspace.connection != Connection::Online)) {
-    // A failed read shows the items at hand; keep waiting for the full list.
-    pendingPickerRefresh_ = !workspace.catalogComplete; updatePicker();
+  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
+    if (workspace.catalogComplete && workspace.catalogRevision != pickerRevision_) {
+      pendingPickerRefresh_ = false; formStatus(""); updatePicker();
+    } else if (workspace.connection != Connection::Online) {
+      // A failed read or another state update cannot fulfill the requested catalog refresh.
+      formStatus(workspace.message, true);
+    }
   }
 }
 
