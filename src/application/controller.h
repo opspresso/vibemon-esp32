@@ -53,6 +53,15 @@ class Controller {
  private:
   struct WifiCredentials { std::string ssid; std::string password; };
   struct CloudCredentials { std::string origin; std::string token; };
+  // The ETag of the displayed catalog and the exact request that returned it.
+  struct Validator {
+    std::uint32_t generation;
+    std::string origin;
+    std::vector<Selection> scope;
+    std::string etag;
+    // The catalog's serverTime, at which its item ages were measured.
+    std::int64_t serverTimeMs;
+  };
   SettingsStore& settings_;
   WifiPort& wifi_;
   CloudPort& cloud_;
@@ -61,6 +70,10 @@ class Controller {
   Workspace workspace_;
   std::optional<WifiCredentials> pendingWifi_;
   std::optional<CloudCredentials> pendingCloud_;
+  std::optional<Validator> validator_;
+  // The scope and If-None-Match of the request in flight.
+  std::vector<Selection> requestedScope_;
+  bool conditional_ = false;
   std::uint32_t generation_ = 1;
   std::uint32_t now_ = 0;
   std::uint32_t nextPoll_ = 0;
@@ -80,6 +93,7 @@ class Controller {
   void state(Connection connection, const std::string& message);
   void needCloud();
   void accept(CloudResult& result);
+  void online();
   void failure(const CloudResult& result, bool validating);
 };
 

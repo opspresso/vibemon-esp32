@@ -305,6 +305,89 @@ int main() {
       const auto requests = cloud.requests.size();
       app.tick(first + 5 + Updater::RetryDelayMs + PollIntervalMs); CHECK(cloud.requests.size() == requests + 1);
     }
-    std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery, timer rollover and firmware updates\n";
+    {
+      // A 304 for the request that returned the displayed catalog keeps it and
+      // re-anchors its report clock at X-Server-Time.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      const std::int64_t t0 = 1790000000000;
+      const std::vector<Selection> panels{{ItemKind::Resource, "one"}, {ItemKind::Account, "codex:work"}};
+      app.begin(0); wifi.connected(); app.tick(1);
+      CHECK(cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"all-1\"", t0); app.tick(2);
+      // The first defaults change the query, so the full read's ETag is not sent.
+      app.tick(2 + PollIntervalMs);
+      CHECK(cloud.requests.back().scope == panels && cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"panels-1\"", t0 + 10000); app.tick(3 + PollIntervalMs);
+      app.tick(3 + 2 * PollIntervalMs);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().ifNoneMatch == "W/\"panels-1\"");
+      const auto revision = app.workspace().revision;
+      cloud.unchanged(t0 + 25000); app.tick(4 + 2 * PollIntervalMs);
+      CHECK(app.workspace().connection == Connection::Online && app.workspace().catalog.items.size() == 2);
+      CHECK(app.snapshotAgeMs(4 + 2 * PollIntervalMs) == 15000 && app.workspace().revision != revision);
+      // A server clock behind the cached reply does not make reports younger than it.
+      app.tick(4 + 3 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch == "W/\"panels-1\"");
+      cloud.unchanged(t0); app.tick(5 + 3 * PollIntervalMs);
+      CHECK(app.snapshotAgeMs(5 + 3 * PollIntervalMs) == 0);
+      // Query switch: the picker reads every item without the panel ETag, and
+      // returning to the panels starts unconditionally again.
+      app.browse(true); app.tick(5 + 4 * PollIntervalMs);
+      CHECK(cloud.requests.back().scope.empty() && cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"all-2\"", t0 + 40000); app.tick(6 + 4 * PollIntervalMs);
+      app.tick(6 + 5 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch == "W/\"all-2\"");
+      cloud.unchanged(t0 + 50000); app.tick(7 + 5 * PollIntervalMs);
+      CHECK(app.workspace().catalogComplete && app.snapshotAgeMs(7 + 5 * PollIntervalMs) == 10000);
+      app.browse(false); app.tick(7 + 6 * PollIntervalMs);
+      CHECK(cloud.requests.back().scope == panels && cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"panels-2\"", t0 + 60000); app.tick(8 + 6 * PollIntervalMs);
+      // A reply without an ETag makes the next request unconditional.
+      app.tick(8 + 7 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch == "W/\"panels-2\"");
+      cloud.complete(catalog()); app.tick(9 + 7 * PollIntervalMs);
+      app.tick(9 + 8 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"panels-3\"", t0 + 80000); app.tick(10 + 8 * PollIntervalMs);
+      // A new connection generation drops the ETag, even for the same server and key.
+      CHECK(app.saveCloud("https://vibemon.io", "").ok);
+      app.tick(11 + 8 * PollIntervalMs);
+      CHECK(cloud.requests.back().scope.empty() && cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"all-3\"", t0 + 90000); app.tick(12 + 8 * PollIntervalMs);
+      app.tick(12 + 9 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch.empty());
+      cloud.tagged(catalog(), "W/\"panels-4\"", t0 + 100000); app.tick(13 + 9 * PollIntervalMs);
+      // A failed decode drops the ETag; a network failure keeps it.
+      app.tick(13 + 10 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch == "W/\"panels-4\"");
+      cloud.complete({}, CloudError::Network); app.tick(14 + 10 * PollIntervalMs);
+      app.refresh(); app.tick(15 + 10 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch == "W/\"panels-4\"");
+      cloud.complete({}, CloudError::InvalidResponse, "A source contains invalid timestamps."); app.tick(16 + 10 * PollIntervalMs);
+      CHECK(app.workspace().catalog.items.size() == 2);
+      app.refresh(); app.tick(17 + 10 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch.empty());
+      // A 304 for an unconditional request has no matching cached reply.
+      cloud.unchanged(t0 + 120000); app.tick(18 + 10 * PollIntervalMs);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable && app.workspace().catalog.items.size() == 2);
+      CHECK(app.workspace().message == "The server returned an invalid workspace. It reported no change without a matching earlier reply.");
+      app.refresh(); app.tick(19 + 10 * PollIntervalMs); CHECK(cloud.requests.back().ifNoneMatch.empty());
+    }
+    {
+      // A 304 without a cached reply in the controller is rejected even before any snapshot.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.unchanged(1790000000000); app.tick(2);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable && !app.workspace().hasSnapshot);
+    }
+    CHECK(entityTag("W/\"abc-123\"") == "W/\"abc-123\"" && entityTag(" \"strong\" ") == "\"strong\"" && entityTag("\"\"") == "\"\"");
+    CHECK(entityTag("").empty() && entityTag("abc").empty() && entityTag("W/abc").empty() && entityTag("\"a\"b\"").empty());
+    CHECK(entityTag("\"a b\"").empty() && entityTag("\"a\r\nX: y\"").empty() && entityTag("W/\"" + std::string(MaxEntityTagBytes, 'a') + "\"").empty());
+    {
+      CloudResult result;
+      notModifiedResult(true, "2026-10-11T10:00:05.000Z", result);
+      CHECK(result.error == CloudError::None && result.notModified && result.serverTimeMs == *utcMilliseconds("2026-10-11T10:00:05.000Z"));
+      CloudResult missing;
+      notModifiedResult(true, "", missing);
+      CHECK(missing.error == CloudError::InvalidResponse && !missing.notModified && !missing.detail.empty());
+      CloudResult malformed;
+      notModifiedResult(true, "Sun, 11 Oct 2026 10:00:05 GMT", malformed);
+      CHECK(malformed.error == CloudError::InvalidResponse && !malformed.notModified);
+      CloudResult unconditional;
+      notModifiedResult(false, "2026-10-11T10:00:05.000Z", unconditional);
+      CHECK(unconditional.error == CloudError::InvalidResponse && !unconditional.notModified);
+    }
+    std::cout << "PASS controller: setup, verified persistence, four-panel restore, polling, clock gate, stale replies, account isolation, rejected tokens, offline recovery, timer rollover, conditional polling and firmware updates\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

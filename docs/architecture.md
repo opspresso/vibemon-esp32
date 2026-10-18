@@ -22,7 +22,7 @@ Domain types have no Arduino or LVGL dependency. The controller owns connection 
 
 To update the contract, run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Add `--app-dir ../vibemon-app` to read that exact commit locally. Never edit files in `contracts/`; change their App source and sync. Native and firmware builds verify the pinned snapshot without requiring App or Web access.
 
-The worker passes owned results through a one-entry queue. It never calls LVGL. The UI task applies complete snapshots and updates changed labels/bars. A picker retains its position while background readings change; explicit refresh rebuilds its list. Settings input is not rebuilt by polling.
+The controller also owns conditional polling. It stores the displayed catalog's `ETag`, `serverTime` and request key, and passes the tag in the next request only for the same key. The worker sends `If-None-Match`, collects `ETag`, `X-Server-Time` and `Retry-After`, and passes a 304 back as a "not modified" result; `src/adapters/cloud_http` validates those header values. The worker passes owned results through a one-entry queue. It never calls LVGL. The UI task applies complete snapshots and updates changed labels/bars. A picker retains its position while background readings change; explicit refresh rebuilds its list. Settings input is not rebuilt by polling.
 
 Touch uses the dark variant of App's pinned product palette. `tools/generate_contract.py` produces the C++ colors directly from `contracts/tokens.css`; native tests check text contrast after RGB565 quantization. Populated cards open scrollable details with all metrics and reporting projects. Long names and units wrap, while updates reuse the existing rows and preserve scroll position. **Change item** opens the panel selector; empty cards open it directly.
 
@@ -57,6 +57,7 @@ Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs addre
 - Credential and HTTPS-origin validation, Unicode, timestamps and malformed JSON.
 - Custom metric order, missing values, multiple accounts and stale reports.
 - Verified saves, rejected keys, delayed replies, account changes, offline retention and timer rollover.
+- Conditional polling: 304 reuse and clock re-anchoring, query and generation changes, and 304 replies without a cached reply or `X-Server-Time`.
 - Four touch cards, category selection, setup forms, actual keyboard input and masking.
 - Long Korean names, 32 metrics, complete values and units, touch scrolling, per-project states and scroll retention during a reading update.
 - Bounded animation redraw regions, stable touch targets, Unicode category separators, and zero idle redraws after activity stops.

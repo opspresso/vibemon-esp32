@@ -207,6 +207,6 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
     return a.name == b.name ? a.selection.id < b.selection.id : a.name < b.name;
   });
   output = std::move(candidate);
-  return {true, false, {}};
+  return {true, false, {}, *now};
 }
 }  // namespace vibemon

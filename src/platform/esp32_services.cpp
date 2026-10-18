@@ -97,6 +97,7 @@ struct CloudJob {
   std::string origin;
   std::string token;
   std::string path;
+  std::string ifNoneMatch;
   ~CloudJob() { wipe(token); }
 };
 
@@ -107,8 +108,8 @@ class CloudSession {
   CloudSession() {
     http_.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
     http_.setReuse(true);
-    const char* collected[] = {"Retry-After"};
-    http_.collectHeaders(collected, 1);
+    const char* collected[] = {"Retry-After", "ETag", "X-Server-Time"};
+    http_.collectHeaders(collected, 3);
   }
   // Frees the TLS session's internal-RAM buffers. The next request starts a
   // new client, so its error state cannot describe an earlier connection.
@@ -155,7 +156,13 @@ class CloudSession {
     http_.addHeader("Authorization", authorization);
     wipe(authorization.begin(), authorization.length());
     http_.addHeader("Accept", "application/json");
+    if (!job.ifNoneMatch.empty()) http_.addHeader("If-None-Match", job.ifNoneMatch.c_str());
     const int status = http_.GET();
+    if (status == 304) {
+      notModifiedResult(!job.ifNoneMatch.empty(), http_.header("X-Server-Time").c_str(), *result);
+      http_.end();
+      return result;
+    }
     if (status != 200) {
       if (status > 0) {
         result->error = cloudStatusError(status);
@@ -167,6 +174,7 @@ class CloudSession {
       http_.end();
       return result;
     }
+    result->etag = entityTag(http_.header("ETag").c_str());
     const int expected = http_.getSize();
     if (expected > static_cast<int>(MaxResponseBytes)) { result->error = CloudError::TooLarge; http_.end(); return result; }
     ResponseBuffer body(expected >= 0 ? static_cast<std::size_t>(expected) : MaxResponseBytes);
@@ -181,7 +189,9 @@ class CloudSession {
     if (!decoded.ok) {
       result->error = decoded.exceedsLimit ? CloudError::TooLarge : CloudError::InvalidResponse;
       result->detail = decoded.message;
+      result->etag.clear();
     }
+    result->serverTimeMs = decoded.serverTimeMs;
     return result;
   }
 };
@@ -305,7 +315,7 @@ bool EspCloud::start(const CloudRequest& request) {
   bool expected = false;
   if (!busy_.compare_exchange_strong(expected, true)) return false;
   // The queue holds only a pointer, so the token exists in one wiped copy.
-  auto* job = new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope)};
+  auto* job = new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope), request.ifNoneMatch};
   if (xQueueSend(jobs_, &job, 0) == pdTRUE) return true;
   delete job;
   busy_ = false;

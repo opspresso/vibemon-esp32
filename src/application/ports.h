@@ -38,6 +38,8 @@ struct CloudRequest {
   std::string token;
   // Sources and accounts to read. Empty reads every source.
   std::vector<Selection> scope;
+  // Sent as If-None-Match. Empty sends an unconditional request.
+  std::string ifNoneMatch;
 };
 enum class CloudError { None, Unauthorized, Forbidden, Network, Tls, InvalidResponse, TooLarge, Memory, Server, RateLimited, Redirected };
 struct CloudResult {
@@ -48,6 +50,12 @@ struct CloudResult {
   std::string detail;
   // The server's requested delay before the next request. 0 when it gave none.
   std::uint32_t retryAfterMs = 0;
+  // HTTP 304: no requested source changed since `ifNoneMatch`. `catalog` is empty.
+  bool notModified = false;
+  // The ETag of a 200 response. Empty when the header is missing or invalid.
+  std::string etag;
+  // `serverTime` of a 200 body or `X-Server-Time` of a 304, in UTC milliseconds.
+  std::int64_t serverTimeMs = 0;
 };
 class CloudPort {
  public:
