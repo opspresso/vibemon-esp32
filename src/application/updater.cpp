@@ -1,10 +1,7 @@
 #include "updater.h"
+#include "../domain/clock.h"
 
 namespace vibemon {
-namespace {
-bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
-}  // namespace
-
 void Updater::confirm() {
   if (confirmed_) return;
   port_.confirm();

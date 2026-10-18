@@ -1,13 +1,10 @@
 #include "controller.h"
+#include "../domain/clock.h"
 
 #include <algorithm>
 #include <utility>
 
 namespace vibemon {
-namespace {
-bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
-}  // namespace
-
 Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version)
     : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)) {}
 

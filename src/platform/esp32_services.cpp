@@ -4,6 +4,7 @@
 #include "../adapters/catalog_json.h"
 #include "../adapters/cloud_http.h"
 #include "../adapters/settings_json.h"
+#include "../domain/clock.h"
 
 #include <Preferences.h>
 #include <algorithm>
@@ -24,7 +25,6 @@ constexpr std::uint32_t RequestBudgetMs = 15000;
 constexpr std::uint32_t IdleSessionMs = 15000;
 constexpr std::size_t InitialBodyBytes = 16 * 1024;
 constexpr std::size_t JsonBudgetBytes = 512 * 1024;
-bool due(std::uint32_t now, std::uint32_t deadline) { return static_cast<std::int32_t>(now - deadline) >= 0; }
 
 class PsramJsonAllocator final : public ArduinoJson::Allocator {
   struct alignas(std::max_align_t) Header { std::size_t size; };
