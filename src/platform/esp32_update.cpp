@@ -1,5 +1,6 @@
 #include "esp32_update.h"
 #include "https.h"
+#include "response_buffer.h"
 #include "../adapters/release_json.h"
 
 #include <Arduino.h>
@@ -110,10 +111,15 @@ std::unique_ptr<UpdateResult> EspUpdate::fetchRelease() {
     result->error = status == 404 || (status > 0 && status < 500) ? UpdateError::InvalidRelease : UpdateError::Network;
     return result;
   }
-  if (http.getSize() > static_cast<int>(MaxReleaseBytes)) { http.end(); result->error = UpdateError::InvalidRelease; return result; }
-  const String body = http.getString();
+  const int expected = http.getSize();
+  if (expected > static_cast<int>(MaxReleaseBytes)) { http.end(); result->error = UpdateError::InvalidRelease; return result; }
+  ResponseBuffer body(expected >= 0 ? static_cast<std::size_t>(expected) : MaxReleaseBytes);
+  const int read = http.writeToStream(&body);
   http.end();
-  if (!decodeRelease({body.c_str(), body.length()}, result->release)) result->error = UpdateError::InvalidRelease;
+  if (body.oversized()) result->error = UpdateError::InvalidRelease;
+  else if (body.outOfMemory()) result->error = UpdateError::Storage;
+  else if (body.timedOut() || read < 0 || (expected >= 0 && read != expected)) result->error = UpdateError::Network;
+  else if (!decodeRelease(body.body(), result->release)) result->error = UpdateError::InvalidRelease;
   return result;
 }
 
