@@ -1,9 +1,8 @@
 #include "esp32_update.h"
+#include "https.h"
 #include "../adapters/release_json.h"
 
 #include <Arduino.h>
-#include <HTTPClient.h>
-#include <NetworkClientSecure.h>
 #include <WiFi.h>
 #include <esp_ota_ops.h>
 #include <esp_heap_caps.h>
@@ -21,10 +20,7 @@ constexpr std::uint32_t StallLimitMs = 20000;
 
 // GitHub release assets redirect to a separate download host.
 void prepare(HTTPClient& http, NetworkClientSecure& client) {
-  client.useBuiltinCACertBundle();
-  client.setHandshakeTimeout(8);
-  http.setConnectTimeout(4000);
-  http.setTimeout(8000);
+  prepareHttps(client, http, 8000);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setRedirectLimit(3);
 }
