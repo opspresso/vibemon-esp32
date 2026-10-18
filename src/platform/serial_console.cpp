@@ -42,7 +42,7 @@ void SerialConsole::command() {
       response["psramFree"] = ESP.getFreePsram();
       response["connection"] = static_cast<int>(workspace.connection);
       response["message"] = workspace.message;
-      response["page"] = static_cast<int>(ui_.page());
+      response["page"] = screen_.page();
       response["items"] = workspace.catalog.items.size();
       response["hasSnapshot"] = workspace.hasSnapshot;
       response["tokenConfigured"] = workspace.tokenConfigured;
@@ -68,11 +68,11 @@ void SerialConsole::command() {
         const auto result = name == "configure-wifi" ? controller_.saveWifi(request[first].as<std::string>(), request[secret].as<std::string>()) :
             controller_.saveCloud(request[first].as<std::string>(), request[secret].as<std::string>());
         response["ok"] = result.ok;
-        if (result.ok) { response["queued"] = true; ui_.dashboard(); }
+        if (result.ok) { response["queued"] = true; screen_.showDashboard(); }
         else response["error"] = result.message;
       }
     } else if (name == "dashboard") {
-      ui_.dashboard(); response["ok"] = true;
+      screen_.showDashboard(); response["ok"] = true;
     } else if (name == "refresh") {
       controller_.refresh(); response["ok"] = true;
     } else if (name == "update-check") {

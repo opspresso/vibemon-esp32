@@ -24,7 +24,7 @@ vibemon::EspCloud cloud;
 vibemon::EspUpdate update;
 vibemon::Controller controller(settings, wifi, cloud, update, VIBEMON_VERSION);
 vibemon::DashboardUi ui(controller);
-vibemon::SerialConsole console(controller, ui, display, update);
+vibemon::SerialConsole console(controller, {[] { return static_cast<int>(ui.page()); }, [] { ui.dashboard(); }}, display, update);
 bool ready = false;
 }
 
