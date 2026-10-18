@@ -93,7 +93,7 @@ Catalog demo() {
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
   agent.projects = {agent, review};
-  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}};
+  agent.metrics = {{"context", "Context", "%", 42, MetricDisplay::Bar, 0, 100, {}}, {"session", "Session", "%", {}, MetricDisplay::Bar, 0, 100, 125}, {"week", "Weekly", "%", 100, MetricDisplay::Bar, 0, 100, 1439}, {"usageWeekModel", "Weekly Opus", "%", 37, MetricDisplay::Bar, 0, 100, 2880}};
   value.items.push_back(agent);
   return value;
 }
@@ -252,6 +252,7 @@ int main() {
       list = ui.widget("detail-list");
       CHECK(findText(list, "web-console") && findText(list, "release-review"));
       CHECK(findText(list, "Working") && findText(list, "Needs input"));
+      CHECK(findText(list, "Weekly Opus") && findText(list, "37% · Resets in 2d"));
       screenshot("account-details");
       lv_obj_scroll_to_view_recursive(findText(list, "Needs input"), LV_ANIM_OFF); advance(ui);
       screenshot("account-details-end");

@@ -79,6 +79,24 @@ bool resetMinutes(JsonVariantConst raw, std::optional<std::uint64_t>& out) {
   return true;
 }
 
+// Weekly usage of one model family, such as Opus. App and Web show it after the
+// account's weekly limit when the newest project reports it.
+bool modelUsage(JsonVariantConst agent, Monitor& monitor) {
+  Metric metric;
+  std::string model;
+  if (!numeric(agent["usageWeekModel"], metric.value) || (metric.value && (*metric.value < 0 || *metric.value > 100)) ||
+      (!agent["usageWeekModelLabel"].isNull() && !text(agent["usageWeekModelLabel"], model, 64, true)) ||
+      !resetMinutes(agent["usageWeekModelResetsIn"], metric.resetMinutes)) return false;
+  if (!metric.value) return true;
+  metric.key = "usageWeekModel";
+  metric.label = model.empty() ? "Weekly model" : "Weekly " + model;
+  metric.unit = "%";
+  metric.display = MetricDisplay::Bar;
+  metric.maximum = 100;
+  monitor.metrics.push_back(std::move(metric));
+  return true;
+}
+
 bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& monitor) {
   const auto values = source["metrics"].as<JsonObjectConst>();
   if (values.isNull()) return false;
@@ -99,7 +117,7 @@ bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& mon
     if (preset.reset && !resetMinutes(source["agent"][preset.reset], metric.resetMinutes)) return false;
     monitor.metrics.push_back(std::move(metric));
   }
-  return true;
+  return kind != "agent" || modelUsage(source["agent"], monitor);
 }
 
 std::uint32_t age(std::int64_t now, std::int64_t then) {
@@ -118,6 +136,7 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
   fields["agent"]["project"] = true;
   fields["agent"]["usage5hResetsIn"] = true;
   fields["agent"]["usageWeekResetsIn"] = true;
+  for (const char* name : {"usageWeekModel", "usageWeekModelResetsIn", "usageWeekModelLabel"}) fields["agent"][name] = true;
   JsonDocument document = allocator ? JsonDocument(allocator) : JsonDocument();
   const auto error = deserializeJson(document, body.data(), body.size(), DeserializationOption::Filter(filter), DeserializationOption::NestingLimit(12));
   if (error == DeserializationError::NoMemory) return {false, true, "The response exceeds the device's JSON memory budget."};
