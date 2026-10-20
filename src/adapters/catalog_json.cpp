@@ -174,7 +174,7 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
           !text(source["account"]["displayName"], item.name, 512) || !validAccountId(provider + ":" + accountId) ||
           !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return invalid("A coding account contains invalid fields.");
       item.selection = {ItemKind::Account, provider + ":" + accountId};
-      item.category = provider + " · " + accountId;
+      item.category = providerLabel(provider) + " · " + accountName(item.selection.id);
       item.projects.push_back(item);
       if (!presetMetrics(source, kind, item)) return invalid("A coding account contains invalid measurements.");
       auto previous = accounts.find(item.selection.id);

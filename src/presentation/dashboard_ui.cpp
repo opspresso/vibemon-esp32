@@ -610,7 +610,9 @@ void DashboardUi::updatePicker() {
     auto* name = label(row, item.name, 14, 11, 386, fonts_.normal());
     wrap(name); lv_obj_update_layout(name);
     const int detailY = 19 + lv_obj_get_height(name);
-    auto* detail = label(row, item.category + " · " + item.selection.id, 14, detailY, 396, fonts_.small(), Muted);
+    // An account category already names its compact account; resources add their source ID.
+    const auto detailText = item.selection.kind == ItemKind::Account ? item.category : item.category + " · " + item.selection.id;
+    auto* detail = label(row, detailText, 14, detailY, 396, fonts_.small(), Muted);
     wrap(detail); lv_obj_update_layout(detail);
     const int height = std::max(68, detailY + static_cast<int>(lv_obj_get_height(detail)) + 12);
     lv_obj_set_height(row, height);

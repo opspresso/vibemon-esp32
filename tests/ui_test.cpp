@@ -88,7 +88,7 @@ Catalog demo() {
     value.items.push_back(item);
   }
   Monitor agent;
-  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "codex · work";
+  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "Codex · work";
   agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working";
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
@@ -157,6 +157,7 @@ int main() {
       tap(ui, "panel-3"); CHECK(ui.page() == Page::Details); screenshot("resource-details");
       tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      CHECK(findText(ui.widget("item-0"), "Codex · work")); screenshot("picker-accounts");
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
       // Plan usage at its limit fills in danger; context is not plan usage and keeps the accent.

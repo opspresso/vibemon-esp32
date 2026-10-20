@@ -58,6 +58,14 @@ int main() {
     CHECK(*utcMilliseconds("2026-10-11T00:00:01.123Z") - *utcMilliseconds("2026-10-11T00:00:00.000Z") == 1123);
     CHECK(validAccountId("codex:work"));
     CHECK(!validAccountId("Codex:work"));
+    // Same vectors as App's shared accountName tests.
+    for (const char* kind : {"auto", "profile", "credential"}) CHECK(accountName(std::string("codex:") + kind + ":27e702a8" + std::string(56, 'a')) == "27e702a8");
+    CHECK(accountName("claude:work") == "work" && accountName("codex:default") == "default");
+    CHECK(accountName("claude:auto:manual-name") == "auto:manual-name");
+    CHECK(accountName("claude:auto:27E702A8" + std::string(56, 'a')) == "auto:27E702A8aa\u2026aaaaaa");
+    std::string longName; for (int i = 0; i < 20; ++i) longName += "long";
+    CHECK(accountName("codex:" + longName) == "longlonglonglon\u2026nglong");
+    CHECK(providerLabel("claude") == "Claude Code" && providerLabel("future") == "future");
     Catalog catalog;
     CHECK(decodeCatalog(sample(), catalog).ok);
     CHECK(catalog.items.size() == 3);
@@ -68,6 +76,7 @@ int main() {
     const auto* account = catalog.find({ItemKind::Account, "codex:work"});
     CHECK(account && account->project == "api" && account->projects.size() == 2 && account->metrics[0].value == 43);
     CHECK(account->projects[0].project == "api" && account->projects[1].project == "web");
+    CHECK(account->category == "Codex · work");
     CHECK(account->metrics[1].value == 0);
     CHECK(account->metrics.size() == 4 && account->metrics[3].key == "usageWeekModel" && account->metrics[3].label == "Weekly Opus");
     CHECK(account->metrics[3].value == 31.5 && account->metrics[3].resetMinutes == 90u && account->metrics[3].display == MetricDisplay::Bar);
