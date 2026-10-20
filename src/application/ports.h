@@ -81,7 +81,8 @@ class UpdatePort {
   virtual std::uint8_t progress() const = 0;  // 0-100 while an install runs
   // Keeps the running image. Without this call, the bootloader returns to the
   // previous image on the next restart.
-  virtual void confirm() = 0;
+  // False only when a trial image cannot store its confirmation.
+  virtual bool confirm() = 0;
   virtual void restart() = 0;
 };
 

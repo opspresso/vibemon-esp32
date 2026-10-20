@@ -11,6 +11,11 @@ int main() {
     CHECK(decodeSettings(encodeSettings(store.saved), recovered));
     CHECK(recovered.ssid == store.saved.ssid && recovered.wifiPassword == store.saved.wifiPassword);
     CHECK(recovered.readToken == store.saved.readToken && recovered.origin == store.saved.origin && recovered.panels == store.saved.panels && recovered.panelsInitialized);
+    // Existing NVS settings keep credentials and selections when the default port is normalized.
+    auto legacy = encodeSettings(store.saved);
+    legacy.replace(legacy.find("https://vibemon.io"), std::string("https://vibemon.io").size(), "https://vibemon.io:00443");
+    CHECK(decodeSettings(legacy, recovered) && recovered.origin == "https://vibemon.io");
+    CHECK(recovered.readToken == store.saved.readToken && recovered.wifiPassword == store.saved.wifiPassword && recovered.panels == store.saved.panels);
     for (const char* invalid : {"", "{}", "null", "[]", "{\"version\":2}", "not json"}) {
       CHECK(!decodeSettings(invalid, recovered));
       CHECK(recovered.readToken == store.saved.readToken);

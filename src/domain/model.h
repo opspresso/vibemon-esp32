@@ -93,6 +93,10 @@ Validation validateToken(const std::string& token);
 bool validConfig(const Config& config);
 bool validSourceId(const std::string& id);
 bool validAccountId(const std::string& id);
+// Compact account labels from App's shared presentation; the full account key
+// stays the selection identity. Generated keys show their first eight hex digits.
+std::string accountName(const std::string& accountKey);
+std::string providerLabel(const std::string& provider);
 bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = false);
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
 bool stale(const ReportState& item, std::uint64_t elapsedMs);

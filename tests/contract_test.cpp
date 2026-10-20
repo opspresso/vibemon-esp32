@@ -56,6 +56,8 @@ int main(int argc, char** argv) {
       std::string body; serializeJson(response, body);
       Catalog catalog;
       CHECK(decodeCatalog(body, catalog).ok);
+      // Iterating only decoded items would accept a decoder that silently dropped an expected account.
+      CHECK(catalog.items.size() == fixture["expected"]["accounts"].size() + fixture["expected"]["resources"].size());
       const auto elapsed = fixture["elapsedMs"].as<std::uint32_t>();
       for (const auto& item : catalog.items) {
         const auto expected = fixture["expected"][item.selection.kind == ItemKind::Account ? "accounts" : "resources"][item.selection.id];

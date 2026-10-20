@@ -88,7 +88,7 @@ Catalog demo() {
     value.items.push_back(item);
   }
   Monitor agent;
-  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "codex · work";
+  agent.selection = {ItemKind::Account, "codex:work"}; agent.name = "Work account"; agent.category = "Codex · work";
   agent.health = Health::Ok; agent.ageMs = 1000; agent.activity = "working";
   agent.sourceId = "current"; agent.project = "web-console";
   auto review = static_cast<ReportState>(agent); review.sourceId = "review"; review.project = "release-review"; review.activity = "notification";
@@ -113,6 +113,21 @@ int main() {
     });
     pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(pointer, [](lv_indev_t*, lv_indev_data_t* data) { data->point = position; data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED; });
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; update.confirmationOk = false;
+      Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); tap(ui, "settings");
+      CHECK(app.workspace().firmware.confirmationFailed && update.confirms == 1);
+      CHECK(findText(lv_screen_active(), "Confirm failed · tap to retry"));
+      CHECK(lv_color_eq(lv_obj_get_style_text_color(ui.widget("firmware-status"), LV_PART_MAIN), lv_color_hex(design::Warning)));
+      screenshot("firmware-confirmation-failed");
+      update.confirmationOk = true; tap(ui, "firmware"); app.tick(++timeMs);
+      update.complete(firmwareRelease("3.6.1")); app.tick(++timeMs); advance(ui);
+      CHECK(!app.workspace().firmware.confirmationFailed && update.confirms == 2);
+      CHECK(findText(lv_screen_active(), "Up to date"));
+      CHECK(lv_color_eq(lv_obj_get_style_text_color(ui.widget("firmware-status"), LV_PART_MAIN), lv_color_hex(design::Muted)));
+    }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0); wifi.connected(); app.tick(1); cloud.complete(demo()); app.tick(2);
@@ -142,6 +157,7 @@ int main() {
       tap(ui, "panel-3"); CHECK(ui.page() == Page::Details); screenshot("resource-details");
       tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
       tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      CHECK(findText(ui.widget("item-0"), "Codex · work")); screenshot("picker-accounts");
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
       // Plan usage at its limit fills in danger; context is not plan usage and keeps the accent.
@@ -296,6 +312,25 @@ int main() {
       CHECK(ui.widget("item-3") && ui.page() == Page::Picker);
       tap(ui, "back"); app.tick(timeMs + PollIntervalMs);
       CHECK(cloud.requests.size() == 4 && cloud.requests.back().scope.size() == 1);
+    }
+    {
+      // Opening an empty panel refreshes a complete catalog retained while polling was paused.
+      Store store; configured(store); store.saved.panelsInitialized = true;
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(timeMs); wifi.connected(); app.tick(++timeMs);
+      auto old = catalog(); old.items.resize(1); cloud.complete(old); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui);
+      tap(ui, "panel-0"); CHECK(ui.page() == Page::Picker && ui.widget("item-0") && !ui.widget("item-1"));
+      app.tick(++timeMs); CHECK(cloud.requests.size() == 2);
+      cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-3"));
+      tap(ui, "refresh-list"); app.tick(++timeMs);
+      cloud.complete({}, CloudError::Network); app.tick(++timeMs); advance(ui, 300);
+      CHECK(findText(lv_screen_active(), app.workspace().message)); screenshot("picker-refresh-error");
+      auto refreshed = demo(); auto extra = refreshed.items.front(); extra.selection.id = "new"; extra.name = "New resource"; refreshed.items.push_back(extra);
+      app.refresh(); app.tick(++timeMs); cloud.complete(refreshed); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.widget("item-4") && !findText(lv_screen_active(), "Could not reach the server. Your last readings are shown."));
+      screenshot("picker-refreshed");
     }
     {
       // The first workspace setup shows the server's failure, not the setup prompt again.

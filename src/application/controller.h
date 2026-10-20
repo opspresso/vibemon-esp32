@@ -1,6 +1,7 @@
 #pragma once
 
 #include "updater.h"
+#include <map>
 
 namespace vibemon {
 
@@ -16,6 +17,8 @@ struct Workspace {
   bool hasSnapshot = false;
   // False while the catalog holds only the selected panels' items.
   bool catalogComplete = false;
+  // Changes only when a complete HTTP response accepts or revalidates the catalog.
+  std::uint32_t catalogRevision = 0;
   std::uint32_t revision = 0;
   std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};
@@ -71,7 +74,8 @@ class Controller {
   std::optional<WifiCredentials> pendingWifi_;
   std::optional<CloudCredentials> pendingCloud_;
   std::optional<Validator> validator_;
-  // The scope and If-None-Match of the request in flight.
+  // The origin, scope and If-None-Match of the request in flight.
+  std::string requestedOrigin_;
   std::vector<Selection> requestedScope_;
   bool conditional_ = false;
   std::uint32_t generation_ = 1;
@@ -79,17 +83,20 @@ class Controller {
   std::uint32_t nextPoll_ = 0;
   std::uint32_t clockStartedAt_ = 0;
   unsigned failures_ = 0;
-  // The earliest request time that the server's last Retry-After allows.
-  std::optional<std::uint32_t> retryAfter_;
+  // Keep each server's delay while another workspace is checked or restored.
+  std::map<std::string, std::uint32_t> retryAfter_;
   bool inFlight_ = false;
-  bool tokenRejected_ = false;
+  // Rejection of the saved credential; candidate checks do not replace it.
+  std::optional<CloudError> tokenRejected_;
   bool storageBlocked_ = false;
   bool hadConnection_ = false;
   bool browsing_ = false;
   bool requestedAll_ = true;
+  bool refreshRequested_ = false;
   void updateConfigView();
   std::vector<Selection> requestScope() const;
-  bool retryAfterPending();
+  std::optional<std::uint32_t> retryAfter();
+  std::unique_ptr<CloudResult> takeCloudResult();
   void state(Connection connection, const std::string& message);
   void needCloud();
   void accept(CloudResult& result);

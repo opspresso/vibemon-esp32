@@ -4,6 +4,143 @@
 int main() {
   try {
     {
+      Update update; update.confirmationOk = false;
+      Updater updater(update, "3.6.1");
+      CHECK(updater.tick(1, true, true) && updater.view().confirmationFailed && update.confirms == 1);
+      for (std::uint32_t now = 2; now < Updater::FirstCheckDelayMs; ++now) updater.tick(now, true, true);
+      CHECK(update.confirms == 1);  // A storage failure must not write flash on every UI tick.
+      updater.tick(Updater::FirstCheckDelayMs + 1, true, true);
+      update.complete(firmwareRelease("3.6.2")); updater.tick(Updater::FirstCheckDelayMs + 2, true, true);
+      CHECK(updater.view().confirmationFailed && update.installs.empty());
+      update.confirmationOk = true; updater.checkNow();
+      updater.tick(Updater::FirstCheckDelayMs + 3, true, true);
+      CHECK(!updater.view().confirmationFailed && update.confirms == 3);
+      update.complete(firmwareRelease("3.6.2")); updater.tick(Updater::FirstCheckDelayMs + 4, true, true);
+      CHECK(update.installs.size() == 1 && update.confirms == 3);
+    }
+    for (const auto error : {CloudError::Unauthorized, CloudError::Forbidden}) {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete({}, error); app.tick(2);
+      const auto reason = app.workspace().message;
+      wifi.current.link = WifiLink::Failed; app.tick(3);
+      wifi.connected("Workshop", false); app.tick(4); wifi.connected(); app.tick(5);
+      CHECK(app.workspace().connection == Connection::TokenRejected && app.workspace().message == reason);
+      CHECK(cloud.requests.size() == 1);
+      // A replacement may be checked, but cancelling it does not revive the rejected saved key.
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(6); CHECK(cloud.requests.size() == 2);
+      app.cancelSetup(); cloud.complete(catalog()); app.tick(7);
+      CHECK(app.workspace().connection == Connection::TokenRejected && cloud.requests.size() == 2);
+      app.refresh(); app.tick(8); CHECK(cloud.requests.size() == 3);
+      cloud.complete(catalog()); app.tick(9); CHECK(app.workspace().connection == Connection::Online);
+    }
+    {
+      // Cancelling a candidate restores even an intentionally empty saved workspace.
+      Store store; configured(store); store.saved.panelsInitialized = true;
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); app.cancelSetup(); cloud.complete(catalog("discarded")); app.tick(4);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(5);
+      CHECK(app.workspace().connection == Connection::Online && app.workspace().panels[0].id.empty());
+    }
+    {
+      // Empty initialized panels need no background data; explicit refresh and the picker still work.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      for (std::size_t panel = 0; panel < PanelCount; ++panel) CHECK(app.select(panel, {}).ok);
+      const auto requests = cloud.requests.size();
+      for (std::uint32_t now = 10002; now <= 60002; now += PollIntervalMs) {
+        app.tick(now);
+        if (cloud.busy) { cloud.complete(catalog()); app.tick(now + 1); }
+      }
+      std::cout << "Empty-panel requests over 60 seconds: " << cloud.requests.size() - requests << '\n';
+      CHECK(cloud.requests.size() == requests);
+      app.refresh(); app.tick(60004); CHECK(cloud.requests.size() == requests + 1 && cloud.requests.back().scope.empty());
+      // A failed check retries after its backoff instead of waiting for another refresh.
+      cloud.complete({}, CloudError::Network); app.tick(60005);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable);
+      app.tick(60005 + 2 * PollIntervalMs); CHECK(cloud.requests.size() == requests + 2);
+      cloud.complete(catalog()); app.tick(60006 + 2 * PollIntervalMs);
+      CHECK(app.workspace().connection == Connection::Online);
+      app.tick(70005); CHECK(cloud.requests.size() == requests + 2 && app.workspace().panels[0].id.empty());
+      wifi.current.link = WifiLink::Failed; app.tick(70006);
+      wifi.connected(); app.tick(70007);
+      CHECK(cloud.requests.size() == requests + 3);
+      cloud.complete(catalog()); app.tick(70008);
+      CHECK(app.workspace().connection == Connection::Online && app.workspace().panels[0].id.empty());
+      // A dormant poll deadline can be older than due()'s signed comparison range.
+      app.tick(30u * 86400000u);
+      app.browse(true); app.tick(30u * 86400000u + 1);
+      CHECK(cloud.requests.size() == requests + 4 && cloud.requests.back().scope.empty());
+      cloud.complete(catalog()); app.tick(30u * 86400000u + 2); app.browse(false);
+      CHECK(app.select(0, {ItemKind::Resource, "one"}).ok);
+      app.tick(30u * 86400000u + 3);
+      CHECK(cloud.requests.size() == requests + 5 && cloud.requests.back().scope == std::vector<Selection>({{ItemKind::Resource, "one"}}));
+    }
+    {
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      const auto savedPanels = store.saved.panels;
+      const auto writes = store.writes;
+      CHECK(app.saveCloud("HTTPS://VIBEMON.IO:00443/", "").ok);
+      app.tick(3); cloud.complete(catalog()); app.tick(4);
+      CHECK(store.saved.panels == savedPanels && store.writes == writes);
+    }
+    {
+      // A candidate server's rate limit does not delay the saved server.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      app.refresh(); app.tick(5);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(6);
+      // Restoring the saved server must not forget the candidate's delay.
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(7); CHECK(cloud.requests.size() == 3);
+      app.tick(120003); CHECK(cloud.requests.size() == 3);
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
+      // Trying and cancelling another server cannot bypass the saved server's delay.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1);
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); CHECK(cloud.requests.size() == 2);
+      app.cancelSetup(); cloud.complete(catalog()); app.tick(4);
+      CHECK(cloud.requests.size() == 2);
+      app.refresh(); app.tick(120001); CHECK(cloud.requests.size() == 2);
+      app.tick(120002); CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+    }
+    {
+      // A cancelled request still carries its server's delay, but cannot change the workspace.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); app.cancelSetup();
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      CHECK(cloud.requests.size() == 3 && cloud.requests.back().origin == "https://vibemon.io");
+      cloud.complete(catalog()); app.tick(5);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(6); CHECK(cloud.requests.size() == 3 && store.saved.origin == "https://vibemon.io");
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
+      // Losing Wi-Fi while a limited reply waits must not discard its server's delay.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
+      app.begin(0); wifi.connected(); app.tick(1); cloud.complete(catalog()); app.tick(2);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(3); wifi.current.link = WifiLink::Failed;
+      cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 120000; app.tick(4);
+      app.cancelSetup(); wifi.connected(); app.tick(5); cloud.complete(catalog()); app.tick(6);
+      CHECK(app.saveCloud("https://other.example", "vm_" + std::string(60, 'b')).ok);
+      app.tick(7); CHECK(cloud.requests.size() == 3);
+      app.tick(120004); CHECK(cloud.requests.size() == 4 && cloud.requests.back().origin == "https://other.example");
+    }
+    {
       Store store; Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(0);
       CHECK(app.workspace().connection == Connection::NeedWifi && wifi.scans == 1);

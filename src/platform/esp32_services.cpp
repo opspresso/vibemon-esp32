@@ -1,6 +1,7 @@
 #include "esp32_services.h"
 #include "https.h"
 #include "secrets.h"
+#include "response_buffer.h"
 #include "../adapters/catalog_json.h"
 #include "../adapters/cloud_http.h"
 #include "../adapters/settings_json.h"
@@ -8,7 +9,6 @@
 
 #include <Preferences.h>
 #include <algorithm>
-#include <cstring>
 #include <cstddef>
 #include <ctime>
 #include <esp_heap_caps.h>
@@ -19,11 +19,9 @@ namespace vibemon {
 namespace {
 constexpr std::uint32_t ConnectTimeoutMs = 20000;
 constexpr std::uint32_t ReconnectDelayMs = 30000;
-constexpr std::uint32_t RequestBudgetMs = 15000;
 // Release the idle TLS session when polling pauses, for example during a
 // firmware install or after a rejected token. Polls arrive every 10 seconds.
 constexpr std::uint32_t IdleSessionMs = 15000;
-constexpr std::size_t InitialBodyBytes = 16 * 1024;
 constexpr std::size_t JsonBudgetBytes = 512 * 1024;
 
 class PsramJsonAllocator final : public ArduinoJson::Allocator {
@@ -49,46 +47,6 @@ class PsramJsonAllocator final : public ArduinoJson::Allocator {
     auto* block = static_cast<Header*>(heap_caps_realloc(previous, sizeof(Header) + size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (!block) return nullptr;
     block->size = size; allocated_ = allocated_ - old + size; return block + 1;
-  }
-};
-
-// Collects one response body in PSRAM. A body without Content-Length grows the
-// buffer by doubling, up to the response limit.
-class ResponseBuffer final : public Stream {
- public:
-  explicit ResponseBuffer(std::size_t limit) : limit_(limit), startedAt_(millis()) {}
-  ~ResponseBuffer() override { heap_caps_free(data_); }
-  ResponseBuffer(const ResponseBuffer&) = delete;
-  ResponseBuffer& operator=(const ResponseBuffer&) = delete;
-  bool oversized() const { return oversized_; }
-  bool outOfMemory() const { return outOfMemory_; }
-  std::string_view body() const { return {data_, size_}; }
-  int available() override { return 0; }
-  int read() override { return -1; }
-  int peek() override { return -1; }
-  void flush() override {}
-  std::size_t write(std::uint8_t byte) override { return write(&byte, 1); }
-  std::size_t write(const std::uint8_t* data, std::size_t size) override {
-    if (size > limit_ - size_) { oversized_ = true; return 0; }
-    if (static_cast<std::uint32_t>(millis() - startedAt_) > RequestBudgetMs || !reserve(size_ + size)) return 0;
-    std::memcpy(data_ + size_, data, size); size_ += size; return size;
-  }
- private:
-  char* data_ = nullptr;
-  std::size_t limit_;
-  std::size_t capacity_ = 0;
-  std::size_t size_ = 0;
-  std::uint32_t startedAt_;
-  bool oversized_ = false;
-  bool outOfMemory_ = false;
-  bool reserve(std::size_t needed) {
-    if (needed <= capacity_) return true;
-    auto capacity = std::max(capacity_, std::min(limit_, InitialBodyBytes));
-    while (capacity < needed) capacity = std::min(limit_, capacity * 2);
-    auto* grown = static_cast<char*>(heap_caps_realloc(data_, capacity, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (!grown) { outOfMemory_ = true; return false; }
-    data_ = grown; capacity_ = capacity;
-    return true;
   }
 };
 
@@ -182,7 +140,7 @@ class CloudSession {
     http_.end();
     if (body.oversized()) result->error = CloudError::TooLarge;
     else if (body.outOfMemory()) result->error = CloudError::Memory;
-    else if (read < 0 || (expected >= 0 && read != expected)) result->error = CloudError::Network;
+    else if (body.timedOut() || read < 0 || (expected >= 0 && read != expected)) result->error = CloudError::Network;
     if (result->error != CloudError::None) return result;
     PsramJsonAllocator allocator;
     const auto decoded = decodeCatalog(body.body(), result->catalog, &allocator);

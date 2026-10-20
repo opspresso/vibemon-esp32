@@ -78,6 +78,7 @@ class DashboardUi {
   bool waitingWifi_ = false;
   bool waitingCloud_ = false;
   bool pendingPickerRefresh_ = false;
+  std::uint32_t pickerRevision_ = 0;
   bool lastScanning_ = false;
   void clear(Page page);
   void header(const std::string& title, std::function<void()> back);

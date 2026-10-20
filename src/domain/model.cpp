@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 
 namespace vibemon {
 namespace {
@@ -87,12 +88,17 @@ Validation normalizeOrigin(const std::string& input, std::string& output) {
       return {false, "Use a hostname without a path, query or sign-in details."};
     }
   }
+  value = "https://" + host;
   if (colon != std::string::npos) {
     const auto port = authority.substr(colon + 1);
-    if (port.empty() || port.size() > 5 || !std::all_of(port.begin(), port.end(), digit)) return {false, "Enter a valid HTTPS port."};
+    if (port.empty() || !std::all_of(port.begin(), port.end(), digit)) return {false, "Enter a valid HTTPS port."};
     unsigned valuePort = 0;
-    for (char c : port) valuePort = valuePort * 10 + static_cast<unsigned>(c - '0');
-    if (!valuePort || valuePort > 65535) return {false, "HTTPS port must be 1 to 65535."};
+    for (char c : port) {
+      valuePort = valuePort * 10 + static_cast<unsigned>(c - '0');
+      if (valuePort > 65535) return {false, "HTTPS port must be 1 to 65535."};
+    }
+    if (!valuePort) return {false, "HTTPS port must be 1 to 65535."};
+    if (valuePort != 443) value += ':' + std::to_string(valuePort);
   }
   output = value;
   return {true, {}};
@@ -212,6 +218,24 @@ std::string monitorTitle(const Monitor& item, std::uint64_t elapsedMs) {
     if (project && !project->project.empty()) return project->project;
   }
   return item.name;
+}
+
+std::string accountName(const std::string& accountKey) {
+  const auto colon = accountKey.find(':');
+  const auto id = colon == std::string::npos ? accountKey : accountKey.substr(colon + 1);
+  for (const char* prefix : {"auto:", "profile:", "credential:"}) {
+    const std::string generated(prefix);
+    if (id.size() != generated.size() + 64 || id.compare(0, generated.size(), generated) != 0) continue;
+    if (std::all_of(id.begin() + generated.size(), id.end(), [](char c) { return digit(c) || (c >= 'a' && c <= 'f'); })) return id.substr(generated.size(), 8);
+  }
+  return id.size() > 24 ? id.substr(0, 15) + "\u2026" + id.substr(id.size() - 6) : id;
+}
+
+std::string providerLabel(const std::string& provider) {
+  static const std::map<std::string, std::string> names{
+    {"claude", "Claude Code"}, {"codex", "Codex"}, {"kiro", "Kiro"}, {"openclaw", "OpenClaw"}, {"opencode", "OpenCode"}};
+  const auto name = names.find(provider);
+  return name == names.end() ? provider : name->second;
 }
 
 std::string stateLabel(const std::string& state) {

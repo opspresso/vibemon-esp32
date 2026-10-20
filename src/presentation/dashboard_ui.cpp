@@ -30,6 +30,7 @@ void wrap(lv_obj_t* object) {
   lv_obj_set_height(object, LV_SIZE_CONTENT);
 }
 std::string firmwareStatus(const FirmwareView& firmware) {
+  if (firmware.confirmationFailed) return "Confirm failed · tap to retry";
   switch (firmware.state) {
     case FirmwareState::Waiting: return "Update check pending";
     case FirmwareState::Checking: return "Checking for updates";
@@ -452,7 +453,7 @@ void DashboardUi::settings() {
   auto* firmware = button(root_, "", 16, 426, 448, 46, [this] { controller_.checkFirmware(); });
   widgets_["firmware"] = firmware;
   label(firmware, "VibeMon Touch " + controller_.firmwareVersion(), 16, 13, 160, fonts_.small());
-  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), Muted);
+  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), workspace.firmware.confirmationFailed ? Warning : Muted);
   lv_obj_set_style_text_align(widgets_["firmware-status"], LV_TEXT_ALIGN_RIGHT, 0);
 }
 
@@ -583,11 +584,15 @@ void DashboardUi::picker(std::size_t panel) {
     const auto result = controller_.select(selectedPanel_, {});
     if (result.ok) dashboard(); else formStatus(result.message, true);
   });
-  widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] { controller_.refresh(); pendingPickerRefresh_ = true; });
+  widgets_["refresh-list"] = button(root_, LV_SYMBOL_REFRESH " Refresh", 308, 420, 156, 48, [this] {
+    controller_.refresh(); pendingPickerRefresh_ = true; pickerRevision_ = controller_.workspace().catalogRevision;
+  });
   formMessage_ = label(root_, "", 20, 382, 440, fonts_.small(), Danger);
   wrap(formMessage_);
   // Polls between pickers read only the selected panels; list the rest when they arrive.
-  pendingPickerRefresh_ = !controller_.workspace().catalogComplete;
+  const auto& workspace = controller_.workspace();
+  pendingPickerRefresh_ = !workspace.catalogComplete || std::none_of(workspace.panels.begin(), workspace.panels.end(), [](const Selection& panel) { return !panel.id.empty(); });
+  pickerRevision_ = workspace.catalogRevision;
   updatePicker();
 }
 
@@ -605,7 +610,9 @@ void DashboardUi::updatePicker() {
     auto* name = label(row, item.name, 14, 11, 386, fonts_.normal());
     wrap(name); lv_obj_update_layout(name);
     const int detailY = 19 + lv_obj_get_height(name);
-    auto* detail = label(row, item.category + " · " + item.selection.id, 14, detailY, 396, fonts_.small(), Muted);
+    // An account category already names its compact account; resources add their source ID.
+    const auto detailText = item.selection.kind == ItemKind::Account ? item.category : item.category + " · " + item.selection.id;
+    auto* detail = label(row, detailText, 14, detailY, 396, fonts_.small(), Muted);
     wrap(detail); lv_obj_update_layout(detail);
     const int height = std::max(68, detailY + static_cast<int>(lv_obj_get_height(detail)) + 12);
     lv_obj_set_height(row, height);
@@ -656,11 +663,17 @@ void DashboardUi::update(std::uint32_t now) {
     updateCards(now);
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
-  else if (page_ == Page::Settings && changed) setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
-  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed &&
-           (workspace.catalogComplete || workspace.connection != Connection::Online)) {
-    // A failed read shows the items at hand; keep waiting for the full list.
-    pendingPickerRefresh_ = !workspace.catalogComplete; updatePicker();
+  else if (page_ == Page::Settings && changed) {
+    setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
+    lv_obj_set_style_text_color(widget("firmware-status"), lv_color_hex(workspace.firmware.confirmationFailed ? Warning : Muted), 0);
+  }
+  else if (page_ == Page::Picker && pendingPickerRefresh_ && !workspace.refreshing && changed) {
+    if (workspace.catalogComplete && workspace.catalogRevision != pickerRevision_) {
+      pendingPickerRefresh_ = false; formStatus(""); updatePicker();
+    } else if (workspace.connection != Connection::Online) {
+      // A failed read or another state update cannot fulfill the requested catalog refresh.
+      formStatus(workspace.message, true);
+    }
   }
 }
 
