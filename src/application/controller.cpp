@@ -338,9 +338,10 @@ void Controller::tick(std::uint32_t now) {
   const auto& origin = pendingCloud_ ? pendingCloud_->origin : config_.origin;
   const auto& token = pendingCloud_ ? pendingCloud_->token : config_.readToken;
   auto scope = requestScope();
-  // Empty panels still get one initial connection check. Afterwards only an
-  // explicit refresh, workspace check or open picker needs a full catalog.
-  if (workspace_.hasSnapshot && config_.panelsInitialized && !pendingCloud_ && !browsing_ && !refreshRequested_ && scope.empty()) return;
+  // Empty panels still get one connection check, retried with backoff until it
+  // succeeds. Afterwards only an explicit refresh, workspace check or open
+  // picker needs a full catalog.
+  if (workspace_.hasSnapshot && config_.panelsInitialized && workspace_.connection == Connection::Online && !pendingCloud_ && !browsing_ && !refreshRequested_ && scope.empty()) return;
   // Only the exact request that returned the displayed catalog sends its ETag.
   if (validator_ && (validator_->generation != generation_ || validator_->origin != origin || validator_->scope != scope)) validator_.reset();
   std::string tag = validator_ ? validator_->etag : std::string();

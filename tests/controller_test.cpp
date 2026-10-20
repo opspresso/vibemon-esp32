@@ -58,21 +58,26 @@ int main() {
       std::cout << "Empty-panel requests over 60 seconds: " << cloud.requests.size() - requests << '\n';
       CHECK(cloud.requests.size() == requests);
       app.refresh(); app.tick(60004); CHECK(cloud.requests.size() == requests + 1 && cloud.requests.back().scope.empty());
-      cloud.complete(catalog()); app.tick(60005);
-      app.tick(70005); CHECK(cloud.requests.size() == requests + 1 && app.workspace().panels[0].id.empty());
+      // A failed check retries after its backoff instead of waiting for another refresh.
+      cloud.complete({}, CloudError::Network); app.tick(60005);
+      CHECK(app.workspace().connection == Connection::CloudUnavailable);
+      app.tick(60005 + 2 * PollIntervalMs); CHECK(cloud.requests.size() == requests + 2);
+      cloud.complete(catalog()); app.tick(60006 + 2 * PollIntervalMs);
+      CHECK(app.workspace().connection == Connection::Online);
+      app.tick(70005); CHECK(cloud.requests.size() == requests + 2 && app.workspace().panels[0].id.empty());
       wifi.current.link = WifiLink::Failed; app.tick(70006);
       wifi.connected(); app.tick(70007);
-      CHECK(cloud.requests.size() == requests + 2);
+      CHECK(cloud.requests.size() == requests + 3);
       cloud.complete(catalog()); app.tick(70008);
       CHECK(app.workspace().connection == Connection::Online && app.workspace().panels[0].id.empty());
       // A dormant poll deadline can be older than due()'s signed comparison range.
       app.tick(30u * 86400000u);
       app.browse(true); app.tick(30u * 86400000u + 1);
-      CHECK(cloud.requests.size() == requests + 3 && cloud.requests.back().scope.empty());
+      CHECK(cloud.requests.size() == requests + 4 && cloud.requests.back().scope.empty());
       cloud.complete(catalog()); app.tick(30u * 86400000u + 2); app.browse(false);
       CHECK(app.select(0, {ItemKind::Resource, "one"}).ok);
       app.tick(30u * 86400000u + 3);
-      CHECK(cloud.requests.size() == requests + 4 && cloud.requests.back().scope == std::vector<Selection>({{ItemKind::Resource, "one"}}));
+      CHECK(cloud.requests.size() == requests + 5 && cloud.requests.back().scope == std::vector<Selection>({{ItemKind::Resource, "one"}}));
     }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.6.1");
