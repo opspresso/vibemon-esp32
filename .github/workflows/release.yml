@@ -12,26 +12,36 @@ on:
 permissions:
   contents: read
 
+env:
+  ARDUINO_CLI_VERSION: '1.5.1'
+
 jobs:
   verify:
     uses: ./.github/workflows/build.yml
 
   build:
     needs: verify
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Compile ESP32-4848S040
-        uses: ./.github/actions/container
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          run: |
-            python -m venv build/venv
-            build/venv/bin/python -m pip install -r requirements-dev.txt
-            python tools/setup.py --firmware
-            build/venv/bin/python tools/build_firmware.py
+          python-version: '3.12'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
+      - name: Install pinned toolchain
+        run: |
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py --firmware
+      - name: Compile ESP32-4848S040
+        run: build/venv/bin/python tools/build_firmware.py
       - name: Check that the tag names the built version
         run: |
           version="$(python3 -c 'import json; print(json.load(open("build/firmware/ota.json"))["version"])')"
@@ -57,8 +67,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 10
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
