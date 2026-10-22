@@ -387,8 +387,8 @@ int main() {
         app.tick(now);
         CHECK(app.snapshotAgeMs(now) == elapsed);
         CHECK(app.snapshotAgeMs(now + 5) == elapsed + 5);
-        CHECK(monitorState(app.workspace().catalog.items[0], app.snapshotAgeMs(now)) == "stale");
-        CHECK(monitorState(app.workspace().catalog.items[1], app.snapshotAgeMs(now)) == "inactive");
+        CHECK(monitorState(app.workspace().catalog.items[0], app.snapshotAgeMs(now)) == "standby");
+        CHECK(monitorState(app.workspace().catalog.items[1], app.snapshotAgeMs(now)) == "standby");
       }
       const auto reconnected = static_cast<std::uint32_t>(60 * day + 3);
       wifi.connected(); app.tick(reconnected); cloud.complete(fresh); app.tick(reconnected + 1);

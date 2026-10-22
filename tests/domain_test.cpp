@@ -96,12 +96,13 @@ int main() {
     }
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
     CHECK(stateLabel(monitorState(*account, 180000)) == "Working");
-    CHECK(stateLabel(monitorState(*account, 600000)) == "Inactive");
+    CHECK(stateLabel(monitorState(*account, 600000)) == "Standby");
     CHECK(!needsAttention(monitorState(*account, 600000)));
     std::uint64_t rolloverAge = 1;
     rolloverAge <<= 32;
     CHECK(stale(*resource, rolloverAge));
-    CHECK(monitorState(*account, rolloverAge) == "inactive");
+    CHECK(monitorState(*account, rolloverAge) == "standby");
+    CHECK(monitorState(*resource, rolloverAge) == "standby" && !needsAttention("standby"));
     auto panels = defaultPanels(catalog);
     CHECK(panels[0].kind == ItemKind::Resource && panels[1].kind == ItemKind::Account && panels[2].id == "codex:work" && panels[3].id.empty());
     const auto before = catalog.items.size();

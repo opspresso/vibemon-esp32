@@ -15,6 +15,10 @@ constexpr std::size_t MaxMetrics = 32;
 constexpr std::size_t MaxResponseBytes = 1024 * 1024;
 constexpr std::size_t MaxOriginBytes = 272;
 constexpr std::uint32_t StaleAfterMs = contract::StaleAfterMs;
+// The display state of a source that is not connected or not active: a
+// resource without a receipt for StaleAfterMs, or a coding account whose
+// projects aged to sleep. It is neutral and needs no attention.
+constexpr const char* StandbyState = "standby";
 constexpr std::uint32_t PollIntervalMs = 10000;
 
 enum class ItemKind { Resource, Account };

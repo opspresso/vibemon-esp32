@@ -208,22 +208,25 @@ int main() {
       CHECK(ui.page() == Page::WifiForm);
       tap(ui, "back"); CHECK(!app.changingWifi() && wifi.requested == "Workshop");
       ui.dashboard(); advance(ui, 130000);
-      // Resources are stale; coding projects expire later on their event clock (working -> idle -> sleep).
-      timeMs += 470000; advance(ui); screenshot("stale-dashboard");
+      // Resources go on standby first; coding projects follow on their event clock (working -> idle -> sleep).
+      timeMs += 470000; advance(ui); screenshot("standby-dashboard");
       const auto* accountStatus = lv_label_get_text(ui.widget("panel-status-3"));
-      CHECK(std::string(accountStatus) == "Inactive · 2 projects");
+      CHECK(std::string(accountStatus) == "Standby · 2 projects");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "web-console");
       CHECK(lv_obj_get_style_border_width(ui.widget("panel-3"), LV_PART_MAIN) == 1);
       CHECK(lv_obj_get_style_outline_width(ui.widget("panel-3"), LV_PART_MAIN) == 0);
       CHECK(lv_obj_get_style_shadow_width(ui.widget("panel-3"), LV_PART_MAIN) == 0);
-      lv_area_t inactiveTitleBounds; lv_obj_get_coords(ui.widget("panel-name-3"), &inactiveTitleBounds);
-      CHECK(activeTitleBounds.x1 == inactiveTitleBounds.x1 && activeTitleBounds.y1 == inactiveTitleBounds.y1);
+      lv_area_t standbyTitleBounds; lv_obj_get_coords(ui.widget("panel-name-3"), &standbyTitleBounds);
+      CHECK(activeTitleBounds.x1 == standbyTitleBounds.x1 && activeTitleBounds.y1 == standbyTitleBounds.y1);
       CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-3"), LV_PART_MAIN), lv_obj_get_style_border_color(ui.widget("panel-2"), LV_PART_MAIN)));
-      const auto inactiveColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
-      const auto staleColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
-      CHECK(!lv_color_eq(inactiveColor, staleColor));
-      advance(ui, 500); const auto inactiveFlushes = flushes; advance(ui, 1000);
-      CHECK(flushes == inactiveFlushes);
+      // A silent resource and an inactive account are both on neutral standby, never in the warning color.
+      CHECK(std::string(lv_label_get_text(ui.widget("panel-status-2"))).rfind("Standby · ", 0) == 0);
+      const auto accountColor = lv_obj_get_style_text_color(ui.widget("panel-status-3"), LV_PART_MAIN);
+      const auto resourceColor = lv_obj_get_style_text_color(ui.widget("panel-status-2"), LV_PART_MAIN);
+      CHECK(lv_color_eq(accountColor, resourceColor));
+      CHECK(lv_color_eq(resourceColor, lv_color_hex(design::Muted)));
+      advance(ui, 500); const auto standbyFlushes = flushes; advance(ui, 1000);
+      CHECK(flushes == standbyFlushes);
     }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
@@ -348,11 +351,11 @@ int main() {
       CHECK(ui.page() == Page::CloudForm && findText(lv_screen_active(), "The server certificate could not be verified."));
       screenshot("cloud-setup-failed");
     }
-    for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "inactive"}) {
+    for (const std::string state : {"working", "thinking", "planning", "packing", "notification", "alert", "done", "idle", "standby"}) {
       Store store; configured(store);
       auto account = demo().items.back();
-      account.activity = state == "inactive" ? "working" : state;
-      if (state == "inactive") account.activityAgeMs = 600000;
+      account.activity = state == "standby" ? "working" : state;
+      if (state == "standby") account.activityAgeMs = 600000;
       if (state == "idle") account.metrics[1].value = 70;
       account.projects = {account};
       Catalog catalog; catalog.items = {account};
@@ -364,7 +367,7 @@ int main() {
       const auto stateColor = state == "thinking" ? design::StateThinking : state == "planning" ? design::StatePlanning : state == "packing" ? design::StatePacking : 0;
       if (stateColor) CHECK(lv_color_eq(lv_obj_get_style_border_color(ui.widget("panel-0"), LV_PART_MAIN), lv_color_hex(stateColor)));
       if (state == "idle") CHECK(lv_color_eq(lv_obj_get_style_bg_color(ui.widget("panel-bar-0-1"), LV_PART_INDICATOR), lv_color_hex(design::Warning)));
-      const bool active = state != "idle" && state != "inactive";
+      const bool active = state != "idle" && state != "standby";
       CHECK(lv_obj_is_hidden(light) != active);
       const auto x = lv_obj_get_x(light), y = lv_obj_get_y(light);
       const auto opacity = lv_obj_get_style_opa(light, LV_PART_MAIN);

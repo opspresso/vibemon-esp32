@@ -254,7 +254,7 @@ void DashboardUi::updateCards(std::uint32_t now) {
     const auto& selection = workspace.panels[index];
     const auto* item = workspace.catalog.find(selection);
     const auto state = item ? monitorState(*item, elapsed) : "unknown";
-    const auto motionState = item && item->selection.kind == ItemKind::Account ? state : "inactive";
+    const std::string motionState = item && item->selection.kind == ItemKind::Account ? state : StandbyState;
     if (card.motionState != motionState) {
       card.motionState = motionState; card.motionSince = now;
       const auto motionTone = stateTone(motionState);
