@@ -14,26 +14,33 @@ on:
 permissions:
   contents: read
 
-# Jobs run on the organization's self-hosted Linux runner, which shares its host with a k3s
-# cluster. Every tool runs in the job's container on the rootless Docker daemon, checkouts keep
-# no credentials, and all downloads stay under build/ in the job workspace.
+# arduino/setup-arduino-cli@v2 still runs on Node.js 20.
+env:
+  ARDUINO_CLI_VERSION: '1.5.1'
+
 jobs:
   native:
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref || github.sha }}
-          persist-credentials: false
-      - name: Test domain, setup and real LVGL screens
-        uses: ./.github/actions/container
+      - uses: actions/setup-python@v6
         with:
-          run: |
-            python -m venv build/venv
-            build/venv/bin/python -m pip install -r requirements-dev.txt
-            python tools/setup.py
-            build/venv/bin/python tools/check.py
+          python-version: '3.12'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
+      - name: Install pinned test dependencies
+        run: |
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py
+      - name: Test domain, setup and real LVGL screens
+        run: build/venv/bin/python tools/check.py
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -43,21 +50,27 @@ jobs:
             build/native/Testing/Temporary/LastTest.log
 
   firmware:
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref || github.sha }}
-          persist-credentials: false
-      - name: Compile ESP32-4848S040
-        uses: ./.github/actions/container
+      - uses: actions/setup-python@v6
         with:
-          run: |
-            python -m venv build/venv
-            build/venv/bin/python -m pip install -r requirements-dev.txt
-            python tools/setup.py --firmware
-            build/venv/bin/python tools/build_firmware.py
+          python-version: '3.12'
+      - name: Install Arduino CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/arduino-cli"
+          curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/arduino-cli" arduino-cli
+          echo "$RUNNER_TEMP/arduino-cli" >> "$GITHUB_PATH"
+      - name: Install pinned toolchain
+        run: |
+          python3 -m venv build/venv
+          build/venv/bin/python -m pip install -r requirements-dev.txt
+          python3 tools/setup.py --firmware
+      - name: Compile ESP32-4848S040
+        run: build/venv/bin/python tools/build_firmware.py
       - uses: actions/upload-artifact@v7
         with:
           name: vibemon-esp32-4848s040
