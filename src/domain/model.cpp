@@ -171,7 +171,7 @@ std::string healthState(Health health) {
 }
 std::string reportState(const ReportState& item, bool agent, std::uint64_t elapsedMs) {
   const auto health = healthState(item.health);
-  if (!agent) return stale(item, elapsedMs) ? "stale" : health;
+  if (!agent) return stale(item, elapsedMs) ? StandbyState : health;
   // Coding hooks report events plus a heartbeat while a turn runs, so liveness
   // follows the clock of the newest report: a turn that stops reporting ages.
   std::string state = item.activity;
@@ -182,7 +182,7 @@ std::string reportState(const ReportState& item, bool agent, std::uint64_t elaps
     state = rule->next;
     rule = stateRule(state);
   }
-  if (state == "sleep") return "inactive";
+  if (state == "sleep") return StandbyState;
   // Health belongs to the event; once its state has aged, so has its health.
   return state == item.activity && attentionRank(health) < attentionRank(state) ? health : state;
 }
@@ -194,12 +194,12 @@ std::string projectState(const ReportState& item, std::uint64_t elapsedMs) {
 
 std::string monitorState(const Monitor& item, std::uint64_t elapsedMs) {
   if (item.selection.kind != ItemKind::Account) return reportState(item, false, elapsedMs);
-  std::string state = "inactive";
+  std::string state = StandbyState;
   // The adapter sorts newest first, with stable source-ID ties, as App and Web do.
   for (const auto& project : item.projects) {
     const auto current = reportState(project, true, elapsedMs);
-    if (current == "inactive") continue;
-    if (state == "inactive" || attentionRank(current) < attentionRank(state)) state = current;
+    if (current == StandbyState) continue;
+    if (state == StandbyState || attentionRank(current) < attentionRank(state)) state = current;
   }
   return state;
 }
