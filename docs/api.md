@@ -2,7 +2,7 @@
 
 ## Cloud reads
 
-The device requests `GET /api/v1/sources` every 10 seconds while connected. Polls add the `ids` and `accounts` filters, so Web returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
+The device requests `GET /api/v1/sources` every 10 seconds while connected. Polls add the `ids` and `accounts` filters, so VibeMon returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
 
 When all four saved panels are empty, the device checks its connection once and then pauses background reads. **Refresh** requests one full catalog, and opening the picker resumes full reads while it is open. Selecting an item resumes polling immediately. These actions still honor the server's `Retry-After`.
 
@@ -42,7 +42,7 @@ Server addresses use lowercase hostnames and numeric ports without leading zeros
 
 The default firmware does not enable flash or NVS encryption. Physical access to the device or a flash backup can expose stored credentials. Use a dedicated read token and keep firmware backups private. In RAM, the HTTPS worker and the USB console overwrite their temporary copies of the token and Wi-Fi password after use; copies inside the HTTP and TLS libraries are not overwritten. The optional USB console is a local setup interface, not an authenticated network service.
 
-The firmware has no inbound HTTP status server, captive portal or WebSocket connection. Collectors send reports to Web; the device only reads them.
+The firmware has no inbound HTTP status server, captive portal or WebSocket connection. Collectors send reports to VibeMon; the device only reads them.
 
 ## USB commands
 
