@@ -555,7 +555,7 @@ void DashboardUi::wifiForm(const std::string& ssid) {
 void DashboardUi::cloud() {
   clear(Page::CloudForm); header("Connect VibeMon", [this] { controller_.cancelSetup(); settings(); });
   firstField_ = field("server", controller_.workspace().origin, "https://vibemon.io", 61, MaxOriginBytes, false);
-  secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps the saved token" : "Read token from vibemon.io/account", 113, 63, true);
+  secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps it on the same server" : "Read token from vibemon.io/account", 113, 63, true);
   formMessage_ = label(root_, "Use a token with read permission.", 20, 164, 440, fonts_.small(), Muted);
   wrap(formMessage_);
   widgets_["connect-cloud"] = button(root_, "Connect workspace", 16, 202, 448, 44, [this] {
