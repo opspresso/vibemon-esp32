@@ -19,9 +19,10 @@ namespace vibemon {
 namespace {
 constexpr std::uint32_t ConnectTimeoutMs = 20000;
 constexpr std::uint32_t ReconnectDelayMs = 30000;
-// Release the idle TLS session when polling pauses, for example during a
-// firmware install or after a rejected token. Polls arrive every 10 seconds.
-constexpr std::uint32_t IdleSessionMs = 15000;
+// Keep the TLS session between regular polls, and release it when polling
+// pauses, for example during a firmware install or after a rejected token.
+// vibemon.io kept idle connections for more than 60 s when measured.
+constexpr std::uint32_t IdleSessionMs = PollIntervalMs + 15000;
 constexpr std::size_t JsonBudgetBytes = 512 * 1024;
 
 class PsramJsonAllocator final : public ArduinoJson::Allocator {

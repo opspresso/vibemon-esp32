@@ -39,7 +39,7 @@ If automatic bootloader entry fails, use the board's documented BOOT/RESET seque
 
 ## Update over Wi-Fi
 
-After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, key and panel settings stay in NVS and are kept.
+After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, read token and panel settings stay in NVS and are kept.
 
 Use USB again only when a release changes the partition table or bootloader, or when the device cannot reach Wi-Fi.
 
@@ -61,7 +61,7 @@ Tap a dashboard card to select its resource or account. **Leave empty** clears o
 
 ## Optional USB setup
 
-USB setup invokes the same application checks as the touchscreen. Passwords and keys are prompted without echo and are not passed as process arguments.
+USB setup invokes the same application checks as the touchscreen. Passwords and read tokens are prompted without echo and are not passed as process arguments.
 
 ```sh
 build/venv/bin/python tools/device.py --port /dev/cu.usbserial-110 wifi
