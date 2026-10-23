@@ -19,7 +19,10 @@ constexpr std::uint32_t StaleAfterMs = contract::StaleAfterMs;
 // resource without a receipt for StaleAfterMs, or a coding account whose
 // projects aged to sleep. It is neutral and needs no attention.
 constexpr const char* StandbyState = "standby";
-constexpr std::uint32_t PollIntervalMs = 10000;
+// Every VibeMon viewer refreshes at the App's CLOUD_POLL_MS.
+constexpr std::uint32_t PollIntervalMs = contract::PollIntervalMs;
+// The longest wait after failed requests, unless Retry-After asks for more.
+constexpr std::uint32_t MaxRetryDelayMs = 60000;
 
 enum class ItemKind { Resource, Account };
 enum class Health { Ok, Warning, Error, Unknown };

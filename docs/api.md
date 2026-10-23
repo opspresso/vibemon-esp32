@@ -2,7 +2,7 @@
 
 ## Cloud reads
 
-The device requests `GET /api/v1/sources` every 10 seconds while connected. Polls add the `ids` and `accounts` filters, so VibeMon returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
+The device requests `GET /api/v1/sources` every 30 seconds while connected, the App contract's `CLOUD_POLL_MS` that every VibeMon viewer uses. Polls add the `ids` and `accounts` filters, so VibeMon returns only the selected panels' sources and those accounts' projects. A token check, the first panel defaults and an open item picker read every source; the picker lists every item when that reply arrives. It sends the read token in the `Authorization: Bearer` header. It uses the ESP32 core's certificate bundle and hostname verification, requires a valid clock, and does not follow redirects. A redirect response asks the user to check the server address. Tokens are never placed in URLs.
 
 When all four saved panels are empty, the device checks its connection once and then pauses background reads. **Refresh** requests one full catalog, and opening the picker resumes full reads while it is open. Selecting an item resumes polling immediately. These actions still honor the server's `Retry-After`.
 
@@ -21,8 +21,8 @@ Report age starts from `serverTime` and advances with accumulated device uptime.
 | HTTP response body | 1 MiB |
 | JSON allocation budget | 512 KiB |
 | Visible metrics per card | First 3, following the Web order; details show all |
-| Poll interval | 10 seconds |
-| Retry delay for transient failures | 20, 40, then at most 60 seconds |
+| Poll interval | 30 seconds (`CLOUD_POLL_MS`) |
+| Retry delay for transient failures | 30, then at most 60 seconds; a longer `Retry-After` wins |
 | Retry delay after HTTP 429 | The longer of that delay and `Retry-After` in seconds, at most 15 minutes. **Refresh** and the item picker also wait for `Retry-After`. |
 | Resource standby boundary | 120 seconds since the server received it |
 

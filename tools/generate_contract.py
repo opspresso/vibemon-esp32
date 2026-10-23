@@ -38,6 +38,7 @@ def generate():
              "#pragma once", "#include <cstdint>", "namespace vibemon::contract {",
              "struct StateRule { const char* id; const char* label; const char* tone; unsigned attentionRank; const char* next; std::uint32_t afterMs; };",
              "inline constexpr std::uint32_t StaleAfterMs = " + str(constants["CLOUD_STALE_MS"]) + ";",
+             "inline constexpr std::uint32_t PollIntervalMs = " + str(constants["CLOUD_POLL_MS"]) + ";",
              "inline constexpr StateRule States[] = {"]
     for name, state in policy["states"].items():
         transition = state.get("transition")
