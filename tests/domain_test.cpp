@@ -65,7 +65,21 @@ int main() {
     CHECK(accountName("claude:auto:27E702A8" + std::string(56, 'a')) == "auto:27E702A8aa\u2026aaaaaa");
     std::string longName; for (int i = 0; i < 20; ++i) longName += "long";
     CHECK(accountName("codex:" + longName) == "longlonglonglon\u2026nglong");
-    CHECK(providerLabel("claude") == "Claude Code" && providerLabel("future") == "future");
+    CHECK(providerLabel("claude") == "Claude Code" && providerLabel("opencode") == "OpenCode" && providerLabel("future") == "future");
+    {
+      // Built-in labels and resource types are the App's shared English messages.
+      Catalog presets;
+      CHECK(decodeCatalog(R"({"serverTime":"2026-10-11T10:00:00.000Z","sources":[
+        {"sourceId":"spark","kind":"host","displayName":"Spark","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,"memoryType":"unified",
+         "metrics":{"cpuPercent":1,"memoryPercent":2,"gpuPercent":3,"gpuTemperatureC":40}},
+        {"sourceId":"k3s","kind":"cluster","displayName":"K3S","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,
+         "metrics":{"cpuPercent":1,"memoryPercent":2,"nodesReady":1,"nodesTotal":1,"podsUnhealthy":0}}]})", presets).ok);
+      const auto* host = presets.find({ItemKind::Resource, "spark"});
+      CHECK(host && host->category == sharedLabel("resource.host") && host->category == "Host");
+      CHECK(host->metrics[1].label == "Unified memory" && host->metrics[3].label == "GPU temperature");
+      const auto* cluster = presets.find({ItemKind::Resource, "k3s"});
+      CHECK(cluster && cluster->category == "Kubernetes" && cluster->metrics[4].label == "Unhealthy pods");
+    }
     Catalog catalog;
     CHECK(decodeCatalog(sample(), catalog).ok);
     CHECK(catalog.items.size() == 3);

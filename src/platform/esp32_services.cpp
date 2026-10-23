@@ -19,9 +19,10 @@ namespace vibemon {
 namespace {
 constexpr std::uint32_t ConnectTimeoutMs = 20000;
 constexpr std::uint32_t ReconnectDelayMs = 30000;
-// Release the idle TLS session when polling pauses, for example during a
-// firmware install or after a rejected token. Polls arrive every 10 seconds.
-constexpr std::uint32_t IdleSessionMs = 15000;
+// Keep the TLS session between regular polls, and release it when polling
+// pauses, for example during a firmware install or after a rejected token.
+// vibemon.io kept idle connections for more than 60 s when measured.
+constexpr std::uint32_t IdleSessionMs = PollIntervalMs + 15000;
 constexpr std::size_t JsonBudgetBytes = 512 * 1024;
 
 class PsramJsonAllocator final : public ArduinoJson::Allocator {
@@ -124,7 +125,8 @@ class CloudSession {
     if (status != 200) {
       if (status > 0) {
         result->error = cloudStatusError(status);
-        if (result->error == CloudError::RateLimited) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
+        // 429 and 503 may say when to retry; the controller only lengthens its backoff with it.
+        if (result->error == CloudError::RateLimited || result->error == CloudError::Server) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
       } else {
         char error[128];
         result->error = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;

@@ -38,6 +38,7 @@ def generate():
              "#pragma once", "#include <cstdint>", "namespace vibemon::contract {",
              "struct StateRule { const char* id; const char* label; const char* tone; unsigned attentionRank; const char* next; std::uint32_t afterMs; };",
              "inline constexpr std::uint32_t StaleAfterMs = " + str(constants["CLOUD_STALE_MS"]) + ";",
+             "inline constexpr std::uint32_t PollIntervalMs = " + str(constants["CLOUD_POLL_MS"]) + ";",
              "inline constexpr StateRule States[] = {"]
     for name, state in policy["states"].items():
         transition = state.get("transition")
@@ -59,6 +60,17 @@ def generate():
                 any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in bounds) or bounds[0] > bounds[1]:
             raise ValueError("Invalid measurement tone")
         lines.append("  {" + json.dumps(tone["keyPrefix"]) + ", " + repr(float(bounds[0])) + ", " + repr(float(bounds[1])) + "},")
+    lines += ["};", "struct Provider { const char* id; const char* name; };", "inline constexpr Provider Providers[] = {"]
+    for provider in policy["providers"]:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,31}", provider["id"]) or not isinstance(provider["name"], str) or not provider["name"]:
+            raise ValueError("Invalid coding provider")
+        lines.append("  {" + json.dumps(provider["id"]) + ", " + json.dumps(provider["name"]) + "},")
+    # Touch shows English. Its labels come from the App's shared catalog.
+    english = json.loads((ROOT / "contracts/i18n.json").read_text())["en"]
+    lines += ["};", "struct Label { const char* key; const char* text; };", "inline constexpr Label Labels[] = {"]
+    for key, text in english.items():
+        if key.startswith(("metric.", "resource.")) and isinstance(text, str):
+            lines.append("  {" + json.dumps(key) + ", " + json.dumps(text) + "},")
     lines += ["};", "}  // namespace vibemon::contract", ""]
     write_generated("monitoring_policy.h", "\n".join(lines))
     write_generated("design_tokens.h", palette())

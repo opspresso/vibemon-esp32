@@ -19,7 +19,10 @@ constexpr std::uint32_t StaleAfterMs = contract::StaleAfterMs;
 // resource without a receipt for StaleAfterMs, or a coding account whose
 // projects aged to sleep. It is neutral and needs no attention.
 constexpr const char* StandbyState = "standby";
-constexpr std::uint32_t PollIntervalMs = 10000;
+// Every VibeMon viewer refreshes at the App's CLOUD_POLL_MS.
+constexpr std::uint32_t PollIntervalMs = contract::PollIntervalMs;
+// The longest wait after failed requests, unless Retry-After asks for more.
+constexpr std::uint32_t MaxRetryDelayMs = 60000;
 
 enum class ItemKind { Resource, Account };
 enum class Health { Ok, Warning, Error, Unknown };
@@ -101,6 +104,8 @@ bool validAccountId(const std::string& id);
 // stays the selection identity. Generated keys show their first eight hex digits.
 std::string accountName(const std::string& accountKey);
 std::string providerLabel(const std::string& provider);
+// The English text of an App shared message key such as "metric.cpuPercent", or the key itself.
+std::string sharedLabel(const std::string& key);
 bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = false);
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
 bool stale(const ReportState& item, std::uint64_t elapsedMs);

@@ -39,7 +39,7 @@ If automatic bootloader entry fails, use the board's documented BOOT/RESET seque
 
 ## Update over Wi-Fi
 
-After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, key and panel settings stay in NVS and are kept.
+After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, read token and panel settings stay in NVS and are kept.
 
 Use USB again only when a release changes the partition table or bootloader, or when the device cannot reach Wi-Fi.
 
@@ -55,13 +55,13 @@ Devices install the release within 6 hours, or at their next restart. A tag that
 
 On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter its password and press **Connect Wi-Fi**. An open network uses an empty password. **Hidden network** accepts a manually entered SSID. A failed connection leaves the saved configuration unchanged and shows a recovery path.
 
-Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty key field retains a saved key only when the server is unchanged.
+Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty token field retains the saved token only when the server is unchanged.
 
 Tap a dashboard card to select its resource or account. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
 
 ## Optional USB setup
 
-USB setup invokes the same application checks as the touchscreen. Passwords and keys are prompted without echo and are not passed as process arguments.
+USB setup invokes the same application checks as the touchscreen. Passwords and read tokens are prompted without echo and are not passed as process arguments.
 
 ```sh
 build/venv/bin/python tools/device.py --port /dev/cu.usbserial-110 wifi

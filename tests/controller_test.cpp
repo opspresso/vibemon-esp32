@@ -157,14 +157,14 @@ int main() {
       CHECK(app.workspace().connection == Connection::Online && store.writes == 2);
       CHECK(app.workspace().panels[0].id == "one" && app.workspace().panels[1].id == "codex:work");
       CHECK(store.saved.panelsInitialized && app.workspace().tokenConfigured);
-      for (std::uint32_t tick = 401; tick < 10400; ++tick) app.tick(tick);
+      for (std::uint32_t tick = 401; tick < 400 + PollIntervalMs; ++tick) app.tick(tick);
       CHECK(cloud.requests.size() == 1 && store.writes == 2);
-      app.tick(10400); CHECK(cloud.requests.size() == 2);
-      cloud.complete(catalog()); app.tick(10401); CHECK(store.writes == 2);
+      app.tick(400 + PollIntervalMs); CHECK(cloud.requests.size() == 2);
+      cloud.complete(catalog()); app.tick(401 + PollIntervalMs); CHECK(store.writes == 2);
       CHECK(app.select(0, {ItemKind::Resource, "one"}).ok && store.writes == 2);
       CHECK(!app.select(4, {}).ok && !app.select(0, {ItemKind::Resource, "missing"}).ok);
       CHECK(app.select(0, {}).ok && store.writes == 3);
-      app.refresh(); app.tick(10402); cloud.complete(catalog()); app.tick(10403);
+      app.refresh(); app.tick(402 + PollIntervalMs); cloud.complete(catalog()); app.tick(403 + PollIntervalMs);
       CHECK(app.workspace().panels[0].id.empty());
       Store rebootedStore = store; Wifi rebootedWifi; Cloud rebootedCloud; Update rebootedUpdate;
       Controller rebooted(rebootedStore, rebootedWifi, rebootedCloud, rebootedUpdate, "3.4.0"); rebooted.begin(0);
@@ -241,9 +241,11 @@ int main() {
       app.tick(120001); CHECK(cloud.requests.size() == 1);
       app.tick(120002); CHECK(cloud.requests.size() == 2);
       cloud.complete({}, CloudError::RateLimited); cloud.reply->retryAfterMs = 1000; app.tick(120003);
-      app.tick(120003 + 19999); CHECK(cloud.requests.size() == 2);
-      app.tick(120003 + 20000); CHECK(cloud.requests.size() == 3);
-      cloud.complete({}, CloudError::Redirected); app.tick(200000);
+      // The refresh reset the failure count, so a shorter Retry-After keeps the regular interval.
+      const auto backoff = PollIntervalMs;
+      app.tick(120003 + backoff - 1); CHECK(cloud.requests.size() == 2);
+      app.tick(120003 + backoff); CHECK(cloud.requests.size() == 3);
+      cloud.complete({}, CloudError::Redirected); app.tick(120004 + backoff);
       CHECK(app.workspace().message == "The server redirected the request. Check the server address.");
     }
     {
@@ -342,7 +344,8 @@ int main() {
       const auto start = std::numeric_limits<std::uint32_t>::max() - 5;
       app.begin(start); wifi.connected(); app.tick(start); cloud.complete(catalog()); app.tick(start + 1);
       app.tick(2); CHECK(cloud.requests.size() == 1);
-      app.tick(9996); CHECK(cloud.requests.size() == 2);
+      app.tick(static_cast<std::uint32_t>(start + 1 + PollIntervalMs) - 1); CHECK(cloud.requests.size() == 1);
+      app.tick(static_cast<std::uint32_t>(start + 1 + PollIntervalMs)); CHECK(cloud.requests.size() == 2);
     }
     {
       Store store; Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0"); app.begin(0);
@@ -404,8 +407,10 @@ int main() {
       app.tick(Updater::FirstCheckDelayMs); CHECK(update.checks == 0);
       app.tick(Updater::FirstCheckDelayMs + 1);
       CHECK(update.checks == 1 && app.workspace().firmware.state == FirmwareState::Checking);
-      cloud.complete(catalog()); update.complete(firmwareRelease("3.4.0"));
-      app.tick(30002); CHECK(app.workspace().firmware.state == FirmwareState::Current && update.installs.empty());
+      update.complete(firmwareRelease("3.4.0"));
+      app.tick(2 + PollIntervalMs); CHECK(app.workspace().firmware.state == FirmwareState::Current && update.installs.empty());
+      // The regular poll runs alongside the firmware checks.
+      CHECK(cloud.busy); cloud.complete(catalog());
       app.checkFirmware(); app.tick(30003); CHECK(update.checks == 2);
       update.complete(firmwareRelease("3.3.9")); app.tick(30004);
       CHECK(app.workspace().firmware.state == FirmwareState::Current && update.installs.empty());

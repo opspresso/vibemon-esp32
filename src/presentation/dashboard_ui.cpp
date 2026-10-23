@@ -386,7 +386,8 @@ void DashboardUi::updateDetails(std::uint32_t now) {
   if (!item) {
     setText(detailName_, "Item unavailable"); setText(detailCategory_, "Selection kept for reconnect");
     setText(detailStatus_, "Choose another item or wait for its next report.");
-    lv_obj_set_style_text_color(detailStatus_, lv_color_hex(Muted), 0);
+    const auto muted = lv_color_hex(Muted);
+    if (!lv_color_eq(lv_obj_get_style_text_color(detailStatus_, LV_PART_MAIN), muted)) lv_obj_set_style_text_color(detailStatus_, muted, 0);
     visible(detailMessage_, false); visible(detailReadings_, false); visible(detailProjects_, false);
     return;
   }
@@ -443,7 +444,7 @@ void DashboardUi::settings() {
   auto* server = button(root_, "", 16, 202, 448, 76, [this] { cloud(); });
   widgets_["cloud-settings"] = server;
   label(server, "VibeMon workspace", 16, 13, 380, fonts_.normal());
-  label(server, workspace.origin + (workspace.tokenConfigured ? " · key saved" : " · add read key"), 16, 44, 380, fonts_.small(), Muted);
+  label(server, workspace.origin + (workspace.tokenConfigured ? " · token saved" : " · add read token"), 16, 44, 380, fonts_.small(), Muted);
   label(server, LV_SYMBOL_RIGHT, 410, 29, 24, fonts_.normal(), Muted);
   widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 448, 48, [this] { controller_.refresh(); dashboard(); });
   auto* message = label(root_, workspace.message, 20, 362, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
@@ -554,7 +555,7 @@ void DashboardUi::wifiForm(const std::string& ssid) {
 void DashboardUi::cloud() {
   clear(Page::CloudForm); header("Connect VibeMon", [this] { controller_.cancelSetup(); settings(); });
   firstField_ = field("server", controller_.workspace().origin, "https://vibemon.io", 61, MaxOriginBytes, false);
-  secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps the saved key" : "Read token from vibemon.io/account", 113, 63, true);
+  secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps it on the same server" : "Read token from vibemon.io/account", 113, 63, true);
   formMessage_ = label(root_, "Use a token with read permission.", 20, 164, 440, fonts_.small(), Muted);
   wrap(formMessage_);
   widgets_["connect-cloud"] = button(root_, "Connect workspace", 16, 202, 448, 44, [this] {

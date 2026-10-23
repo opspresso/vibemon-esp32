@@ -170,7 +170,8 @@ void Controller::failure(const CloudResult& result, bool validating) {
   failures_ = std::min(failures_ + 1, 3u);
   // A server's Retry-After can only lengthen the backoff.
   const auto delay = failedOrigin == config_.origin ? result.retryAfterMs : 0;
-  nextPoll_ = now_ + std::max(delay, std::min<std::uint32_t>(60000, PollIntervalMs << failures_));
+  // The first retry keeps the regular interval; later ones wait longer.
+  nextPoll_ = now_ + std::max(delay, std::min<std::uint32_t>(MaxRetryDelayMs, PollIntervalMs << (failures_ - 1)));
 }
 
 void Controller::accept(CloudResult& result) {
