@@ -232,10 +232,13 @@ std::string accountName(const std::string& accountKey) {
 }
 
 std::string providerLabel(const std::string& provider) {
-  static const std::map<std::string, std::string> names{
-    {"claude", "Claude Code"}, {"codex", "Codex"}, {"kiro", "Kiro"}, {"openclaw", "OpenClaw"}, {"opencode", "OpenCode"}};
-  const auto name = names.find(provider);
-  return name == names.end() ? provider : name->second;
+  for (const auto& known : contract::Providers) if (provider == known.id) return known.name;
+  return provider;
+}
+
+std::string sharedLabel(const std::string& key) {
+  for (const auto& label : contract::Labels) if (key == label.key) return label.text;
+  return key;
 }
 
 std::string stateLabel(const std::string& state) {

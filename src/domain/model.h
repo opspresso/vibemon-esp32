@@ -104,6 +104,8 @@ bool validAccountId(const std::string& id);
 // stays the selection identity. Generated keys show their first eight hex digits.
 std::string accountName(const std::string& accountKey);
 std::string providerLabel(const std::string& provider);
+// The English text of an App shared message key such as "metric.cpuPercent", or the key itself.
+std::string sharedLabel(const std::string& key);
 bool validText(const std::string& text, std::size_t maxBytes, bool allowEmpty = false);
 std::optional<std::int64_t> utcMilliseconds(const std::string& value);
 bool stale(const ReportState& item, std::uint64_t elapsedMs);

@@ -89,7 +89,12 @@ bool modelUsage(JsonVariantConst agent, Monitor& monitor) {
       !resetMinutes(agent["usageWeekModelResetsIn"], metric.resetMinutes)) return false;
   if (!metric.value) return true;
   metric.key = "usageWeekModel";
-  metric.label = model.empty() ? "Weekly model" : "Weekly " + model;
+  if (model.empty()) metric.label = sharedLabel("metric.weeklyModelUnknown");
+  else {
+    metric.label = sharedLabel("metric.weeklyModel");
+    const auto slot = metric.label.find("{model}");
+    if (slot != std::string::npos) metric.label.replace(slot, 7, model);
+  }
   metric.unit = "%";
   metric.display = MetricDisplay::Bar;
   metric.maximum = 100;
@@ -100,17 +105,18 @@ bool modelUsage(JsonVariantConst agent, Monitor& monitor) {
 bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& monitor) {
   const auto values = source["metrics"].as<JsonObjectConst>();
   if (values.isNull()) return false;
+  // Labels are the App's shared metric messages; plan usage uses its compact form.
   struct Preset { const char* key; const char* label; const char* unit; bool gauge; const char* reset = nullptr; };
-  const Preset host[] = {{"cpuPercent", "CPU", "%", true}, {"memoryPercent", "Memory", "%", true}, {"gpuPercent", "GPU", "%", true}, {"gpuTemperatureC", "GPU temperature", "°C", false}};
-  const Preset cluster[] = {{"cpuPercent", "CPU", "%", true}, {"memoryPercent", "Memory", "%", true}, {"nodesReady", "Ready nodes", "", false}, {"nodesTotal", "Total nodes", "", false}, {"podsUnhealthy", "Unhealthy pods", "", false}};
-  const Preset agent[] = {{"contextPercent", "Context", "%", true}, {"usageSessionPercent", "Session", "%", true, "usage5hResetsIn"}, {"usageWeekPercent", "Weekly", "%", true, "usageWeekResetsIn"}};
+  const Preset host[] = {{"cpuPercent", "metric.cpuPercent", "%", true}, {"memoryPercent", "metric.memoryPercent", "%", true}, {"gpuPercent", "metric.gpuPercent", "%", true}, {"gpuTemperatureC", "metric.gpuTemperatureC", "°C", false}};
+  const Preset cluster[] = {{"cpuPercent", "metric.cpuPercent", "%", true}, {"memoryPercent", "metric.memoryPercent", "%", true}, {"nodesReady", "metric.nodesReady", "", false}, {"nodesTotal", "metric.nodesTotal", "", false}, {"podsUnhealthy", "metric.podsUnhealthy", "", false}};
+  const Preset agent[] = {{"contextPercent", "metric.contextPercent", "%", true}, {"usageSessionPercent", "metric.short.usageSessionPercent", "%", true, "usage5hResetsIn"}, {"usageWeekPercent", "metric.short.usageWeekPercent", "%", true, "usageWeekResetsIn"}};
   const Preset* presets = kind == "agent" ? agent : kind == "cluster" ? cluster : host;
   const std::size_t count = kind == "agent" ? 3 : kind == "cluster" ? 5 : 4;
   for (std::size_t i = 0; i < count; ++i) {
     const auto& preset = presets[i];
     Metric metric;
-    metric.key = preset.key; metric.label = preset.label; metric.unit = preset.unit;
-    if (metric.key == "memoryPercent" && source["memoryType"] == "unified") metric.label = "Unified memory";
+    metric.key = preset.key; metric.label = sharedLabel(preset.label); metric.unit = preset.unit;
+    if (metric.key == "memoryPercent" && source["memoryType"] == "unified") metric.label = sharedLabel("metric.unifiedMemory");
     metric.display = preset.gauge ? MetricDisplay::Bar : MetricDisplay::Number;
     if (preset.gauge) metric.maximum = 100;
     if (!numeric(values[preset.key], metric.value)) return false;
@@ -192,7 +198,7 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
       if (!source["statusMessage"].isNull() && !text(source["statusMessage"], item.statusMessage, 640, true)) return invalid("A resource status message is invalid.");
       if (!source["resourceType"].isNull()) {
         if (!text(source["resourceType"], item.category, 256)) return invalid("A resource type is invalid.");
-      } else item.category = kind == "cluster" ? "Kubernetes" : source["memoryType"] == "unified" ? "DGX Spark" : "Host";
+      } else item.category = sharedLabel(kind == "cluster" ? "resource.cluster" : kind == "host" ? "resource.host" : "resource.other");
       if (kind == "resource" || !source["metricDefinitions"].isNull()) {
         if (!customMetrics(source, item)) return invalid("A resource contains invalid metric definitions or values.");
       } else if (!presetMetrics(source, kind, item)) return invalid("A resource contains invalid measurements.");

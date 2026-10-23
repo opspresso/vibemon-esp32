@@ -60,6 +60,17 @@ def generate():
                 any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in bounds) or bounds[0] > bounds[1]:
             raise ValueError("Invalid measurement tone")
         lines.append("  {" + json.dumps(tone["keyPrefix"]) + ", " + repr(float(bounds[0])) + ", " + repr(float(bounds[1])) + "},")
+    lines += ["};", "struct Provider { const char* id; const char* name; };", "inline constexpr Provider Providers[] = {"]
+    for provider in policy["providers"]:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,31}", provider["id"]) or not isinstance(provider["name"], str) or not provider["name"]:
+            raise ValueError("Invalid coding provider")
+        lines.append("  {" + json.dumps(provider["id"]) + ", " + json.dumps(provider["name"]) + "},")
+    # Touch shows English. Its labels come from the App's shared catalog.
+    english = json.loads((ROOT / "contracts/i18n.json").read_text())["en"]
+    lines += ["};", "struct Label { const char* key; const char* text; };", "inline constexpr Label Labels[] = {"]
+    for key, text in english.items():
+        if key.startswith(("metric.", "resource.")) and isinstance(text, str):
+            lines.append("  {" + json.dumps(key) + ", " + json.dumps(text) + "},")
     lines += ["};", "}  // namespace vibemon::contract", ""]
     write_generated("monitoring_policy.h", "\n".join(lines))
     write_generated("design_tokens.h", palette())
