@@ -15,6 +15,9 @@ def main():
     subprocess.run([sys.executable, str(ROOT / "tools/generate_assets.py")], check=True)
     subprocess.run(["cmake", "-S", str(ROOT), "-B", str(ROOT / "build/native"), "-G", "Ninja"], check=True)
     subprocess.run(["cmake", "--build", str(ROOT / "build/native"), "-j", "4"], check=True)
+    # Renders of removed tests must not remain beside the current screens.
+    for stale in (ROOT / "build/native/screenshots").glob("*.p[np][gm]"):
+        stale.unlink()
     subprocess.run(["ctest", "--test-dir", str(ROOT / "build/native"), "--output-on-failure"], check=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "*_test.py"], cwd=ROOT, check=True)
     for image in (ROOT / "build/native/screenshots").glob("*.ppm"):

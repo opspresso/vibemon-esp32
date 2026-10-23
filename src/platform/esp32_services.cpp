@@ -124,7 +124,8 @@ class CloudSession {
     if (status != 200) {
       if (status > 0) {
         result->error = cloudStatusError(status);
-        if (result->error == CloudError::RateLimited) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
+        // 429 and 503 may say when to retry; the controller only lengthens its backoff with it.
+        if (result->error == CloudError::RateLimited || result->error == CloudError::Server) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
       } else {
         char error[128];
         result->error = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;

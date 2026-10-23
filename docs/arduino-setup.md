@@ -55,7 +55,7 @@ Devices install the release within 6 hours, or at their next restart. A tag that
 
 On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter its password and press **Connect Wi-Fi**. An open network uses an empty password. **Hidden network** accepts a manually entered SSID. A failed connection leaves the saved configuration unchanged and shows a recovery path.
 
-Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty key field retains a saved key only when the server is unchanged.
+Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty token field retains the saved token only when the server is unchanged.
 
 Tap a dashboard card to select its resource or account. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
 
