@@ -55,7 +55,9 @@ Devices install the release within 6 hours, or at their next restart. A tag that
 
 On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter its password and press **Connect Wi-Fi**. An open network uses an empty password. **Hidden network** accepts a manually entered SSID. A failed connection leaves the saved configuration unchanged and shows a recovery path.
 
-Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty token field retains the saved token only when the server is unchanged.
+Next the device shows **Sign in with a code**: a QR code and an 8-character code such as `BCDF-GHJK`. Scan the QR code with a phone, or open `vibemon.io/device` and enter the code, then sign in and select **Allow**. The code is valid for 10 minutes. The device receives its own read-only token, named **VibeMon Touch** followed by the last six hex digits of its Wi-Fi MAC address, and verifies the connection before saving it. Delete that token on [Web Account](https://vibemon.io/account) to disconnect the device. A denied or expired request shows its reason and **New code**.
+
+**Enter a token** opens the manual form: the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. **Use a code** on that form signs in to the server in the address field. In connection settings, an empty token field retains the saved token only when the server is unchanged. A server without code sign-in for VibeMon Touch shows **Enter a read token instead**.
 
 Tap a dashboard card to select its agent or resource. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
 

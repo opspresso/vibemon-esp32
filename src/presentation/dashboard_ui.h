@@ -9,7 +9,7 @@
 
 namespace vibemon {
 
-enum class Page { Dashboard, Wifi, WifiForm, CloudForm, Picker, Settings, Details };
+enum class Page { Dashboard, Wifi, WifiForm, CloudForm, SignIn, Picker, Settings, Details };
 
 // LVGL objects belong exclusively to the UI task. Network workers publish results through Controller ports.
 class DashboardUi {
@@ -21,6 +21,8 @@ class DashboardUi {
   void dashboard();
   void wifi();
   void cloud();
+  // Shows a code to approve on the server's /device page; the device then receives its read token.
+  void signIn(const std::string& origin);
   void settings();
   void picker(std::size_t panel);
   void details(std::size_t panel);
@@ -95,6 +97,8 @@ class DashboardUi {
   lv_obj_t* detailLabel(lv_obj_t* parent, const std::string& text, const lv_font_t* font, std::uint32_t color);
   void updateNetworks();
   void updatePicker();
+  void updateSignIn();
+  std::uint32_t signInStage_ = 0;
   void formStatus(const std::string& message, bool error = false);
   static bool setText(lv_obj_t* object, const std::string& text);
 };

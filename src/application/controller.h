@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sign_in.h"
 #include "updater.h"
 #include <map>
 
@@ -33,6 +34,11 @@ class Controller {
   void tick(std::uint32_t now);
   Validation saveWifi(const std::string& ssid, const std::string& password);
   Validation saveCloud(const std::string& origin, const std::string& token);
+  // Signs in with a code that the person approves on the server's /device page.
+  // The approved read token is checked and saved like one entered by hand.
+  Validation startSignIn(const std::string& origin);
+  void cancelSignIn();
+  const SignInView& signIn() const { return signIn_.view(); }
   Validation select(std::size_t panel, const Selection& selection);
   void refresh();
   void retryWifi();
@@ -69,6 +75,8 @@ class Controller {
   WifiPort& wifi_;
   CloudPort& cloud_;
   Updater updater_;
+  DeviceSignIn signIn_;
+  std::uint32_t signInRevision_ = 0;
   Config config_;
   Workspace workspace_;
   std::optional<WifiCredentials> pendingWifi_;

@@ -8,8 +8,8 @@ The 480×480 display follows your VibeMon workspace over HTTPS. Each card can sh
 
 1. Build and upload the firmware using the [setup guide](docs/arduino-setup.md). Later releases install over Wi-Fi.
 2. On the screen, select a **2.4 GHz Wi-Fi** network and enter its password. Use **Hidden network** to enter a name manually.
-3. Enter `https://vibemon.io` or your own HTTPS VibeMon origin.
-4. Enter a token with **read** permission from [Account](https://vibemon.io/account). The device checks it before saving.
+3. Scan the QR code on the screen, or open `vibemon.io/device` and enter the code shown, such as `BCDF-GHJK`. Sign in and select **Allow**. The device receives its own read-only token and checks it before saving.
+4. To use another server or an existing token, select **Enter a token**: enter your HTTPS VibeMon origin and a token with **read** permission from [Account](https://vibemon.io/account). **Use a code** on that form signs in to the server you entered.
 5. Tap an empty card, or open a populated card and select **Change item**. Choose an agent or a resource; the **Agents** and **Resources** buttons narrow the list, which lists agents first.
 
 The first successful non-empty response fills up to four cards, alternating agents and resources and starting with an agent. Your selections then remain fixed until you change them. Missing measurements display `—`; lost connections retain the last readings with an explicit connection status. Items that are not connected or not active show neutral `Standby`: a resource without a report for 120 seconds, or an agent whose projects reached sleep through the shared state timeouts. Hooks repeat a running turn's state every 60 seconds, so a long task stays active.

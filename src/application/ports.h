@@ -57,11 +57,41 @@ struct CloudResult {
   // `serverTime` of a 200 body or `X-Server-Time` of a 304, in UTC milliseconds.
   std::int64_t serverTimeMs = 0;
 };
+// VibeMon's device authorization (RFC 8628) for this device's client. A request
+// without a device code asks for a new user code; one with a device code polls for
+// the read token that the person approves on the server's /device page.
+struct SignInRequest {
+  std::uint32_t attempt = 0;
+  std::string origin;
+  std::string deviceCode;
+};
+enum class SignInError { None, Pending, SlowDown, Denied, Expired, Unsupported, Network, Tls, InvalidResponse, Server, RateLimited, Redirected };
+struct DeviceCode {
+  std::string deviceCode;
+  std::string userCode;
+  std::string verificationUri;
+  std::string verificationUriComplete;
+  std::uint32_t expiresInS = 0;
+  std::uint32_t intervalS = 0;
+};
+struct SignInResult {
+  std::uint32_t attempt = 0;
+  SignInError error = SignInError::None;
+  // Set when a request without a device code succeeds.
+  DeviceCode code;
+  // Set when a poll succeeds: a read token.
+  std::string token;
+  std::uint32_t retryAfterMs = 0;
+};
+
+// One worker serves workspace reads and sign-in requests in order, on one connection.
 class CloudPort {
  public:
   virtual ~CloudPort() = default;
   virtual bool start(const CloudRequest& request) = 0;
   virtual std::unique_ptr<CloudResult> take() = 0;
+  virtual bool startSignIn(const SignInRequest& request) = 0;
+  virtual std::unique_ptr<SignInResult> takeSignIn() = 0;
 };
 
 enum class UpdateError { None, Network, InvalidRelease, Download, Integrity, Storage };

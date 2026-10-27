@@ -52,9 +52,12 @@ class EspCloud final : public CloudPort {
   bool begin();
   bool start(const CloudRequest& request) override;
   std::unique_ptr<CloudResult> take() override;
+  bool startSignIn(const SignInRequest& request) override;
+  std::unique_ptr<SignInResult> takeSignIn() override;
  private:
   QueueHandle_t jobs_ = nullptr;
   QueueHandle_t results_ = nullptr;
+  QueueHandle_t signInResults_ = nullptr;
   TaskHandle_t worker_ = nullptr;
   std::atomic<bool> busy_{false};
   static void work(void* context);

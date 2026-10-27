@@ -36,6 +36,23 @@ struct Cloud final : CloudPort {
   bool busy = false;
   bool start(const CloudRequest& request) override { if (busy) return false; busy = true; requests.push_back(request); return true; }
   std::unique_ptr<CloudResult> take() override { return std::move(reply); }
+  std::vector<SignInRequest> signIns;
+  std::unique_ptr<SignInResult> signInReply;
+  bool startSignIn(const SignInRequest& request) override { if (busy) return false; busy = true; signIns.push_back(request); return true; }
+  std::unique_ptr<SignInResult> takeSignIn() override { return std::move(signInReply); }
+  // Answers the last sign-in request.
+  void signedIn(SignInResult result) {
+    CHECK(busy && !signIns.empty());
+    result.attempt = signIns.back().attempt;
+    signInReply = std::make_unique<SignInResult>(std::move(result));
+    busy = false;
+  }
+  static SignInResult code(std::uint32_t interval = 5, std::uint32_t expires = 600) {
+    SignInResult result;
+    result.code = {"device-secret", "BCDF-GHJK", "https://vibemon.io/device", "https://vibemon.io/device?code=BCDF-GHJK", expires, interval};
+    return result;
+  }
+  static SignInResult error(SignInError error, std::uint32_t retryAfterMs = 0) { SignInResult result; result.error = error; result.retryAfterMs = retryAfterMs; return result; }
   void complete(Catalog catalog = {}, CloudError error = CloudError::None, std::string detail = {}) {
     CHECK(busy && !requests.empty());
     reply = std::make_unique<CloudResult>();
