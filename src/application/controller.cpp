@@ -11,7 +11,7 @@ const char* rejectionMessage(CloudError error) {
 }
 }  // namespace
 Controller::Controller(SettingsStore& settings, WifiPort& wifi, CloudPort& cloud, UpdatePort& update, std::string version)
-    : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)) {}
+    : settings_(settings), wifi_(wifi), cloud_(cloud), updater_(update, std::move(version)), signIn_(cloud) {}
 
 void Controller::state(Connection connection, const std::string& message) {
   if (workspace_.connection == connection && workspace_.message == message) return;
@@ -78,6 +78,18 @@ Validation Controller::saveCloud(const std::string& origin, const std::string& t
   state(Connection::CheckingCloud, "Checking your read token...");
   return {true, {}};
 }
+
+Validation Controller::startSignIn(const std::string& origin) {
+  std::string normalized;
+  const auto checked = normalizeOrigin(origin, normalized);
+  if (!checked.ok) return checked;
+  const auto& wifi = wifi_.status();
+  if (wifi.link != WifiLink::Connected || !wifi.clockReady || pendingWifi_) return {false, "Connect Wi-Fi before signing in."};
+  signIn_.start(normalized, now_);
+  return {true, {}};
+}
+
+void Controller::cancelSignIn() { signIn_.cancel(); }
 
 Validation Controller::select(std::size_t panel, const Selection& selection) {
   if (pendingCloud_) return {false, "Finish or cancel workspace setup before changing panels."};
@@ -315,6 +327,11 @@ void Controller::tick(std::uint32_t now) {
     } else state(Connection::SettingClock, "Setting the clock for a secure connection...");
     return;
   }
+  if (auto token = signIn_.tick(now)) {
+    const auto saved = saveCloud(signIn_.origin(), *token);
+    if (!saved.ok) signIn_.fail(saved.message);
+  }
+  if (signIn_.revision() != signInRevision_) { signInRevision_ = signIn_.revision(); ++workspace_.revision; }
   if (auto result = takeCloudResult()) {
     if (result->generation == generation_) {
       inFlight_ = false; workspace_.refreshing = false;

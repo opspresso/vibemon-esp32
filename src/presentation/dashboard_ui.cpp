@@ -565,6 +565,11 @@ void DashboardUi::wifiForm(const std::string& ssid) {
 
 void DashboardUi::cloud() {
   clear(Page::CloudForm); header("Connect VibeMon", [this] { controller_.cancelSetup(); settings(); });
+  // Signing in with a code uses the server in the field, so another server works the same way.
+  widgets_["use-code"] = button(root_, "Use a code", 330, 10, 134, 44, [this] {
+    const std::string origin = lv_textarea_get_text(firstField_);
+    controller_.cancelSetup(); signIn(origin);
+  });
   firstField_ = field("server", controller_.workspace().origin, "https://vibemon.io", 61, MaxOriginBytes, false);
   secretField_ = field("read-token", "", controller_.workspace().tokenConfigured ? "Read token · blank keeps it on the same server" : "Read token from vibemon.io/account", 113, 63, true);
   formMessage_ = label(root_, "Use a token with read permission.", 20, 164, 440, fonts_.small(), Muted);
@@ -574,6 +579,68 @@ void DashboardUi::cloud() {
     waitingCloud_ = result.ok; formStatus(result.ok ? "Checking your read token..." : result.message, !result.ok);
   }, true);
   attachKeyboard();
+}
+
+void DashboardUi::signIn(const std::string& origin) {
+  clear(Page::SignIn); header("Sign in with a code", [this] { controller_.cancelSignIn(); cloud(); });
+  // The steps appear only while a code is waiting for approval.
+  auto* steps = lv_obj_create(root_); box(steps, 0, 70, 480, 200, Background, 0);
+  widgets_["sign-in-steps"] = steps;
+  // Scanners need dark modules on a light field with a quiet zone around them.
+  auto* field = lv_obj_create(steps); box(field, 16, 0, 196, 196, 0xffffff, 12);
+  auto* code = lv_qrcode_create(field);
+  lv_qrcode_set_size(code, 172);
+  lv_qrcode_set_dark_color(code, lv_color_hex(0x000000));
+  lv_qrcode_set_light_color(code, lv_color_hex(0xffffff));
+  lv_obj_center(code);
+  widgets_["sign-in-qr"] = code;
+  label(steps, "Scan the code, or open", 228, 4, 236, fonts_.small(), Muted);
+  widgets_["sign-in-page"] = label(steps, "", 228, 26, 236, fonts_.normal());
+  label(steps, "and enter", 228, 66, 236, fonts_.small(), Muted);
+  widgets_["sign-in-code"] = label(steps, "", 228, 88, 236, &lv_font_montserrat_28);
+  auto* allow = label(steps, "Sign in, then select Allow. This device receives a read-only token.", 228, 134, 236, fonts_.small(), Muted);
+  wrap(allow);
+  formMessage_ = label(root_, "", 20, 290, 440, fonts_.normal(), Muted);
+  wrap(formMessage_);
+  widgets_["new-code"] = button(root_, LV_SYMBOL_REFRESH " New code", 16, 420, 216, 48, [this, origin] {
+    const auto result = controller_.startSignIn(origin);
+    if (!result.ok) formStatus(result.message, true);
+  });
+  widgets_["enter-token"] = button(root_, "Enter a token", 248, 420, 216, 48, [this] { controller_.cancelSignIn(); cloud(); });
+  signInStage_ = static_cast<std::uint32_t>(-1);
+  const auto started = controller_.startSignIn(origin);
+  updateSignIn();
+  if (!started.ok) formStatus(started.message, true);
+}
+
+void DashboardUi::updateSignIn() {
+  const auto& view = controller_.signIn();
+  const auto stage = static_cast<std::uint32_t>(view.stage);
+  const bool waiting = view.stage == SignInStage::Waiting;
+  visible(widget("sign-in-steps"), waiting);
+  // Without steps, the status line takes their place below the header.
+  lv_obj_set_y(formMessage_, waiting ? 290 : 80);
+  // The page address without its scheme fits the narrow column.
+  const auto page = view.verificationUri.rfind("https://", 0) == 0 ? view.verificationUri.substr(8) : view.verificationUri;
+  setText(widget("sign-in-page"), waiting ? page : "");
+  setText(widget("sign-in-code"), waiting ? view.userCode : "");
+  if (waiting && stage != signInStage_) {
+    const auto& link = view.verificationUriComplete;
+    lv_qrcode_update(widget("sign-in-qr"), link.data(), static_cast<std::uint32_t>(link.size()));
+  }
+  signInStage_ = stage;
+  if (view.stage == SignInStage::Approved) {
+    // The approved token goes through the same check as one entered by hand.
+    const auto& workspace = controller_.workspace();
+    if (!controller_.changingCloud() && workspace.connection == Connection::Online) { dashboard(); return; }
+    const bool failed = !controller_.changingCloud();
+    visible(widget("new-code"), failed);
+    formStatus(failed ? workspace.message : view.message, failed);
+    return;
+  }
+  visible(widget("new-code"), view.stage == SignInStage::Failed);
+  const auto message = view.message.empty() && waiting ? "Waiting for approval..." : view.message;
+  formStatus(message, view.stage == SignInStage::Failed);
 }
 
 void DashboardUi::picker(std::size_t panel) {
@@ -656,7 +723,7 @@ void DashboardUi::update(std::uint32_t now) {
       waitingWifi_ = false; formStatus(workspace.message, true);
     } else if (!controller_.changingWifi()) {
       waitingWifi_ = false;
-      if (workspace.tokenConfigured) dashboard(); else cloud();
+      if (workspace.tokenConfigured) dashboard(); else signIn(workspace.origin);
       return;
     }
   }
@@ -671,10 +738,11 @@ void DashboardUi::update(std::uint32_t now) {
     // Only a missing configuration needs setup. A saved Wi-Fi network that is
     // unavailable is retried in the background, so the dashboard stays and
     // returns to live readings when the network does.
-    if (changed && !workspace.hasSnapshot && workspace.connection == Connection::NeedCloud) { cloud(); return; }
+    if (changed && !workspace.hasSnapshot && workspace.connection == Connection::NeedCloud) { signIn(workspace.origin); return; }
     updateCards(now);
   } else if (page_ == Page::Details) updateDetails(now);
   else if (page_ == Page::Wifi) updateNetworks();
+  else if (page_ == Page::SignIn && changed) updateSignIn();
   else if (page_ == Page::Settings && changed) {
     setText(widget("firmware-status"), firmwareStatus(workspace.firmware));
     lv_obj_set_style_text_color(widget("firmware-status"), lv_color_hex(workspace.firmware.confirmationFailed ? Warning : Muted), 0);

@@ -16,7 +16,7 @@ flowchart LR
   UI --> LCD[ST7701 and GT911 board adapter]
 ```
 
-Domain types have no Arduino or LVGL dependency. The controller owns connection verification, four stable selections, persistence and request generations. An older in-flight reply cannot restore a previous account after a configuration change. JSON and hardware libraries remain outside the application boundary.
+Domain types have no Arduino or LVGL dependency. The controller owns connection verification, four stable selections, persistence and request generations. `DeviceSignIn` runs sign-in with a code: it holds the device code, follows the server's polling interval and hands the approved read token to the same verification as a typed token. An older in-flight reply cannot restore a previous account after a configuration change. JSON and hardware libraries remain outside the application boundary.
 
 `app-contract.json` pins public App policy, timing constants and behavioral fixtures by commit and SHA-256. `tools/generate_contract.py` verifies those bytes and emits a C++ state table and the measurement tone bounds in `build/generated`. The JSON adapter retains bounded per-project state and sorts it before the domain aggregates account status. Both App and ESP32 run the same contract cases, including exact freshness boundaries, offline aging, attention priority, account isolation, plan usage reset countdowns and plan usage tones. Web consumes the same App snapshot.
 

@@ -4,12 +4,14 @@
 #include "response_buffer.h"
 #include "../adapters/catalog_json.h"
 #include "../adapters/cloud_http.h"
+#include "../adapters/device_auth.h"
 #include "../adapters/settings_json.h"
 #include "../domain/clock.h"
 
 #include <Preferences.h>
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <ctime>
 #include <esp_heap_caps.h>
 #include <map>
@@ -60,6 +62,28 @@ struct CloudJob {
   ~CloudJob() { wipe(token); }
 };
 
+struct SignInJob {
+  std::uint32_t attempt;
+  std::string origin;
+  std::string deviceCode;
+  ~SignInJob() { wipe(deviceCode); }
+};
+
+// The worker queue holds one of the two requests.
+struct WorkerJob {
+  std::unique_ptr<CloudJob> read;
+  std::unique_ptr<SignInJob> signIn;
+};
+
+// The token name on the server: the last three bytes of the station MAC, such as 1A2B3C.
+std::string deviceName() {
+  std::uint8_t mac[6] = {};
+  WiFi.macAddress(mac);
+  char name[7];
+  std::snprintf(name, sizeof(name), "%02X%02X%02X", mac[3], mac[4], mac[5]);
+  return name;
+}
+
 // Owned by the worker task. HTTP keep-alive reuses the TLS connection while
 // the origin stays the same and every response is read completely.
 class CloudSession {
@@ -91,19 +115,68 @@ class CloudSession {
     if (result->error != CloudError::None) close();
     return result;
   }
+  std::unique_ptr<SignInResult> signIn(const SignInJob& job) {
+    if (origin_ != job.origin) close();
+    const bool reused = client_ && client_->connected();
+    auto result = post(job);
+    if (reused && (result->error == SignInError::Network || result->error == SignInError::Tls)) {
+      close();
+      result = post(job);
+    }
+    // Pending and slow-down replies are complete responses on a healthy connection.
+    if (result->error != SignInError::None && result->error != SignInError::Pending && result->error != SignInError::SlowDown) close();
+    return result;
+  }
  private:
   std::unique_ptr<NetworkClientSecure> client_;
   HTTPClient http_;
   std::string origin_;  // the origin of client_
 
+  void connect(const std::string& origin) {
+    if (client_) return;
+    client_ = std::make_unique<NetworkClientSecure>();
+    prepareHttps(*client_, http_, 4000);
+    origin_ = origin;
+  }
+
+  // RFC 8628 requests are form posts. Only 200 and 400 replies carry a body to read.
+  std::unique_ptr<SignInResult> post(const SignInJob& job) {
+    const bool start = job.deviceCode.empty();
+    auto failed = [&](SignInError error) { auto result = std::make_unique<SignInResult>(); result->attempt = job.attempt; result->error = error; return result; };
+    connect(job.origin);
+    if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + (start ? DeviceStartPath : DeviceTokenPath)).c_str())) return failed(SignInError::Network);
+    http_.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    http_.addHeader("Accept", "application/json");
+    std::string form = start ? deviceStartBody(deviceName()) : deviceTokenBody(job.deviceCode);
+    const int status = http_.POST(reinterpret_cast<std::uint8_t*>(form.data()), form.size());
+    wipe(form);
+    if (status <= 0) {
+      char error[128];
+      const auto tls = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED;
+      http_.end();
+      return failed(tls ? SignInError::Tls : SignInError::Network);
+    }
+    std::unique_ptr<SignInResult> result;
+    if (status == 200 || status == 400) {
+      ResponseBuffer body(MaxDeviceReplyBytes);
+      const int read = http_.writeToStream(&body);
+      http_.end();
+      if (body.timedOut() || read < 0) return failed(SignInError::Network);
+      if (body.oversized() || body.outOfMemory()) return failed(SignInError::InvalidResponse);
+      result = std::make_unique<SignInResult>(start ? decodeDeviceStart(status, body.body(), job.origin) : decodeDeviceToken(status, body.body()));
+    } else {
+      result = std::make_unique<SignInResult>(start ? decodeDeviceStart(status, {}, job.origin) : decodeDeviceToken(status, {}));
+      if (status == 429 || status >= 500) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
+      http_.end();
+    }
+    result->attempt = job.attempt;
+    return result;
+  }
+
   std::unique_ptr<CloudResult> request(const CloudJob& job) {
     auto result = std::make_unique<CloudResult>();
     result->generation = job.generation;
-    if (!client_) {
-      client_ = std::make_unique<NetworkClientSecure>();
-      prepareHttps(*client_, http_, 4000);
-      origin_ = job.origin;
-    }
+    connect(job.origin);
     if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + job.path).c_str())) {
       result->error = CloudError::Network;
       return result;
@@ -264,9 +337,10 @@ void EspWifi::tick(std::uint32_t now) {
 }
 
 bool EspCloud::begin() {
-  jobs_ = xQueueCreate(1, sizeof(CloudJob*));
+  jobs_ = xQueueCreate(1, sizeof(WorkerJob*));
   results_ = xQueueCreate(1, sizeof(CloudResult*));
-  if (!jobs_ || !results_) return false;
+  signInResults_ = xQueueCreate(1, sizeof(SignInResult*));
+  if (!jobs_ || !results_ || !signInResults_) return false;
   return xTaskCreatePinnedToCore(work, "vibemon-https", 12288, this, 1, &worker_, 0) == pdPASS;
 }
 
@@ -275,11 +349,29 @@ bool EspCloud::start(const CloudRequest& request) {
   bool expected = false;
   if (!busy_.compare_exchange_strong(expected, true)) return false;
   // The queue holds only a pointer, so the token exists in one wiped copy.
-  auto* job = new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope), request.ifNoneMatch};
+  auto* job = new WorkerJob{std::unique_ptr<CloudJob>(new CloudJob{request.generation, request.origin, request.token, sourcesPath(request.scope), request.ifNoneMatch}), nullptr};
   if (xQueueSend(jobs_, &job, 0) == pdTRUE) return true;
   delete job;
   busy_ = false;
   return false;
+}
+
+bool EspCloud::startSignIn(const SignInRequest& request) {
+  if (!jobs_ || request.origin.size() > MaxOriginBytes) return false;
+  bool expected = false;
+  if (!busy_.compare_exchange_strong(expected, true)) return false;
+  auto* job = new WorkerJob{nullptr, std::unique_ptr<SignInJob>(new SignInJob{request.attempt, request.origin, request.deviceCode})};
+  if (xQueueSend(jobs_, &job, 0) == pdTRUE) return true;
+  delete job;
+  busy_ = false;
+  return false;
+}
+
+std::unique_ptr<SignInResult> EspCloud::takeSignIn() {
+  SignInResult* result = nullptr;
+  if (!signInResults_ || xQueueReceive(signInResults_, &result, 0) != pdTRUE) return {};
+  busy_ = false;
+  return std::unique_ptr<SignInResult>(result);
 }
 
 std::unique_ptr<CloudResult> EspCloud::take() {
@@ -292,10 +384,16 @@ std::unique_ptr<CloudResult> EspCloud::take() {
 void EspCloud::work(void* context) {
   auto& self = *static_cast<EspCloud*>(context);
   CloudSession session;
-  CloudJob* job = nullptr;
+  WorkerJob* received = nullptr;
   for (;;) {
-    if (xQueueReceive(self.jobs_, &job, pdMS_TO_TICKS(IdleSessionMs)) != pdTRUE) { session.close(); continue; }
-    auto* result = session.fetch(*std::unique_ptr<CloudJob>(job)).release();
+    if (xQueueReceive(self.jobs_, &received, pdMS_TO_TICKS(IdleSessionMs)) != pdTRUE) { session.close(); continue; }
+    std::unique_ptr<WorkerJob> job(received);
+    if (job->signIn) {
+      auto* result = session.signIn(*job->signIn).release();
+      if (xQueueSend(self.signInResults_, &result, portMAX_DELAY) != pdTRUE) delete result;
+      continue;
+    }
+    auto* result = session.fetch(*job->read).release();
     if (xQueueSend(self.results_, &result, portMAX_DELAY) != pdTRUE) delete result;
   }
 }

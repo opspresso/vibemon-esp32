@@ -336,13 +336,53 @@ int main() {
       screenshot("picker-refreshed");
     }
     {
+      // Sign-in with a code: the device shows the code and its QR, then connects after approval.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.10.0");
+      app.begin(timeMs);
+      DashboardUi ui(app); CHECK(ui.begin());
+      wifi.connected(); app.tick(++timeMs); advance(ui);
+      CHECK(ui.page() == Page::SignIn && app.signIn().stage == SignInStage::Requesting);
+      app.tick(++timeMs); CHECK(cloud.signIns.size() == 1 && cloud.signIns[0].origin == "https://vibemon.io");
+      advance(ui); CHECK(findText(lv_screen_active(), "Getting a code...")); screenshot("sign-in-requesting");
+      cloud.signedIn(Cloud::code()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(std::string(lv_label_get_text(ui.widget("sign-in-code"))) == "BCDF-GHJK");
+      CHECK(std::string(lv_label_get_text(ui.widget("sign-in-page"))) == "vibemon.io/device");
+      CHECK(!lv_obj_is_hidden(ui.widget("sign-in-steps")) && lv_obj_is_hidden(ui.widget("new-code")));
+      CHECK(findText(lv_screen_active(), "Waiting for approval..."));
+      screenshot("sign-in");
+      timeMs += 5000; app.tick(timeMs); CHECK(cloud.signIns.size() == 2);
+      SignInResult granted; granted.token = "vm_" + std::string(60, 'd');
+      cloud.signedIn(granted); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.page() == Page::SignIn && app.changingCloud() && findText(lv_screen_active(), "Approved. Connecting..."));
+      app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); advance(ui, 300);
+      CHECK(ui.page() == Page::Dashboard && store.saved.readToken == "vm_" + std::string(60, 'd'));
+    }
+    {
+      // A denied request explains itself and offers a new code.
+      Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
+      Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.10.0");
+      app.begin(timeMs);
+      DashboardUi ui(app); CHECK(ui.begin());
+      wifi.connected(); app.tick(++timeMs); advance(ui); app.tick(++timeMs);
+      cloud.signedIn(Cloud::code()); app.tick(++timeMs);
+      timeMs += 5000; app.tick(timeMs);
+      cloud.signedIn(Cloud::error(SignInError::Denied)); app.tick(++timeMs); advance(ui, 300);
+      CHECK(lv_obj_is_hidden(ui.widget("sign-in-steps")) && !lv_obj_is_hidden(ui.widget("new-code")));
+      CHECK(findText(lv_screen_active(), "The request was denied. Get a new code to try again."));
+      screenshot("sign-in-denied");
+      tap(ui, "new-code"); app.tick(++timeMs); CHECK(cloud.signIns.size() == 3 && app.signIn().stage == SignInStage::Requesting);
+    }
+    {
       // The first workspace setup shows the server's failure, not the setup prompt again.
       Store store; store.result = LoadResult::Loaded; store.saved.ssid = "Workshop"; store.saved.wifiPassword = "test-password";
       Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs);
       DashboardUi ui(app); CHECK(ui.begin());
       wifi.connected(); app.tick(++timeMs); advance(ui);
-      CHECK(ui.page() == Page::CloudForm);
+      // A first setup offers a code; a token can still be entered by hand.
+      CHECK(ui.page() == Page::SignIn);
+      tap(ui, "enter-token"); CHECK(ui.page() == Page::CloudForm && app.signIn().stage == SignInStage::Idle);
       lv_textarea_set_text(ui.widget("read-token"), ("vm_" + std::string(60, 'c')).c_str()); tap(ui, "connect-cloud");
       CHECK(app.changingCloud()); app.tick(++timeMs);
       cloud.complete({}, CloudError::Tls); app.tick(++timeMs); advance(ui);

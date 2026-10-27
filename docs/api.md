@@ -34,6 +34,17 @@ Wi-Fi recovery and cancelling a replacement keep a saved token's rejection and i
 
 Plan usage bars (metric keys that start with `usage`) use the App contract's tones: warning from 70 and danger from 90, both inclusive. Other bars use the accent color. Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
+## Sign-in with a code
+
+The device uses VibeMon's device authorization (RFC 8628) as the client `vibemon-touch`, which may request only the `read` scope.
+
+1. `POST /api/oauth/device` with the form fields `client_id=vibemon-touch`, `scope=read` and `device_name`, the last six hex digits of the Wi-Fi MAC address. The reply must contain a `device_code`, a `user_code` of two groups of four consonants such as `BCDF-GHJK`, `verification_uri` and `verification_uri_complete` on the same origin, `expires_in` from 60 to 3600 seconds and `interval` from 1 to 60 seconds. A page on another origin makes the reply invalid, so a person never approves a code on another site.
+2. The screen shows the user code, the page address and `verification_uri_complete` as a QR code. The device code never reaches the screen or the log.
+3. Every `interval` seconds, `POST /api/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `client_id` and `device_code`. `authorization_pending` keeps waiting; `slow_down` adds 5 seconds to every later interval. `access_denied`, `expired_token` and `invalid_grant` end the attempt; the device also ends it when `expires_in` passes on its own clock. A 404 reply or `invalid_client` means the server has no code sign-in for this device, so the person enters a read token instead.
+4. A token reply must be a `Bearer` token with exactly the `read` scope, in the same format as a typed token. The device then checks the workspace with it and saves it like a typed token; a failed check saves nothing.
+
+Network, certificate, server and rate-limit failures keep the current code and retry after the interval or the server's `Retry-After`. Sign-in requests share the workspace connection and wait while a workspace read is in flight. Leaving the screen discards replies of that attempt.
+
 ## Persistent settings
 
 The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key and four selections. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.
