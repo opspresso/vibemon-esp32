@@ -229,6 +229,22 @@ int main() {
       CHECK(flushes == standbyFlushes);
     }
     {
+      // An account that only a connected service reports: plan usage, no project count, context or project list.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs); wifi.connected(); app.tick(timeMs);
+      auto catalog = demo();
+      auto& account = catalog.items.back();
+      account.name = "Claude plan"; account.activity = "standby"; account.project.clear(); account.projects.clear();
+      account.metrics = {{"usageSessionPercent", "Session", "%", 12.5, MetricDisplay::Bar, 0, 100, 125}, {"usageWeekPercent", "Weekly", "%", 42, MetricDisplay::Bar, 0, 100, 1439}};
+      cloud.complete(catalog); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("connected-only-dashboard");
+      CHECK(std::string(lv_label_get_text(ui.widget("panel-status-0"))) == "Standby");
+      CHECK(std::string(lv_label_get_text(ui.widget("panel-name-0"))) == "Claude plan");
+      CHECK(!findText(ui.widget("panel-0"), "Context"));
+      tap(ui, "panel-0"); CHECK(ui.page() == Page::Details); screenshot("connected-only-details");
+      CHECK(!findText(lv_screen_active(), "Reporting projects") && findText(lv_screen_active(), "Weekly"));
+    }
+    {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       app.begin(timeMs); wifi.connected(); app.tick(timeMs);
       auto catalog = demo();

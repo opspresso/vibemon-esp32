@@ -108,6 +108,18 @@ int main() {
       auto variant = sample(); variant.replace(variant.find(from), from.size(), to);
       Catalog decoded; CHECK(!decodeCatalog(variant, decoded).ok);
     }
+    {
+      // The server's source for an account that only a connected service reports: plan usage, no project or context.
+      Catalog connected;
+      CHECK(decodeCatalog(R"({"serverTime":"2026-10-11T10:00:00.000Z","sources":[
+        {"sourceId":"usage:6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","kind":"agent","displayName":"person@example.com","observedAt":"2026-10-11T09:58:00.000Z","receivedAt":"2026-10-11T09:58:00.000Z","health":"ok","stale":false,
+         "metrics":{"usageSessionPercent":12.5,"usageWeekPercent":42},"account":{"id":"plan","provider":"claude","displayName":"person@example.com"},
+         "agent":{"state":"standby","project":"person@example.com","usageWeekResetsIn":60,"usageWeekModel":7,"usageWeekModelLabel":"Fable"}}]})", connected).ok);
+      const auto* plan = connected.find({ItemKind::Account, "claude:plan"});
+      CHECK(plan && plan->projects.empty() && plan->metrics.size() == 3);
+      CHECK(plan->metrics[0].key == "usageSessionPercent" && plan->metrics[1].key == "usageWeekPercent" && plan->metrics[2].key == "usageWeekModel");
+      CHECK(stateLabel(monitorState(*plan, 0)) == "Standby" && monitorTitle(*plan, 0) == "person@example.com");
+    }
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
     CHECK(stateLabel(monitorState(*account, 180000)) == "Working");
     CHECK(stateLabel(monitorState(*account, 600000)) == "Standby");

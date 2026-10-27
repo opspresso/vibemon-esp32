@@ -102,7 +102,7 @@ bool modelUsage(JsonVariantConst agent, Monitor& monitor) {
   return true;
 }
 
-bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& monitor) {
+bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& monitor, bool planUsageOnly = false) {
   const auto values = source["metrics"].as<JsonObjectConst>();
   if (values.isNull()) return false;
   // Labels are the App's shared metric messages; plan usage uses its compact form.
@@ -114,6 +114,7 @@ bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& mon
   const std::size_t count = kind == "agent" ? 3 : kind == "cluster" ? 5 : 4;
   for (std::size_t i = 0; i < count; ++i) {
     const auto& preset = presets[i];
+    if (planUsageOnly && !preset.reset) continue;
     Metric metric;
     metric.key = preset.key; metric.label = sharedLabel(preset.label); metric.unit = preset.unit;
     if (metric.key == "memoryPercent" && source["memoryType"] == "unified") metric.label = sharedLabel("metric.unifiedMemory");
@@ -181,8 +182,11 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
           !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return invalid("A coding account contains invalid fields.");
       item.selection = {ItemKind::Account, provider + ":" + accountId};
       item.category = providerLabel(provider) + " · " + accountName(item.selection.id);
-      item.projects.push_back(item);
-      if (!presetMetrics(source, kind, item)) return invalid("A coding account contains invalid measurements.");
+      // A connected service (`usage:` source) reads plan usage only. The server adds such a source only
+      // for an account without hook reports: it has no project and no context, as in every client.
+      const bool connected = id.rfind("usage:", 0) == 0;
+      if (!connected) item.projects.push_back(item);
+      if (!presetMetrics(source, kind, item, connected)) return invalid("A coding account contains invalid measurements.");
       auto previous = accounts.find(item.selection.id);
       if (previous != accounts.end()) {
         auto& current = candidate.items[previous->second];
