@@ -155,20 +155,20 @@ int main() {
       app.tick(300); CHECK(cloud.requests.size() == 1 && store.writes == 1);
       cloud.complete(catalog()); app.tick(400);
       CHECK(app.workspace().connection == Connection::Online && store.writes == 2);
-      CHECK(app.workspace().panels[0].id == "one" && app.workspace().panels[1].id == "codex:work");
+      CHECK(app.workspace().panels[0].id == "codex:work" && app.workspace().panels[1].id == "one");
       CHECK(store.saved.panelsInitialized && app.workspace().tokenConfigured);
       for (std::uint32_t tick = 401; tick < 400 + PollIntervalMs; ++tick) app.tick(tick);
       CHECK(cloud.requests.size() == 1 && store.writes == 2);
       app.tick(400 + PollIntervalMs); CHECK(cloud.requests.size() == 2);
       cloud.complete(catalog()); app.tick(401 + PollIntervalMs); CHECK(store.writes == 2);
-      CHECK(app.select(0, {ItemKind::Resource, "one"}).ok && store.writes == 2);
+      CHECK(app.select(0, {ItemKind::Account, "codex:work"}).ok && store.writes == 2);
       CHECK(!app.select(4, {}).ok && !app.select(0, {ItemKind::Resource, "missing"}).ok);
       CHECK(app.select(0, {}).ok && store.writes == 3);
       app.refresh(); app.tick(402 + PollIntervalMs); cloud.complete(catalog()); app.tick(403 + PollIntervalMs);
       CHECK(app.workspace().panels[0].id.empty());
       Store rebootedStore = store; Wifi rebootedWifi; Cloud rebootedCloud; Update rebootedUpdate;
       Controller rebooted(rebootedStore, rebootedWifi, rebootedCloud, rebootedUpdate, "3.4.0"); rebooted.begin(0);
-      CHECK(rebooted.workspace().panels[0].id.empty() && rebooted.workspace().panels[1].id == "codex:work");
+      CHECK(rebooted.workspace().panels[0].id.empty() && rebooted.workspace().panels[1].id == "one");
     }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
@@ -182,7 +182,7 @@ int main() {
       cloud.complete(catalog("new-owner")); app.tick(4);
       CHECK(app.workspace().catalog.find({ItemKind::Resource, "new-owner"}));
       CHECK(!app.workspace().catalog.find({ItemKind::Resource, "previous-owner"}));
-      CHECK(app.workspace().panels[0].id == "new-owner" && store.saved.origin == "https://other.example");
+      CHECK(app.workspace().panels[1].id == "new-owner" && store.saved.origin == "https://other.example");
       CHECK(!app.saveCloud("https://third.example", "").ok);
       CHECK(app.saveCloud("https://other.example", "").ok);
     }
@@ -254,9 +254,9 @@ int main() {
       app.begin(0); wifi.connected(); app.tick(1);
       CHECK(cloud.requests.back().scope.empty());
       cloud.complete(catalog()); app.tick(2);
-      CHECK(app.workspace().catalogComplete && app.workspace().panels[0].id == "one");
+      CHECK(app.workspace().catalogComplete && app.workspace().panels[0].id == "codex:work");
       app.tick(2 + PollIntervalMs);
-      const std::vector<Selection> panels{{ItemKind::Resource, "one"}, {ItemKind::Account, "codex:work"}};
+      const std::vector<Selection> panels{{ItemKind::Account, "codex:work"}, {ItemKind::Resource, "one"}};
       CHECK(cloud.requests.size() == 2 && cloud.requests.back().scope == panels);
       Catalog selected = catalog(); selected.items.pop_back();
       app.browse(true);
@@ -452,7 +452,7 @@ int main() {
       // re-anchors its report clock at X-Server-Time.
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
       const std::int64_t t0 = 1790000000000;
-      const std::vector<Selection> panels{{ItemKind::Resource, "one"}, {ItemKind::Account, "codex:work"}};
+      const std::vector<Selection> panels{{ItemKind::Account, "codex:work"}, {ItemKind::Resource, "one"}};
       app.begin(0); wifi.connected(); app.tick(1);
       CHECK(cloud.requests.back().ifNoneMatch.empty());
       cloud.tagged(catalog(), "W/\"all-1\"", t0); app.tick(2);

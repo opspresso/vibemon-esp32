@@ -1,12 +1,12 @@
 {
   "repository": "opspresso/vibemon-app",
-  "revision": "ad5e4dee0cca2a83800de4445f5a684b50e0fec3",
+  "revision": "eca842d4ca9b379dc720e105d65fea593d2d0896",
   "files": {
     "constants.json": "e9aa61ec5d2b5c66ba7d40d814b4c1bfb247877861f0649c2820f65adc8a8d06",
     "monitoring.json": "c319c7a4a14aa823ad857f7be22c552b8ff1a589b0d209a3f9a775b6c79748e7",
     "cases.json": "af51cdf023d2e87e4812dee828f228218b988fa7288f426269ae735b887840d0",
-    "tokens.css": "5c3fb891c02cc7f3fc8120cef18dae89ec4dd7fdd74e1dc41381fba28503672d",
-    "i18n.json": "ae88fda928ea29306dba6de71db3ad97081f69c790348967dbe0e4c156dcf2cb",
+    "tokens.css": "1f1b1a36af263ec29dd5a7495893ea82ee94a0f064f71e6760ec8f82e639b66e",
+    "i18n.json": "c7bb33cf157c287dd7b6178123042309d90fe07d7e547cb4f068cfb2eb44d53e",
     "LICENSE-App.txt": "59c1bfad7fb2ad12cf9a7bae7b44c85005ba781d47cb1e0a4d5a91ccd582bbfe"
   }
 }

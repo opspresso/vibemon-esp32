@@ -25,6 +25,18 @@ def palette():
         if len(values) != 1:
             raise ValueError("Expected one light-dark hex token: --vm-" + token)
         lines.append("inline constexpr std::uint32_t " + name + " = 0x" + values[0] + ";")
+    # Product-card geometry in pixels, as iOS and Android compile it.
+    for name, token in {"PanelRadius": "radius-panel", "PanelPadding": "panel-padding"}.items():
+        values = re.findall(r"--vm-" + re.escape(token) + r"\s*:\s*(\d+)px\s*;", css)
+        if len(values) != 1 or not 0 < int(values[0]) <= 64:
+            raise ValueError("Expected one pixel length up to 64px: --vm-" + token)
+        lines.append("inline constexpr int " + name + " = " + values[0] + ";")
+    # Agent-card motion durations in milliseconds.
+    for name in ["orbit", "start", "planning", "packing", "breathe", "danger", "wait", "complete"]:
+        values = re.findall(r"--vm-agent-" + name + r"\s*:\s*(\d+)ms\s*;", css)
+        if len(values) != 1 or not 0 < int(values[0]) <= 60000:
+            raise ValueError("Expected one motion duration up to 60000ms: --vm-agent-" + name)
+        lines.append("inline constexpr std::uint32_t Agent" + name.capitalize() + "Ms = " + values[0] + ";")
     return "\n".join([*lines, "}  // namespace vibemon::design", ""])
 
 

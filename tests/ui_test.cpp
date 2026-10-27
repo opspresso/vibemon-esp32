@@ -152,12 +152,12 @@ int main() {
       CHECK(lv_font_get_glyph_dsc(categoryFont, &glyph, 0xD55C, 0) && !glyph.is_placeholder);
       // Animated lights must refresh bounded regions, not the whole dashboard.
       advance(ui, 250); const auto stable = flushes; const auto pixelsBefore = flushedPixels;
-      advance(ui, 1000); CHECK(flushes > stable);
+      advance(ui, design::AgentWaitMs); CHECK(flushes > stable);
       CHECK(flushedPixels - pixelsBefore < 480 * 480 * 4);
       tap(ui, "panel-3"); CHECK(ui.page() == Page::Details); screenshot("resource-details");
       tap(ui, "change-item"); CHECK(ui.page() == Page::Picker); screenshot("picker");
-      tap(ui, "filter-2"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
-      CHECK(findText(ui.widget("item-0"), "Codex · work")); screenshot("picker-accounts");
+      tap(ui, "filter-1"); CHECK(ui.widget("item-0") && !ui.widget("item-1"));
+      CHECK(findText(ui.widget("item-0"), "Codex · work")); screenshot("picker-agents");
       tap(ui, "item-0"); CHECK(ui.page() == Page::Dashboard && app.workspace().panels[3].id == "codex:work");
       CHECK(std::string(lv_label_get_text(ui.widget("panel-name-3"))) == "release-review");
       // Plan usage at its limit fills in danger; context is not plan usage and keeps the accent.
@@ -240,7 +240,7 @@ int main() {
       for (int i = 0; i < 32; ++i) resource.metrics.push_back({"metric" + std::to_string(i), longLabel + std::to_string(i), "requests/second!", 9007199254740991.0, MetricDisplay::Number, 0, {}, {}});
       cloud.complete(catalog); app.tick(++timeMs);
       DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("long-dashboard");
-      tap(ui, "panel-0"); CHECK(ui.page() == Page::Details);
+      tap(ui, "panel-1"); CHECK(ui.page() == Page::Details);
       auto* list = ui.widget("detail-list");
       CHECK(findText(list, resource.name)); CHECK(findText(list, resource.statusMessage));
       CHECK(findText(list, "9,007,199,254,740,991 requests/second!"));
@@ -270,7 +270,7 @@ int main() {
       cloud.complete(catalog); app.tick(++timeMs); advance(ui);
       CHECK(findText(list, "0 requests/second!")); CHECK(lv_obj_get_scroll_y(list) == offset);
       advance(ui, 300); const auto stable = flushes; advance(ui, 1000); CHECK(flushes == stable);
-      tap(ui, "back"); tap(ui, "panel-1");
+      tap(ui, "back"); tap(ui, "panel-0");
       list = ui.widget("detail-list");
       CHECK(findText(list, "web-console") && findText(list, "release-review"));
       CHECK(findText(list, "Working") && findText(list, "Needs input"));
@@ -372,7 +372,9 @@ int main() {
       const auto x = lv_obj_get_x(light), y = lv_obj_get_y(light);
       const auto opacity = lv_obj_get_style_opa(light, LV_PART_MAIN);
       const auto before = flushedPixels;
-      screenshot("motion-" + state + "-a"); advance(ui, 800);
+      // Completion sweeps once within its duration; an input request pulses late in its wait cycle.
+      const std::uint32_t step = state == "done" ? design::AgentCompleteMs / 2 : state == "notification" ? design::AgentWaitMs * 4 / 5 : 800;
+      screenshot("motion-" + state + "-a"); advance(ui, step);
       const auto painted = flushedPixels - before;
       CHECK(painted < 480 * 480 * 4);
       if (!active) CHECK(painted == 0);
@@ -383,7 +385,7 @@ int main() {
         advance(ui, 800); CHECK(lv_obj_is_hidden(light));
         const auto settled = flushes; advance(ui, 800); CHECK(flushes == settled);
       }
-      std::cout << "Motion " << state << ": " << painted << " pixels / 800ms across four cards\n";
+      std::cout << "Motion " << state << ": " << painted << " pixels / " << step << "ms across four cards\n";
       if (state == "working") {
         tap(ui, "panel-light-0-0"); CHECK(ui.page() == Page::Details);
         CHECK(!ui.widget("panel-light-0-0"));

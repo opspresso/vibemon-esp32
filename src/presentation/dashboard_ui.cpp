@@ -76,25 +76,31 @@ std::uint32_t toneColor(MetricTone tone) {
   return tone == MetricTone::Danger ? Danger : tone == MetricTone::Warning ? Warning : Accent;
 }
 
+constexpr int CardWidth = 216, CardHeight = 174, ContentWidth = CardWidth - 2 * PanelPadding;
+// Account labels are short words, so plan usage and its reset time get the wider value column.
+constexpr int ResourceValueWidth = 88, AccountValueWidth = 124;
+// Lights travel on the card border, one pixel inside its outer edge.
 lv_point_t edgePoint(float phase) {
-  constexpr float pi = 3.14159265f, radius = 15, horizontal = 184, vertical = 142, arc = pi * radius / 2;
+  constexpr float pi = 3.14159265f, corner = PanelRadius, radius = corner - 1;
+  constexpr float horizontal = CardWidth - 2 * corner, vertical = CardHeight - 2 * corner, arc = pi * radius / 2;
+  constexpr float right = CardWidth - corner, bottom = CardHeight - corner;
   float distance = (phase - std::floor(phase)) * (2 * (horizontal + vertical) + 4 * arc);
   auto point = [](float x, float y) { return lv_point_t{static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y))}; };
-  if (distance < horizontal) return point(16 + distance, 1);
+  if (distance < horizontal) return point(corner + distance, 1);
   distance -= horizontal;
-  if (distance < arc) return point(200 + radius * std::sin(distance / radius), 16 - radius * std::cos(distance / radius));
+  if (distance < arc) return point(right + radius * std::sin(distance / radius), corner - radius * std::cos(distance / radius));
   distance -= arc;
-  if (distance < vertical) return point(215, 16 + distance);
+  if (distance < vertical) return point(CardWidth - 1, corner + distance);
   distance -= vertical;
-  if (distance < arc) return point(200 + radius * std::cos(distance / radius), 158 + radius * std::sin(distance / radius));
+  if (distance < arc) return point(right + radius * std::cos(distance / radius), bottom + radius * std::sin(distance / radius));
   distance -= arc;
-  if (distance < horizontal) return point(200 - distance, 173);
+  if (distance < horizontal) return point(right - distance, CardHeight - 1);
   distance -= horizontal;
-  if (distance < arc) return point(16 - radius * std::sin(distance / radius), 158 + radius * std::cos(distance / radius));
+  if (distance < arc) return point(corner - radius * std::sin(distance / radius), bottom + radius * std::cos(distance / radius));
   distance -= arc;
-  if (distance < vertical) return point(1, 158 - distance);
+  if (distance < vertical) return point(1, bottom - distance);
   distance -= vertical;
-  return point(16 - radius * std::cos(distance / radius), 16 - radius * std::sin(distance / radius));
+  return point(corner - radius * std::cos(distance / radius), corner - radius * std::sin(distance / radius));
 }
 }  // namespace
 
@@ -191,7 +197,7 @@ void DashboardUi::dashboard() {
   for (std::size_t i = 0; i < PanelCount; ++i) {
     auto& card = cards_[i];
     card.box = lv_button_create(root_);
-    box(card.box, 16 + static_cast<int>(i % 2) * 232, 94 + static_cast<int>(i / 2) * 186, 216, 174, Surface);
+    box(card.box, 16 + static_cast<int>(i % 2) * 232, 94 + static_cast<int>(i / 2) * 186, CardWidth, CardHeight, Surface, PanelRadius);
     lv_obj_set_style_border_width(card.box, 1, 0);
     lv_obj_set_style_border_color(card.box, lv_color_hex(Border), 0);
     lv_obj_set_style_shadow_opa(card.box, LV_OPA_30, 0);
@@ -202,28 +208,28 @@ void DashboardUi::dashboard() {
       else picker(i);
     });
     widgets_["panel-" + std::to_string(i)] = card.box;
-    card.category = label(card.box, "PANEL " + std::to_string(i + 1), 14, 13, 168, fonts_.small(), Muted);
+    card.category = label(card.box, "PANEL " + std::to_string(i + 1), PanelPadding, 13, ContentWidth - 20, fonts_.small(), Muted);
     widgets_["panel-category-" + std::to_string(i)] = card.category;
-    label(card.box, LV_SYMBOL_RIGHT, 188, 13, 16, &lv_font_montserrat_12, Muted);
-    card.name = label(card.box, "", 14, 34, 188, fonts_.title());
+    label(card.box, LV_SYMBOL_RIGHT, CardWidth - PanelPadding - 16, 13, 16, &lv_font_montserrat_12, Muted);
+    card.name = label(card.box, "", PanelPadding, 34, ContentWidth, fonts_.title());
     widgets_["panel-name-" + std::to_string(i)] = card.name;
-    card.empty = label(card.box, "+\nChoose an item", 12, 61, 192, fonts_.normal(), Accent);
+    card.empty = label(card.box, "+\nChoose an item", PanelPadding, 61, ContentWidth, fonts_.normal(), Accent);
     lv_obj_set_style_text_align(card.empty, LV_TEXT_ALIGN_CENTER, 0);
     wrap(card.empty);
     for (std::size_t metric = 0; metric < 3; ++metric) {
       const int y = 67 + static_cast<int>(metric) * 28;
-      card.labels[metric] = label(card.box, "", 14, y + 3, 101, fonts_.small(), Muted);
-      card.values[metric] = label(card.box, "", 114, y + 3, 88, fonts_.small());
+      card.labels[metric] = label(card.box, "", PanelPadding, y + 3, ContentWidth - ResourceValueWidth, fonts_.small(), Muted);
+      card.values[metric] = label(card.box, "", CardWidth - PanelPadding - ResourceValueWidth, y + 3, ResourceValueWidth, fonts_.small());
       lv_obj_set_style_text_align(card.values[metric], LV_TEXT_ALIGN_RIGHT, 0);
       card.bars[metric] = lv_bar_create(card.box);
       widgets_["panel-bar-" + std::to_string(i) + "-" + std::to_string(metric)] = card.bars[metric];
-      box(card.bars[metric], 14, y + 23, 188, 2, Border, 1);
+      box(card.bars[metric], PanelPadding, y + 23, ContentWidth, 2, Border, 1);
       lv_bar_set_range(card.bars[metric], 0, 1000);
       lv_obj_set_style_bg_color(card.bars[metric], lv_color_hex(Accent), LV_PART_INDICATOR);
       lv_obj_set_style_bg_opa(card.bars[metric], LV_OPA_COVER, LV_PART_INDICATOR);
       lv_obj_set_style_radius(card.bars[metric], 1, LV_PART_INDICATOR);
     }
-    card.footer = label(card.box, "", 14, 152, 190, fonts_.small(), Muted);
+    card.footer = label(card.box, "", PanelPadding, 152, ContentWidth, fonts_.small(), Muted);
     widgets_["panel-status-" + std::to_string(i)] = card.footer;
     for (std::size_t lightIndex = 0; lightIndex < card.lights.size(); ++lightIndex) {
       auto*& light = card.lights[lightIndex];
@@ -282,7 +288,7 @@ void DashboardUi::updateCards(std::uint32_t now) {
     if (!item) {
       setText(card.category, "PANEL " + std::to_string(index + 1));
       setText(card.empty, selection.id.empty() ? "+\nChoose an item" : "Item unavailable\nTap to choose another");
-      setText(card.footer, selection.id.empty() ? "Resource or account" : "Selection kept for reconnect");
+      setText(card.footer, selection.id.empty() ? "Agent or resource" : "Selection kept for reconnect");
       if (card.accent != Muted) { lv_obj_set_style_text_color(card.footer, lv_color_hex(Muted), 0); card.accent = Muted; }
     } else {
       setText(card.category, item->category);
@@ -299,9 +305,8 @@ void DashboardUi::updateCards(std::uint32_t now) {
       visible(card.labels[m], available); visible(card.values[m], available);
       if (!available) { visible(card.bars[m], false); continue; }
       const auto& metric = item->metrics[m];
-      // Account labels are short words, so plan usage and its reset time get the wider value column.
       const bool account = item->selection.kind == ItemKind::Account;
-      const int labelWidth = account ? 61 : 101, valueX = account ? 74 : 114, valueWidth = account ? 128 : 88;
+      const int valueWidth = account ? AccountValueWidth : ResourceValueWidth, labelWidth = ContentWidth - valueWidth, valueX = CardWidth - PanelPadding - valueWidth;
       if (lv_obj_get_style_width(card.labels[m], LV_PART_MAIN) != labelWidth) lv_obj_set_width(card.labels[m], labelWidth);
       if (lv_obj_get_x(card.values[m]) != valueX) { lv_obj_set_x(card.values[m], valueX); lv_obj_set_width(card.values[m], valueWidth); }
       setText(card.labels[m], metric.label);
@@ -327,10 +332,16 @@ void DashboardUi::updateCardMotion(std::uint32_t now) {
     const auto tone = stateTone(state);
     const auto elapsed = static_cast<std::uint32_t>(now - card.motionSince);
     const bool waiting = tone == "warning";
-    const bool moving = tone == "active" || needsAttention(state) || (state == "done" && elapsed < 1600);
-    const float period = state == "thinking" ? 6400 : state == "planning" ? 7000 : state == "packing" ? 2400 : tone == "danger" ? 1800 : state == "start" ? 2200 : state == "done" ? 1600 : 3600;
-    const float phase = static_cast<float>(elapsed % static_cast<unsigned>(period)) / period;
-    const float pulse = .5f - .5f * std::cos(static_cast<float>(elapsed % 2400) / 2400 * 6.2831853f);
+    // The App's --vm-agent-* durations: active states travel, thinking also breathes, input requests
+    // pulse late in each wait cycle, errors run fast, and completion makes one sweep.
+    const bool moving = tone == "active" || needsAttention(state) || (state == "done" && elapsed < AgentCompleteMs);
+    const std::uint32_t period = state == "planning" ? AgentPlanningMs : state == "packing" ? AgentPackingMs : state == "start" ? AgentStartMs :
+        tone == "danger" ? AgentDangerMs : state == "done" ? AgentCompleteMs : AgentOrbitMs;
+    const float phase = static_cast<float>(elapsed % period) / period;
+    const float breathe = .5f - .5f * std::cos(static_cast<float>(elapsed % AgentBreatheMs) / AgentBreatheMs * 6.2831853f);
+    const float wait = static_cast<float>(elapsed % AgentWaitMs) / AgentWaitMs;
+    const float waitPulse = wait < .75f ? 0 : .5f - .5f * std::cos((wait - .75f) / .25f * 6.2831853f);
+    const float level = waiting ? .4f + .6f * waitPulse : state == "thinking" ? .4f + .6f * breathe : 1;
     for (std::size_t i = 0; i < card.lights.size(); ++i) {
       auto* light = card.lights[i];
       visible(light, moving);
@@ -342,7 +353,7 @@ void DashboardUi::updateCardMotion(std::uint32_t now) {
       const int size = lv_obj_get_width(light);
       lv_obj_set_pos(light, lv_obj_get_x(card.box) + point.x - size / 2, lv_obj_get_y(card.box) + point.y - size / 2);
       constexpr int opacity[] = {255, 170, 95, 45};
-      const auto alpha = static_cast<lv_opa_t>(opacity[trail] * ((waiting || state == "thinking") ? .4f + .6f * pulse : 1));
+      const auto alpha = static_cast<lv_opa_t>(opacity[trail] * level);
       if (lv_obj_get_style_opa(light, LV_PART_MAIN) != alpha) lv_obj_set_style_opa(light, alpha, 0);
     }
   }
@@ -568,7 +579,7 @@ void DashboardUi::cloud() {
 void DashboardUi::picker(std::size_t panel) {
   clear(Page::Picker); selectedPanel_ = panel; filter_ = 0;
   header("Choose for panel " + std::to_string(panel + 1), [this] { dashboard(); });
-  const char* labels[] = {"All", "Resources", "Accounts"};
+  const char* labels[] = {"All", "Agents", "Resources"};
   for (int i = 0; i < 3; ++i) {
     auto* tab = button(root_, labels[i], 16 + i * 152, 70, 144, 44, [this, i] {
       filter_ = i;
@@ -604,7 +615,7 @@ void DashboardUi::updatePicker() {
   int rowIndex = 0;
   int rowY = 0;
   for (const auto& item : workspace.catalog.items) {
-    if ((filter_ == 1 && item.selection.kind != ItemKind::Resource) || (filter_ == 2 && item.selection.kind != ItemKind::Account)) continue;
+    if ((filter_ == 1 && item.selection.kind != ItemKind::Account) || (filter_ == 2 && item.selection.kind != ItemKind::Resource)) continue;
     auto* row = lv_button_create(list_); box(row, 0, rowY, 448, 68, Surface, 12);
     const bool selected = workspace.panels[selectedPanel_] == item.selection;
     if (selected) { lv_obj_set_style_border_width(row, 1, 0); lv_obj_set_style_border_color(row, lv_color_hex(Accent), 0); }

@@ -57,7 +57,7 @@ On first boot the device shows nearby networks. Choose a 2.4 GHz network, enter 
 
 Next enter the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. The device verifies the connection before saving it. In connection settings, an empty token field retains the saved token only when the server is unchanged.
 
-Tap a dashboard card to select its resource or account. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
+Tap a dashboard card to select its agent or resource. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
 
 ## Optional USB setup
 

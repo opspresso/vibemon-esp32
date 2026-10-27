@@ -209,7 +209,8 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
     return a.observedAtMs == b.observedAtMs ? a.sourceId < b.sourceId : a.observedAtMs > b.observedAtMs;
   });
   std::sort(candidate.items.begin(), candidate.items.end(), [](const Monitor& a, const Monitor& b) {
-    if (a.selection.kind != b.selection.kind) return a.selection.kind < b.selection.kind;
+    // Agents precede resources, as in every VibeMon client.
+    if (a.selection.kind != b.selection.kind) return a.selection.kind == ItemKind::Account;
     return a.name == b.name ? a.selection.id < b.selection.id : a.name < b.name;
   });
   output = std::move(candidate);
