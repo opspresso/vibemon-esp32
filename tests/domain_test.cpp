@@ -118,7 +118,7 @@ int main() {
     CHECK(monitorState(*account, rolloverAge) == "standby");
     CHECK(monitorState(*resource, rolloverAge) == "standby" && !needsAttention("standby"));
     auto panels = defaultPanels(catalog);
-    CHECK(panels[0].kind == ItemKind::Resource && panels[1].kind == ItemKind::Account && panels[2].id == "codex:work" && panels[3].id.empty());
+    CHECK(panels[0].kind == ItemKind::Account && panels[1].kind == ItemKind::Resource && panels[2].id == "codex:work" && panels[3].id.empty());
     const auto before = catalog.items.size();
     auto malformed = sample();
     const auto at = malformed.find("\"gpu\":28.4");

@@ -364,12 +364,12 @@ std::string describeReset(const std::string& countdown) {
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog) {
   std::array<Selection, PanelCount> result{};
   std::size_t next = 0;
-  // Alternate the two categories so the first dashboard includes both when available.
+  // Alternate the two categories, agents first, so the first dashboard includes both when available.
   std::array<std::size_t, 2> cursor{};
   for (std::size_t round = 0; next < PanelCount && round < PanelCount; ++round) {
     for (std::size_t group = 0; group < 2 && next < PanelCount; ++group) {
       auto& index = cursor[group];
-      while (index < catalog.items.size() && catalog.items[index].selection.kind != (group ? ItemKind::Account : ItemKind::Resource)) ++index;
+      while (index < catalog.items.size() && catalog.items[index].selection.kind != (group ? ItemKind::Resource : ItemKind::Account)) ++index;
       if (index < catalog.items.size()) result[next++] = catalog.items[index++].selection;
     }
   }
