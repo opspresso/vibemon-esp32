@@ -80,6 +80,28 @@ int main() {
       const auto* cluster = presets.find({ItemKind::Resource, "k3s"});
       CHECK(cluster && cluster->category == "Kubernetes" && cluster->metrics[4].label == "Unhealthy pods");
     }
+    {
+      // The App's shared card order and account activity line.
+      Catalog ordered;
+      CHECK(decodeCatalog(R"({"serverTime":"2026-10-11T10:00:00.000Z","sources":[
+        {"sourceId":"zeta","kind":"host","displayName":"Zeta","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,"metrics":{"cpuPercent":1}},
+        {"sourceId":"alpha","kind":"host","displayName":"alpha","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,"metrics":{"cpuPercent":1}},
+        {"sourceId":"broken","kind":"host","displayName":"Broken","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"error","stale":false,"metrics":{"cpuPercent":1}},
+        {"sourceId":"old","kind":"host","displayName":"Old","observedAt":"2026-10-11T08:00:00.000Z","receivedAt":"2026-10-11T08:00:00.000Z","health":"ok","stale":true,"metrics":{"cpuPercent":1}},
+        {"sourceId":"one","kind":"agent","displayName":"api","observedAt":"2026-10-11T09:59:58.000Z","receivedAt":"2026-10-11T09:59:58.000Z","health":"ok","stale":false,
+         "metrics":{"contextPercent":1},"account":{"id":"work","provider":"codex","displayName":"Work"},"agent":{"state":"working","project":"api","model":"gpt-5","tool":"Editing"}},
+        {"sourceId":"two","kind":"agent","displayName":"web","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:50.000Z","health":"ok","stale":false,
+         "metrics":{"contextPercent":1},"account":{"id":"home","provider":"claude","displayName":"Home"},"agent":{"state":"idle","project":"web","model":" ","tool":""}},
+        {"sourceId":"three","kind":"agent","displayName":"docs","observedAt":"2026-10-11T09:59:40.000Z","receivedAt":"2026-10-11T09:59:40.000Z","health":"ok","stale":false,
+         "metrics":{"contextPercent":1},"account":{"id":"home","provider":"claude","displayName":"Home"},"agent":{"state":"idle","project":"docs"}}]})", ordered).ok);
+      std::vector<std::string> ids;
+      for (const auto& item : ordered.items) ids.push_back(item.selection.id);
+      // Agents by title, then the resource that needs attention, then by title ignoring case, standby last.
+      CHECK((ids == std::vector<std::string>{"codex:work", "claude:home", "broken", "alpha", "zeta", "old"}));
+      CHECK(accountActivityLine(*ordered.find({ItemKind::Account, "codex:work"}), 0) == "gpt-5 · Editing");
+      // Blank model and tool count as absent, as App trims them.
+      CHECK(accountActivityLine(*ordered.find({ItemKind::Account, "claude:home"}), 0) == "2 projects");
+    }
     Catalog catalog;
     CHECK(decodeCatalog(sample(), catalog).ok);
     CHECK(catalog.items.size() == 3);
@@ -130,7 +152,8 @@ int main() {
     CHECK(monitorState(*account, rolloverAge) == "standby");
     CHECK(monitorState(*resource, rolloverAge) == "standby" && !needsAttention("standby"));
     auto panels = defaultPanels(catalog);
-    CHECK(panels[0].kind == ItemKind::Account && panels[1].kind == ItemKind::Resource && panels[2].id == "codex:work" && panels[3].id.empty());
+    // Panels follow the shared card order: the account titled "api" precedes the one titled "tools".
+    CHECK(panels[0].id == "codex:work" && panels[1].kind == ItemKind::Resource && panels[2].id == "codex:personal" && panels[3].id.empty());
     const auto before = catalog.items.size();
     auto malformed = sample();
     const auto at = malformed.find("\"gpu\":28.4");

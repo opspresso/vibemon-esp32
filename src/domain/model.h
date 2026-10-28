@@ -61,6 +61,9 @@ struct ReportState {
   std::string sourceId;
   std::string activity;
   std::string project;
+  // Reported model and tool of a coding project, such as "gpt-5" and "Editing"; empty when absent.
+  std::string model;
+  std::string tool;
   Health health = Health::Unknown;
   bool reportedStale = false;
   std::uint32_t ageMs = StaleAfterMs;
@@ -112,6 +115,14 @@ bool stale(const ReportState& item, std::uint64_t elapsedMs);
 std::string monitorState(const Monitor& item, std::uint64_t elapsedMs);
 const ReportState* accountActivity(const Monitor& item, std::uint64_t elapsedMs);
 std::string monitorTitle(const Monitor& item, std::uint64_t elapsedMs);
+// App accountActivityLine(): the model and tool of the project responsible for
+// the account state, or "N projects" when several report.
+std::string accountActivityLine(const Monitor& item, std::uint64_t elapsedMs);
+// The trimmed model and tool of a project joined by " · ", or empty.
+std::string projectDetail(const ReportState& project);
+// App compareCards(): agents first, standby last, attention first, the most
+// recently active standby card first, then title and ID.
+bool cardBefore(const Monitor& a, const Monitor& b, std::uint64_t elapsedMs);
 std::string projectState(const ReportState& item, std::uint64_t elapsedMs);
 std::string stateLabel(const std::string& state);
 std::string stateTone(const std::string& state);

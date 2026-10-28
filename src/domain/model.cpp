@@ -361,6 +361,54 @@ std::string describeReset(const std::string& countdown) {
   return countdown == "now" ? "Resets now" : "Resets in " + countdown;
 }
 
+std::string projectDetail(const ReportState& project) {
+  const auto trim = [](const std::string& value) {
+    const auto first = value.find_first_not_of(" \t");
+    return first == std::string::npos ? std::string() : value.substr(first, value.find_last_not_of(" \t") - first + 1);
+  };
+  const auto model = trim(project.model), tool = trim(project.tool);
+  return model.empty() ? tool : tool.empty() ? model : model + " · " + tool;
+}
+
+std::string accountActivityLine(const Monitor& item, std::uint64_t elapsedMs) {
+  if (const auto* project = accountActivity(item, elapsedMs)) {
+    const auto detail = projectDetail(*project);
+    if (!detail.empty()) return detail;
+  }
+  // "N projects": the panel footer also holds the state, so the shorter form fits.
+  return item.projects.size() > 1 ? std::to_string(item.projects.size()) + " projects" : std::string();
+}
+
+namespace {
+// Case-insensitive ASCII comparison first, as a locale collation puts "alpha" before "Zeta".
+int compareTitles(const std::string& a, const std::string& b) {
+  const auto fold = [](unsigned char c) { return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c; };
+  const auto size = std::min(a.size(), b.size());
+  for (std::size_t i = 0; i < size; ++i) {
+    const auto x = fold(static_cast<unsigned char>(a[i])), y = fold(static_cast<unsigned char>(b[i]));
+    if (x != y) return x < y ? -1 : 1;
+  }
+  if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+  return a.compare(b) < 0 ? -1 : a.compare(b) > 0 ? 1 : 0;
+}
+}  // namespace
+
+bool cardBefore(const Monitor& a, const Monitor& b, std::uint64_t elapsedMs) {
+  const bool accountA = a.selection.kind == ItemKind::Account, accountB = b.selection.kind == ItemKind::Account;
+  if (accountA != accountB) return accountA;
+  const auto stateA = monitorState(a, elapsedMs), stateB = monitorState(b, elapsedMs);
+  const bool standbyA = stateA == StandbyState, standbyB = stateB == StandbyState;
+  if (standbyA != standbyB) return standbyB;
+  const bool attentionA = needsAttention(stateA), attentionB = needsAttention(stateB);
+  if (attentionA != attentionB) return attentionA;
+  // An account was last active when its project reported; a resource when the server received it.
+  if (standbyA && accountA && a.observedAtMs != b.observedAtMs) return a.observedAtMs > b.observedAtMs;
+  if (standbyA && !accountA && a.ageMs != b.ageMs) return a.ageMs < b.ageMs;
+  const auto title = compareTitles(monitorTitle(a, elapsedMs), monitorTitle(b, elapsedMs));
+  if (title != 0) return title < 0;
+  return a.selection.id < b.selection.id;
+}
+
 std::array<Selection, PanelCount> defaultPanels(const Catalog& catalog) {
   std::array<Selection, PanelCount> result{};
   std::size_t next = 0;
