@@ -141,6 +141,8 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
   for (const char* name : {"sourceId", "kind", "displayName", "observedAt", "receivedAt", "health", "stale", "memoryType", "resourceType", "metrics", "metricDefinitions", "metricOrder", "account", "statusMessage"}) fields[name] = true;
   fields["agent"]["state"] = true;
   fields["agent"]["project"] = true;
+  fields["agent"]["model"] = true;
+  fields["agent"]["tool"] = true;
   fields["agent"]["usage5hResetsIn"] = true;
   fields["agent"]["usageWeekResetsIn"] = true;
   for (const char* name : {"usageWeekModel", "usageWeekModelResetsIn", "usageWeekModelLabel"}) fields["agent"][name] = true;
@@ -180,6 +182,9 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
       if (!text(source["account"]["provider"], provider, 32) || !text(source["account"]["id"], accountId, 128) ||
           !text(source["account"]["displayName"], item.name, 512) || !validAccountId(provider + ":" + accountId) ||
           !text(source["agent"]["state"], item.activity, 256) || !text(source["agent"]["project"], item.project, 1024)) return invalid("A coding account contains invalid fields.");
+      for (auto [name, field] : {std::pair{"model", &item.model}, std::pair{"tool", &item.tool}}) {
+        if (!source["agent"][name].isNull() && !text(source["agent"][name], *field, 256, true)) return invalid("A coding account contains invalid fields.");
+      }
       item.selection = {ItemKind::Account, provider + ":" + accountId};
       item.category = providerLabel(provider) + " · " + accountName(item.selection.id);
       // A connected service (`usage:` source) reads plan usage only. The server adds such a source only
@@ -212,11 +217,8 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
   for (auto& item : candidate.items) std::sort(item.projects.begin(), item.projects.end(), [](const ReportState& a, const ReportState& b) {
     return a.observedAtMs == b.observedAtMs ? a.sourceId < b.sourceId : a.observedAtMs > b.observedAtMs;
   });
-  std::sort(candidate.items.begin(), candidate.items.end(), [](const Monitor& a, const Monitor& b) {
-    // Agents precede resources, as in every VibeMon client.
-    if (a.selection.kind != b.selection.kind) return a.selection.kind == ItemKind::Account;
-    return a.name == b.name ? a.selection.id < b.selection.id : a.name < b.name;
-  });
+  // The shared card order at the time of this response; the picker and default panels use it.
+  std::sort(candidate.items.begin(), candidate.items.end(), [](const Monitor& a, const Monitor& b) { return cardBefore(a, b, 0); });
   output = std::move(candidate);
   return {true, false, {}, *now};
 }

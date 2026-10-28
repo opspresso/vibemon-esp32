@@ -294,10 +294,10 @@ void DashboardUi::updateCards(std::uint32_t now) {
       setText(card.category, item->category);
       setText(card.name, monitorTitle(*item, elapsed));
       const auto color = statusColor(state);
-      // An account that only a connected service reports has no project to count.
+      // An account that only a connected service reports has no project, so it has no activity line.
+      const auto activity = item->selection.kind == ItemKind::Account ? accountActivityLine(*item, elapsed) : std::string();
       const auto caption = item->selection.kind != ItemKind::Account ? stateLabel(state) + " · " + ageLabel(static_cast<std::uint64_t>(item->ageMs) + elapsed) :
-          item->projects.empty() ? stateLabel(state) :
-          stateLabel(state) + " · " + std::to_string(item->projects.size()) + (item->projects.size() == 1 ? " project" : " projects");
+          activity.empty() ? stateLabel(state) : stateLabel(state) + " · " + activity;
       setText(card.footer, caption);
       if (card.accent != color) { lv_obj_set_style_text_color(card.footer, lv_color_hex(color), 0); card.accent = color; }
     }
