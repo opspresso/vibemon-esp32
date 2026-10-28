@@ -209,6 +209,7 @@ CatalogDecode decodeCatalog(std::string_view body, Catalog& output, ArduinoJson:
         if (!text(source["resourceType"], item.category, 256)) return invalid("A resource type is invalid.");
       } else item.category = sharedLabel(kind == "cluster" ? "resource.cluster" : kind == "host" ? "resource.host" : "resource.other");
       if (kind == "resource" || !source["metricDefinitions"].isNull()) {
+        item.definesMetrics = true;
         if (!customMetrics(source, item)) return invalid("A resource contains invalid metric definitions or values.");
       } else if (!presetMetrics(source, kind, item)) return invalid("A resource contains invalid measurements.");
     } else return invalid("The server returned an unsupported source kind.");

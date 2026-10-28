@@ -75,6 +75,7 @@ int main() {
         {"sourceId":"k3s","kind":"cluster","displayName":"K3S","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:55.000Z","health":"ok","stale":false,
          "metrics":{"cpuPercent":1,"memoryPercent":2,"nodesReady":1,"nodesTotal":1,"podsUnhealthy":0}}]})", presets).ok);
       const auto* host = presets.find({ItemKind::Resource, "spark"});
+      CHECK(host && !host->definesMetrics);
       CHECK(host && host->category == sharedLabel("resource.host") && host->category == "Host");
       CHECK(host->metrics[1].label == "Unified memory" && host->metrics[3].label == "GPU temperature");
       const auto* cluster = presets.find({ItemKind::Resource, "k3s"});
@@ -106,6 +107,7 @@ int main() {
     CHECK(decodeCatalog(sample(), catalog).ok);
     CHECK(catalog.items.size() == 3);
     const auto* resource = catalog.find({ItemKind::Resource, "spark"});
+    CHECK(resource && resource->definesMetrics);
     CHECK(resource && resource->metrics[0].key == "temperature" && resource->metrics[1].value && std::abs(*resource->metrics[1].value - 28.4) < 1e-5);
     CHECK(!resource->metrics[2].value);
     CHECK(!stale(*resource, 114999) && stale(*resource, 115000));
@@ -192,6 +194,10 @@ int main() {
     metric.value = 12.4; CHECK(metricValue(metric) == "12.4");
     metric.value = 14200; CHECK(metricValue(metric) == "14.2k");
     CHECK(metricValue(metric, false) == "14,200");
+    metric.value = 1.234567; CHECK(metricValue(metric, false) == "1.2");
+    CHECK(metricValue(metric, false, true) == "1.23457");
+    metric.value = 0.0000001234567; CHECK(metricValue(metric, false, true) == "0.000000123457");
+    metric.value = -999999.5; CHECK(metricValue(metric, false, true) == "-1,000,000");
     CHECK(ageLabel(14999) == "Just now" && ageLabel(15000) == "15s ago" && ageLabel(60000) == "1m ago");
     CHECK(newerVersion("3.3.2", "3.4.0") && newerVersion("3.3.2", "3.3.10") && newerVersion("3.9.9", "4.0.0"));
     CHECK(!newerVersion("3.4.0", "3.4.0") && !newerVersion("3.4.0", "3.3.9") && !newerVersion("3.4.0", "3.4"));

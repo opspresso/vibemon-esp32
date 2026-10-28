@@ -32,7 +32,7 @@ Missing measurements remain unavailable; they do not become zero. Invalid or inc
 
 Wi-Fi recovery and cancelling a replacement keep a saved token's rejection and its permission error. Only an explicit retry or a verified replacement resumes that connection. Cancelling a replacement of a usable connection checks the saved workspace once, including when all panels are empty.
 
-Plan usage bars (metric keys that start with `usage`) use the App contract's tones: warning from 70 and danger from 90, both inclusive. Other bars use the accent color. Percentage and GiB readings use the shared App/Web precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards; details show their full numeric representation and unit. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
+Plan usage bars (metric keys that start with `usage`) use the App contract's tones: warning from 70 and danger from 90, both inclusive. Other bars use the accent color. Percentage and GiB readings use the shared precision: at most two decimal places, without trailing zeros. Other large readings use compact suffixes on cards. Details of resources that define their metrics show up to six significant digits; other details use the shared standard precision. Long names and labels wrap in the scrollable detail view. The stored measurements retain their original precision.
 
 ## Sign-in with a code
 

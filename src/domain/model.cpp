@@ -288,6 +288,11 @@ std::string decimalValue(double value, int precision) {
       else digits.insert(0, "1");
     }
   } else digits.append(static_cast<std::size_t>(keep) - digits.size(), '0');
+  if (precision < 0) {
+    if (digits != "0" && !digits.empty()) digits.append(static_cast<std::size_t>(-precision), '0');
+    else digits = "0";
+    return groupInteger(std::signbit(value) ? "-" + digits : digits);
+  }
   if (digits.size() <= static_cast<std::size_t>(precision)) digits.insert(0, precision + 1 - digits.size(), '0');
   const auto integerSize = digits.size() - precision;
   if (precision) {
@@ -296,6 +301,24 @@ std::string decimalValue(double value, int precision) {
     if (digits.back() == '.') digits.pop_back();
   }
   return groupInteger(std::signbit(value) ? "-" + digits : digits);
+}
+
+int significantPrecision(double value, int significantDigits) {
+  if (value == 0) return 0;
+  char buffer[64];
+  const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), std::abs(value));
+  std::string digits(buffer, converted.ptr);
+  int exponent = 0;
+  const auto exponentAt = digits.find('e');
+  if (exponentAt != std::string::npos) {
+    exponent = std::stoi(digits.substr(exponentAt + 1));
+    digits.resize(exponentAt);
+  }
+  const auto dot = digits.find('.');
+  const int decimalAt = static_cast<int>(dot == std::string::npos ? digits.size() : dot) + exponent;
+  if (dot != std::string::npos) digits.erase(dot, 1);
+  const auto first = digits.find_first_not_of('0');
+  return significantDigits - decimalAt + static_cast<int>(first);
 }
 }  // namespace
 
@@ -308,7 +331,7 @@ MetricTone metricTone(const std::string& key, std::optional<double> value) {
   return MetricTone::Normal;
 }
 
-std::string metricValue(const Metric& metric, bool compact) {
+std::string metricValue(const Metric& metric, bool compact, bool exact) {
   if (!metric.value || !std::isfinite(*metric.value)) return "—";
   const double value = *metric.value;
   char buffer[64];
@@ -317,9 +340,9 @@ std::string metricValue(const Metric& metric, bool compact) {
     return decimalValue(value, precision.fractionDigits);
   }
   if (!compact) {
-    const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
-        value != 0 && std::abs(value) < 0.001 ? std::chars_format::general : std::chars_format::fixed);
-    return groupInteger(std::string(buffer, converted.ptr));
+    if (exact || (value != 0 && std::abs(value) < 1))
+      return decimalValue(value, significantPrecision(value, exact ? 6 : 2));
+    return decimalValue(value, 1);
   }
   if (std::abs(value) >= 1e9) std::snprintf(buffer, sizeof(buffer), "%.1fG", value / 1e9);
   else if (std::abs(value) >= 1e6) std::snprintf(buffer, sizeof(buffer), "%.1fM", value / 1e6);
@@ -330,10 +353,10 @@ std::string metricValue(const Metric& metric, bool compact) {
   return buffer;
 }
 
-std::string metricText(const Metric& metric, bool compact) {
+std::string metricText(const Metric& metric, bool compact, bool exact) {
   const bool hasValue = metric.value && std::isfinite(*metric.value);
   const bool adjacent = metric.unit.rfind("%", 0) == 0 || metric.unit.rfind("°", 0) == 0;
-  return metricValue(metric, compact) + (hasValue && !metric.unit.empty() ? (adjacent ? "" : " ") + metric.unit : "");
+  return metricValue(metric, compact, exact) + (hasValue && !metric.unit.empty() ? (adjacent ? "" : " ") + metric.unit : "");
 }
 
 std::string ageLabel(std::uint64_t milliseconds) {

@@ -82,6 +82,14 @@ int main(int argc, char** argv) {
       const auto actual = metricValue(metric);
       if (actual != expected) throw std::runtime_error("Measurement " + fixture["value"].as<std::string>() + " " + metric.unit + ": expected " + expected + ", got " + actual);
     }
+    for (JsonObjectConst fixture : fixtures["exactMeasurements"].as<JsonArrayConst>()) {
+      Metric metric;
+      metric.unit = fixture["unit"].as<std::string>();
+      metric.value = fixture["value"].as<double>();
+      const auto expected = fixture["expected"].as<std::string>();
+      const auto actual = metricValue(metric, false, true);
+      if (actual != expected) throw std::runtime_error("Exact measurement: expected " + expected + ", got " + actual);
+    }
     for (JsonObjectConst fixture : fixtures["resetCountdowns"].as<JsonArrayConst>()) {
       JsonDocument response;
       response["serverTime"] = timestamp(0);
