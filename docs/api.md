@@ -75,6 +75,6 @@ A setup response with `queued: true` is not proof that connection or storage suc
 
 Connection codes, in order: `0` Wi-Fi setup, `1` connecting Wi-Fi, `2` Wi-Fi unavailable, `3` setting clock, `4` server setup, `5` checking server, `6` online, `7` server unavailable, `8` token rejected, `9` storage error, `10` network time unavailable. Firmware update states: `0` check pending, `1` checking, `2` up to date, `3` check failed, `4` installing, `5` restarting, `6` install failed. Page codes: `0` dashboard, `1` network list, `2` Wi-Fi form, `3` server form, `4` item picker, `5` settings, `6` details.
 
-`info.firmwareConfirmationFailed` is true when the running trial image could not be confirmed in flash. Device settings show the failure; tap the firmware row or send `update-check` to retry. A failed confirmation does not permit another install or disable bootloader rollback.
+`info.firmwareConfirmationFailed` is true when the running trial image could not be confirmed in flash. Device settings show the failure; select **Check & install updates** or send `update-check` to retry. A failed confirmation does not permit another install or disable bootloader rollback.
 
 Use [tools/device.py](../tools/device.py) to prompt for secrets safely rather than including credentials in shell commands.
