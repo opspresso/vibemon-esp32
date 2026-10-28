@@ -430,9 +430,9 @@ void DashboardUi::updateDetails(std::uint32_t now) {
   };
   const auto observationAge = static_cast<std::uint64_t>(item->activityAgeMs) + elapsed;
   updateRows(detailReadings_, detailMetrics_, item->metrics, [](const Metric& metric) { return metric.key; },
-      [](const Metric& metric) { return metric.label; }, [observationAge](const Metric& metric) {
+      [](const Metric& metric) { return metric.label; }, [observationAge, item](const Metric& metric) {
         const auto reset = describeReset(resetCountdown(metric, observationAge));
-        return reset.empty() ? metricText(metric, false) : metricText(metric, false) + " · " + reset;
+        return reset.empty() ? metricText(metric, false, item->definesMetrics) : metricText(metric, false, item->definesMetrics) + " · " + reset;
       }, false);
   updateRows(detailProjects_, detailMembers_, item->projects, [](const ReportState& project) { return project.sourceId; },
       [](const ReportState& project) { return project.project.empty() ? project.sourceId : project.project; },

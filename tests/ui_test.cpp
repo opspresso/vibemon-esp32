@@ -249,6 +249,7 @@ int main() {
       app.begin(timeMs); wifi.connected(); app.tick(timeMs);
       auto catalog = demo();
       auto& resource = catalog.items[0];
+      resource.definesMetrics = true;
       resource.name.clear(); for (int i = 0; i < 40; ++i) resource.name += "긴이름";
       resource.statusMessage = "A long status explanation stays available with every reading.";
       resource.metrics.clear();
@@ -259,7 +260,7 @@ int main() {
       tap(ui, "panel-1"); CHECK(ui.page() == Page::Details);
       auto* list = ui.widget("detail-list");
       CHECK(findText(list, resource.name)); CHECK(findText(list, resource.statusMessage));
-      CHECK(findText(list, "9,007,199,254,740,991 requests/second!"));
+      CHECK(findText(list, "9,007,200,000,000,000 requests/second!"));
       screenshot("long-details");
       std::vector<lv_obj_t*> text; labels(list, text);
       CHECK(text.size() >= 68);

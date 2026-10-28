@@ -76,6 +76,7 @@ struct Monitor : ReportState {
   std::string name;
   std::string category;
   std::string statusMessage;
+  bool definesMetrics = false;
   // Every project retains its own clock so offline aging cannot hide live requests.
   std::vector<ReportState> projects;
   std::vector<Metric> metrics;
@@ -130,8 +131,8 @@ bool needsAttention(const std::string& state);
 // Plan usage warns before its limit; the pinned App policy sets the inclusive
 // bounds. Other and missing measurements are Normal.
 MetricTone metricTone(const std::string& key, std::optional<double> value);
-std::string metricValue(const Metric& metric, bool compact = true);
-std::string metricText(const Metric& metric, bool compact = true);
+std::string metricValue(const Metric& metric, bool compact = true, bool exact = false);
+std::string metricText(const Metric& metric, bool compact = true, bool exact = false);
 std::string ageLabel(std::uint64_t milliseconds);
 // Time left until a measured plan usage limit resets, `observationAgeMs` after
 // the report was observed: "now", "24m", "2h5m" or "3d4h". Empty when unknown.
