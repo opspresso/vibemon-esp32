@@ -361,10 +361,18 @@ std::string describeReset(const std::string& countdown) {
   return countdown == "now" ? "Resets now" : "Resets in " + countdown;
 }
 
+std::string projectDetail(const ReportState& project) {
+  const auto trim = [](const std::string& value) {
+    const auto first = value.find_first_not_of(" \t");
+    return first == std::string::npos ? std::string() : value.substr(first, value.find_last_not_of(" \t") - first + 1);
+  };
+  const auto model = trim(project.model), tool = trim(project.tool);
+  return model.empty() ? tool : tool.empty() ? model : model + " · " + tool;
+}
+
 std::string accountActivityLine(const Monitor& item, std::uint64_t elapsedMs) {
   if (const auto* project = accountActivity(item, elapsedMs)) {
-    std::string detail = project->model;
-    if (!project->tool.empty()) detail += (detail.empty() ? "" : " · ") + project->tool;
+    const auto detail = projectDetail(*project);
     if (!detail.empty()) return detail;
   }
   // "N projects": the panel footer also holds the state, so the shorter form fits.

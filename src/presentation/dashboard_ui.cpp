@@ -436,7 +436,10 @@ void DashboardUi::updateDetails(std::uint32_t now) {
       }, false);
   updateRows(detailProjects_, detailMembers_, item->projects, [](const ReportState& project) { return project.sourceId; },
       [](const ReportState& project) { return project.project.empty() ? project.sourceId : project.project; },
-      [elapsed](const ReportState& project) { return stateLabel(projectState(project, elapsed)); }, true);
+      [elapsed](const ReportState& project) {
+        const auto detail = projectDetail(project);
+        return stateLabel(projectState(project, elapsed)) + (detail.empty() ? "" : " · " + detail);
+      }, true);
   for (std::size_t i = 0; i < item->projects.size(); ++i) {
     const auto projectColor = lv_color_hex(statusColor(projectState(item->projects[i], elapsed)));
     if (!lv_color_eq(lv_obj_get_style_text_color(detailMembers_[i].value, LV_PART_MAIN), projectColor))
@@ -682,7 +685,13 @@ void DashboardUi::updatePicker() {
   const auto& workspace = controller_.workspace();
   int rowIndex = 0;
   int rowY = 0;
-  for (const auto& item : workspace.catalog.items) {
+  // The card order at the time the list is built. An open list keeps its order, so rows do not move under a finger.
+  const auto elapsed = controller_.snapshotAgeMs(lv_tick_get());
+  std::vector<const Monitor*> items;
+  for (const auto& item : workspace.catalog.items) items.push_back(&item);
+  std::stable_sort(items.begin(), items.end(), [elapsed](const Monitor* a, const Monitor* b) { return cardBefore(*a, *b, elapsed); });
+  for (const auto* entry : items) {
+    const auto& item = *entry;
     if ((filter_ == 1 && item.selection.kind != ItemKind::Account) || (filter_ == 2 && item.selection.kind != ItemKind::Resource)) continue;
     auto* row = lv_button_create(list_); box(row, 0, rowY, 448, 68, Surface, 12);
     const bool selected = workspace.panels[selectedPanel_] == item.selection;

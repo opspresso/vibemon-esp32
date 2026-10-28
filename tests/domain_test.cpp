@@ -91,7 +91,7 @@ int main() {
         {"sourceId":"one","kind":"agent","displayName":"api","observedAt":"2026-10-11T09:59:58.000Z","receivedAt":"2026-10-11T09:59:58.000Z","health":"ok","stale":false,
          "metrics":{"contextPercent":1},"account":{"id":"work","provider":"codex","displayName":"Work"},"agent":{"state":"working","project":"api","model":"gpt-5","tool":"Editing"}},
         {"sourceId":"two","kind":"agent","displayName":"web","observedAt":"2026-10-11T09:59:50.000Z","receivedAt":"2026-10-11T09:59:50.000Z","health":"ok","stale":false,
-         "metrics":{"contextPercent":1},"account":{"id":"home","provider":"claude","displayName":"Home"},"agent":{"state":"idle","project":"web"}},
+         "metrics":{"contextPercent":1},"account":{"id":"home","provider":"claude","displayName":"Home"},"agent":{"state":"idle","project":"web","model":" ","tool":""}},
         {"sourceId":"three","kind":"agent","displayName":"docs","observedAt":"2026-10-11T09:59:40.000Z","receivedAt":"2026-10-11T09:59:40.000Z","health":"ok","stale":false,
          "metrics":{"contextPercent":1},"account":{"id":"home","provider":"claude","displayName":"Home"},"agent":{"state":"idle","project":"docs"}}]})", ordered).ok);
       std::vector<std::string> ids;
@@ -99,6 +99,7 @@ int main() {
       // Agents by title, then the resource that needs attention, then by title ignoring case, standby last.
       CHECK((ids == std::vector<std::string>{"codex:work", "claude:home", "broken", "alpha", "zeta", "old"}));
       CHECK(accountActivityLine(*ordered.find({ItemKind::Account, "codex:work"}), 0) == "gpt-5 · Editing");
+      // Blank model and tool count as absent, as App trims them.
       CHECK(accountActivityLine(*ordered.find({ItemKind::Account, "claude:home"}), 0) == "2 projects");
     }
     Catalog catalog;
