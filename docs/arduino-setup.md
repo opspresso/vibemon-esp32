@@ -39,7 +39,7 @@ If automatic bootloader entry fails, use the board's documented BOOT/RESET seque
 
 ## Update over Wi-Fi
 
-After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and the update state; tap that row to check now. The device restarts after an install. Wi-Fi, server, read token and panel settings stay in NVS and are kept.
+After one USB upload of version 3.4.0 or later, the device installs newer releases by itself. See [Firmware updates](architecture.md#firmware-updates) for the schedule and checks. Device settings show the installed version and update state. Select **Check & install updates** to check now; a newer release installs automatically. The device restarts after an install. Wi-Fi, server, read token and panel settings stay in NVS and are kept.
 
 Use USB again only when a release changes the partition table or bootloader, or when the device cannot reach Wi-Fi.
 

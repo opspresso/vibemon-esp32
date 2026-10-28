@@ -42,7 +42,7 @@ The upload bundle writes boot metadata at `0xe000`. The partition table reserves
 
 The device installs new releases over Wi-Fi. Two 7 MB application slots hold the running image and the next one.
 
-1. **Check.** 30 seconds after Wi-Fi and network time are ready, then every 6 hours, the device reads `ota.json` from `https://github.com/opspresso/vibemon-esp32/releases/latest/download/`. A tap on the firmware row in device settings, or the USB `update-check` command, checks immediately. A failed check retries after 15 minutes.
+1. **Check.** 30 seconds after Wi-Fi and network time are ready, then every 6 hours, the device reads `ota.json` from `https://github.com/opspresso/vibemon-esp32/releases/latest/download/`. Select **Check & install updates** in device settings, or send the USB `update-check` command, to check immediately. A failed check retries after 15 minutes.
 2. **Accept.** The device accepts the release only when the board is `ESP32-4848S040`, the version is a newer `MAJOR.MINOR.PATCH`, the image fits one slot and the URL is in this repository's releases. Prereleases are never "latest", so they are not installed.
 3. **Install.** The update worker on core 0 streams the image into the slot that is not running. Workspace polling pauses until the restart. The dashboard status line shows the version and progress.
 4. **Verify.** The next boot selects the new slot only when the SHA-256 digest from `ota.json` matches and ESP-IDF validates the image. Otherwise the running image stays selected, and the device retries at the next 6-hour check.

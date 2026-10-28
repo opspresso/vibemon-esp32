@@ -464,13 +464,12 @@ void DashboardUi::settings() {
   widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 448, 48, [this] { controller_.refresh(); dashboard(); });
   auto* message = label(root_, workspace.message, 20, 362, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
   wrap(message);
-  label(root_, "FIRMWARE", 20, 404, 440, &lv_font_montserrat_12, Muted);
+  label(root_, "FIRMWARE  " + controller_.firmwareVersion(), 20, 404, 440, &lv_font_montserrat_12, Muted);
   // Tapping starts a check now; a newer release then installs and restarts.
   auto* firmware = button(root_, "", 16, 426, 448, 46, [this] { controller_.checkFirmware(); });
   widgets_["firmware"] = firmware;
-  label(firmware, "VibeMon Touch " + controller_.firmwareVersion(), 16, 13, 160, fonts_.small());
-  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 176, 13, 256, fonts_.small(), workspace.firmware.confirmationFailed ? Warning : Muted);
-  lv_obj_set_style_text_align(widgets_["firmware-status"], LV_TEXT_ALIGN_RIGHT, 0);
+  label(firmware, LV_SYMBOL_REFRESH "  Check & install updates", 16, 4, 416, fonts_.small());
+  widgets_["firmware-status"] = label(firmware, firmwareStatus(workspace.firmware), 16, 25, 416, fonts_.small(), workspace.firmware.confirmationFailed ? Warning : Muted);
 }
 
 void DashboardUi::wifi() {
