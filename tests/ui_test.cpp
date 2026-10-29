@@ -175,6 +175,16 @@ int main() {
       tap(ui, "firmware"); app.tick(timeMs); CHECK(update.checks == 1);
       update.complete(firmwareRelease("3.4.0")); app.tick(timeMs + 1); advance(ui);
       CHECK(firmwareText() == "Up to date"); screenshot("settings");
+      // Each tap saves the next quarter turn clockwise; four taps return to upright.
+      CHECK(findText(ui.widget("rotate"), LV_SYMBOL_LOOP "  Rotate · 0°"));
+      tap(ui, "rotate");
+      CHECK(ui.page() == Page::Settings && app.workspace().rotation == ScreenRotation::Deg90 && store.saved.rotation == ScreenRotation::Deg90);
+      CHECK(findText(ui.widget("rotate"), LV_SYMBOL_LOOP "  Rotate · 90°"));
+      store.writable = false; tap(ui, "rotate");
+      CHECK(app.workspace().rotation == ScreenRotation::Deg90 && findText(ui.widget("device-message"), "Screen rotation could not be saved. Try again."));
+      store.writable = true;
+      for (int turn = 0; turn < 3; ++turn) tap(ui, "rotate");
+      CHECK(app.workspace().rotation == ScreenRotation::Deg0 && store.saved.rotation == ScreenRotation::Deg0);
       tap(ui, "firmware"); app.tick(timeMs); update.complete(firmwareRelease("3.5.0")); app.tick(timeMs + 1);
       update.percent = 42; app.tick(timeMs + 2); advance(ui);
       CHECK(firmwareText() == "Installing 3.5.0 · 42%");
