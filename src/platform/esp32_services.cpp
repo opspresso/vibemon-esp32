@@ -88,17 +88,13 @@ std::string deviceName() {
 // the origin stays the same and every response is read completely.
 class CloudSession {
  public:
-  CloudSession() {
-    http_.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-    http_.setReuse(true);
-    const char* collected[] = {"Retry-After", "ETag", "X-Server-Time"};
-    http_.collectHeaders(collected, 3);
-  }
   // Frees the TLS session's internal-RAM buffers. The next request starts a
   // new client, so its error state cannot describe an earlier connection.
   void close() {
     if (!client_) return;
-    http_.end();
+    // HTTPClient::end() keeps its client pointer for keep-alive or a closed
+    // socket. Delete the HTTPClient first so no pointer to the freed client remains.
+    http_.reset();
     client_.reset();
     origin_.clear();
   }
@@ -129,13 +125,18 @@ class CloudSession {
   }
  private:
   std::unique_ptr<NetworkClientSecure> client_;
-  HTTPClient http_;
+  std::unique_ptr<HTTPClient> http_;  // uses client_; exists only with it
   std::string origin_;  // the origin of client_
 
   void connect(const std::string& origin) {
     if (client_) return;
     client_ = std::make_unique<NetworkClientSecure>();
-    prepareHttps(*client_, http_, 4000);
+    http_ = std::make_unique<HTTPClient>();
+    http_->setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http_->setReuse(true);
+    const char* collected[] = {"Retry-After", "ETag", "X-Server-Time"};
+    http_->collectHeaders(collected, 3);
+    prepareHttps(*client_, *http_, 4000);
     origin_ = origin;
   }
 
@@ -144,30 +145,30 @@ class CloudSession {
     const bool start = job.deviceCode.empty();
     auto failed = [&](SignInError error) { auto result = std::make_unique<SignInResult>(); result->attempt = job.attempt; result->error = error; return result; };
     connect(job.origin);
-    if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + (start ? DeviceStartPath : DeviceTokenPath)).c_str())) return failed(SignInError::Network);
-    http_.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    http_.addHeader("Accept", "application/json");
+    if (WiFi.status() != WL_CONNECTED || !http_->begin(*client_, (job.origin + (start ? DeviceStartPath : DeviceTokenPath)).c_str())) return failed(SignInError::Network);
+    http_->addHeader("Content-Type", "application/x-www-form-urlencoded");
+    http_->addHeader("Accept", "application/json");
     std::string form = start ? deviceStartBody(deviceName()) : deviceTokenBody(job.deviceCode);
-    const int status = http_.POST(reinterpret_cast<std::uint8_t*>(form.data()), form.size());
+    const int status = http_->POST(reinterpret_cast<std::uint8_t*>(form.data()), form.size());
     wipe(form);
     if (status <= 0) {
       char error[128];
       const auto tls = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED;
-      http_.end();
+      http_->end();
       return failed(tls ? SignInError::Tls : SignInError::Network);
     }
     std::unique_ptr<SignInResult> result;
     if (status == 200 || status == 400) {
       ResponseBuffer body(MaxDeviceReplyBytes);
-      const int read = http_.writeToStream(&body);
-      http_.end();
+      const int read = http_->writeToStream(&body);
+      http_->end();
       if (body.timedOut() || read < 0) return failed(SignInError::Network);
       if (body.oversized() || body.outOfMemory()) return failed(SignInError::InvalidResponse);
       result = std::make_unique<SignInResult>(start ? decodeDeviceStart(status, body.body(), job.origin) : decodeDeviceToken(status, body.body()));
     } else {
       result = std::make_unique<SignInResult>(start ? decodeDeviceStart(status, {}, job.origin) : decodeDeviceToken(status, {}));
-      if (status == 429 || status >= 500) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
-      http_.end();
+      if (status == 429 || status >= 500) result->retryAfterMs = retryAfterMs(http_->header("Retry-After").c_str()).value_or(0);
+      http_->end();
     }
     result->attempt = job.attempt;
     return result;
@@ -177,7 +178,7 @@ class CloudSession {
     auto result = std::make_unique<CloudResult>();
     result->generation = job.generation;
     connect(job.origin);
-    if (WiFi.status() != WL_CONNECTED || !http_.begin(*client_, (job.origin + job.path).c_str())) {
+    if (WiFi.status() != WL_CONNECTED || !http_->begin(*client_, (job.origin + job.path).c_str())) {
       result->error = CloudError::Network;
       return result;
     }
@@ -185,34 +186,34 @@ class CloudSession {
     authorization.reserve(7 + job.token.size());
     authorization += "Bearer ";
     authorization += job.token.c_str();
-    http_.addHeader("Authorization", authorization);
+    http_->addHeader("Authorization", authorization);
     wipe(authorization.begin(), authorization.length());
-    http_.addHeader("Accept", "application/json");
-    if (!job.ifNoneMatch.empty()) http_.addHeader("If-None-Match", job.ifNoneMatch.c_str());
-    const int status = http_.GET();
+    http_->addHeader("Accept", "application/json");
+    if (!job.ifNoneMatch.empty()) http_->addHeader("If-None-Match", job.ifNoneMatch.c_str());
+    const int status = http_->GET();
     if (status == 304) {
-      notModifiedResult(!job.ifNoneMatch.empty(), http_.header("X-Server-Time").c_str(), *result);
-      http_.end();
+      notModifiedResult(!job.ifNoneMatch.empty(), http_->header("X-Server-Time").c_str(), *result);
+      http_->end();
       return result;
     }
     if (status != 200) {
       if (status > 0) {
         result->error = cloudStatusError(status);
         // 429 and 503 may say when to retry; the controller only lengthens its backoff with it.
-        if (result->error == CloudError::RateLimited || result->error == CloudError::Server) result->retryAfterMs = retryAfterMs(http_.header("Retry-After").c_str()).value_or(0);
+        if (result->error == CloudError::RateLimited || result->error == CloudError::Server) result->retryAfterMs = retryAfterMs(http_->header("Retry-After").c_str()).value_or(0);
       } else {
         char error[128];
         result->error = client_->lastError(error, sizeof(error)) == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED ? CloudError::Tls : CloudError::Network;
       }
-      http_.end();
+      http_->end();
       return result;
     }
-    result->etag = entityTag(http_.header("ETag").c_str());
-    const int expected = http_.getSize();
-    if (expected > static_cast<int>(MaxResponseBytes)) { result->error = CloudError::TooLarge; http_.end(); return result; }
+    result->etag = entityTag(http_->header("ETag").c_str());
+    const int expected = http_->getSize();
+    if (expected > static_cast<int>(MaxResponseBytes)) { result->error = CloudError::TooLarge; http_->end(); return result; }
     ResponseBuffer body(expected >= 0 ? static_cast<std::size_t>(expected) : MaxResponseBytes);
-    const int read = http_.writeToStream(&body);
-    http_.end();
+    const int read = http_->writeToStream(&body);
+    http_->end();
     if (body.oversized()) result->error = CloudError::TooLarge;
     else if (body.outOfMemory()) result->error = CloudError::Memory;
     else if (body.timedOut() || read < 0 || (expected >= 0 && read != expected)) result->error = CloudError::Network;
