@@ -461,8 +461,18 @@ void DashboardUi::settings() {
   label(server, "VibeMon workspace", 16, 13, 380, fonts_.normal());
   label(server, workspace.origin + (workspace.tokenConfigured ? " · token saved" : " · add read token"), 16, 44, 380, fonts_.small(), Muted);
   label(server, LV_SYMBOL_RIGHT, 410, 29, 24, fonts_.normal(), Muted);
-  widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 448, 48, [this] { controller_.refresh(); dashboard(); });
+  widgets_["refresh"] = button(root_, LV_SYMBOL_REFRESH "  Refresh readings", 16, 304, 252, 48, [this] { controller_.refresh(); dashboard(); });
+  // Each tap turns the screen a quarter clockwise, so the device can stand on any edge.
+  const auto degrees = static_cast<int>(workspace.rotation) * 90;
+  widgets_["rotate"] = button(root_, LV_SYMBOL_LOOP "  Rotate · " + std::to_string(degrees) + "°", 280, 304, 184, 48, [this] {
+    const auto next = static_cast<ScreenRotation>((static_cast<int>(controller_.workspace().rotation) + 1) % 4);
+    const auto result = controller_.rotate(next);
+    if (result.ok) { settings(); return; }
+    setText(widget("device-message"), result.message);
+    lv_obj_set_style_text_color(widget("device-message"), lv_color_hex(Danger), 0);
+  });
   auto* message = label(root_, workspace.message, 20, 362, 440, fonts_.small(), workspace.connection == Connection::Online ? Muted : Warning);
+  widgets_["device-message"] = message;
   wrap(message);
   label(root_, "FIRMWARE  " + controller_.firmwareVersion(), 20, 404, 440, &lv_font_montserrat_12, Muted);
   // Tapping starts a check now; a newer release then installs and restarts.

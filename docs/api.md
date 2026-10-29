@@ -47,7 +47,7 @@ Network, certificate, server and rate-limit failures keep the current code and r
 
 ## Persistent settings
 
-The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key and four selections. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.
+The `vibemon-touch` NVS namespace stores one versioned `config` value containing Wi-Fi credentials, server origin, key, four selections and the screen rotation. Settings saved before screen rotation existed have no `rotation` field and load as 0°. One NVS write commits the complete configuration. Polling does not write flash. Selecting the same item or reconnecting with unchanged Wi-Fi credentials does not write flash. Leaving an in-progress setup form cancels it; a late cloud reply cannot save a canceled workspace.
 
 Server addresses use lowercase hostnames and numeric ports without leading zeros. The default HTTPS port `443` is omitted, so `https://vibemon.io:00443` and `https://vibemon.io` keep the same key and panel selections. Older stored addresses are normalized when read, without an automatic flash write.
 
@@ -61,7 +61,7 @@ Send one UTF-8 JSON object followed by LF at 115200 baud. Commands are limited t
 
 | Command | Fields | Result |
 | --- | --- | --- |
-| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts (items in the last reply, which can hold only the selected panels), touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress; no credentials or names. Frame/pixel counters wrap at 32 bits. |
+| `info` | None | Version, board, memory, connection/page codes, the connection message, item/selection counts (items in the last reply, which can hold only the selected panels), touch presses, completed scanout frames, LVGL redraws, rendered pixels and requested pixel clock, running firmware slot and firmware update state, available version and progress, and the screen `rotation` in degrees; no credentials or names. Frame/pixel counters wrap at 32 bits. |
 | `configure-wifi` | `ssid`, `password` | Validate and queue a connection. Save only after it connects. |
 | `configure-cloud` | `origin`, `token` | Validate and queue an authenticated workspace read. Save only after it succeeds. |
 | `dashboard` | None | Open the four-panel view. |

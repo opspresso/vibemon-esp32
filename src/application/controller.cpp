@@ -25,6 +25,7 @@ void Controller::updateConfigView() {
   workspace_.origin = config_.origin;
   workspace_.tokenConfigured = !config_.readToken.empty();
   workspace_.panels = config_.panels;
+  workspace_.rotation = config_.rotation;
   ++workspace_.revision;
 }
 
@@ -103,6 +104,17 @@ Validation Controller::select(std::size_t panel, const Selection& selection) {
   config_ = std::move(candidate);
   storageBlocked_ = false;
   nextPoll_ = now_;
+  updateConfigView();
+  return {true, {}};
+}
+
+Validation Controller::rotate(ScreenRotation rotation) {
+  if (config_.rotation == rotation) return {true, {}};
+  Config candidate = config_;
+  candidate.rotation = rotation;
+  if (!settings_.save(candidate)) return {false, "Screen rotation could not be saved. Try again."};
+  config_ = std::move(candidate);
+  storageBlocked_ = false;
   updateConfigView();
   return {true, {}};
 }

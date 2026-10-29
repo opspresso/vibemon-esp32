@@ -59,7 +59,7 @@ Next the device shows **Sign in with a code**: a QR code and an 8-character code
 
 **Enter a token** opens the manual form: the server origin, normally `https://vibemon.io`, and a token with read permission from [Web Account](https://vibemon.io/account). The token keypad provides digits, `a`–`f` and a `vm_` prefix key. **Use a code** on that form signs in to the server in the address field. In connection settings, an empty token field retains the saved token only when the server is unchanged. A server without code sign-in for VibeMon Touch shows **Enter a read token instead**.
 
-Tap a dashboard card to select its agent or resource. **Leave empty** clears only that card. Settings and panel selections are saved together and survive ordinary firmware uploads and power cycles.
+Tap a dashboard card to select its agent or resource. **Leave empty** clears only that card. The board has no orientation sensor. To stand the device on another edge, select **Rotate** in device settings: each tap turns the screen 90° clockwise. Settings, panel selections and the rotation are saved together and survive ordinary firmware uploads and power cycles.
 
 ## Optional USB setup
 
