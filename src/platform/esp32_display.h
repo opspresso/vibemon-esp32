@@ -18,7 +18,6 @@ class EspDisplay {
   std::uint32_t pixelClock() const { return pixelClockHz_; }
   // Call on the UI task outside lv_timer_handler(). Fails only when the canvas cannot be allocated.
   bool setRotation(ScreenRotation rotation);
-  ScreenRotation rotation() const { return rotation_; }
  private:
   esp_panel::board::Board board_;
   lv_display_t* display_ = nullptr;
