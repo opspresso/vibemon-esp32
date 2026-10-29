@@ -26,6 +26,15 @@ vibemon::Controller controller(settings, wifi, cloud, update, VIBEMON_VERSION);
 vibemon::DashboardUi ui(controller);
 vibemon::SerialConsole console(controller, {[] { return static_cast<int>(ui.page()); }, [] { ui.dashboard(); }}, display, update);
 bool ready = false;
+vibemon::ScreenRotation appliedRotation = vibemon::ScreenRotation::Deg0;
+
+// Applies the saved rotation outside lv_timer_handler(), before the next frame.
+void applyRotation() {
+  const auto rotation = controller.workspace().rotation;
+  if (rotation == appliedRotation) return;
+  appliedRotation = rotation;
+  if (!display.setRotation(rotation)) Serial.println("Screen rotation failed: canvas allocation.");
+}
 }
 
 void setup() {
@@ -44,6 +53,7 @@ void setup() {
   // preserving internal memory for DMA, FreeRTOS stacks and Wi-Fi's capability-specific allocations.
   heap_caps_malloc_extmem_enable(0);
   controller.begin(millis());
+  applyRotation();
   if (!ui.begin()) { Serial.println("Startup failed: UI font allocation."); return; }
   ready = true;
   Serial.printf("Ready / internal heap %lu / PSRAM free %lu\n", static_cast<unsigned long>(ESP.getFreeHeap()), static_cast<unsigned long>(ESP.getFreePsram()));
@@ -55,6 +65,7 @@ void loop() {
   wifi.tick(now);
   controller.tick(now);
   ui.update(now);
+  applyRotation();
   console.tick();
   lv_timer_handler();
   delay(5);
