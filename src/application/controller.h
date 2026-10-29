@@ -23,6 +23,7 @@ struct Workspace {
   std::uint32_t revision = 0;
   std::uint64_t snapshotAgeMs = 0;
   std::array<Selection, PanelCount> panels{};
+  ScreenRotation rotation = ScreenRotation::Deg0;
   Catalog catalog;
   FirmwareView firmware;
 };
@@ -40,6 +41,8 @@ class Controller {
   void cancelSignIn();
   const SignInView& signIn() const { return signIn_.view(); }
   Validation select(std::size_t panel, const Selection& selection);
+  // Saves the screen rotation. The display adapter applies workspace().rotation.
+  Validation rotate(ScreenRotation rotation);
   void refresh();
   void retryWifi();
   void cancelSetup();

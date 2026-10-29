@@ -28,6 +28,8 @@ enum class ItemKind { Resource, Account };
 enum class Health { Ok, Warning, Error, Unknown };
 enum class MetricDisplay { Number, Bar };
 enum class MetricTone { Normal, Warning, Danger };
+// Clockwise rotation of the square screen, so the device can stand on any edge.
+enum class ScreenRotation { Deg0, Deg90, Deg180, Deg270 };
 
 struct Selection {
   ItemKind kind = ItemKind::Resource;
@@ -43,6 +45,7 @@ struct Config {
   std::string readToken;
   std::array<Selection, PanelCount> panels{};
   bool panelsInitialized = false;
+  ScreenRotation rotation = ScreenRotation::Deg0;
 };
 
 struct Metric {

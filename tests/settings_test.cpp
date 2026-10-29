@@ -16,6 +16,17 @@ int main() {
     legacy.replace(legacy.find("https://vibemon.io"), std::string("https://vibemon.io").size(), "https://vibemon.io:00443");
     CHECK(decodeSettings(legacy, recovered) && recovered.origin == "https://vibemon.io");
     CHECK(recovered.readToken == store.saved.readToken && recovered.wifiPassword == store.saved.wifiPassword && recovered.panels == store.saved.panels);
+    // The screen rotation round-trips; settings saved before rotation existed stay upright.
+    store.saved.rotation = ScreenRotation::Deg270;
+    CHECK(decodeSettings(encodeSettings(store.saved), recovered) && recovered.rotation == ScreenRotation::Deg270);
+    auto unrotated = encodeSettings(store.saved);
+    unrotated.erase(unrotated.find(",\"rotation\":270"), std::string(",\"rotation\":270").size());
+    CHECK(decodeSettings(unrotated, recovered) && recovered.rotation == ScreenRotation::Deg0 && recovered.readToken == store.saved.readToken);
+    for (const char* degrees : {"45", "360", "-90", "\"90\""}) {
+      auto invalidRotation = encodeSettings(store.saved);
+      invalidRotation.replace(invalidRotation.find("270"), 3, degrees);
+      CHECK(!decodeSettings(invalidRotation, recovered) && recovered.rotation == ScreenRotation::Deg0);
+    }
     for (const char* invalid : {"", "{}", "null", "[]", "{\"version\":2}", "not json"}) {
       CHECK(!decodeSettings(invalid, recovered));
       CHECK(recovered.readToken == store.saved.readToken);
