@@ -117,7 +117,9 @@ int main() {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; update.confirmationOk = false;
       Controller app(store, wifi, cloud, update, "3.6.1");
       app.begin(timeMs); wifi.connected(); app.tick(++timeMs); cloud.complete(demo()); app.tick(++timeMs); app.tick(++timeMs);
-      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); tap(ui, "settings");
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui);
+      CHECK(std::string(lv_label_get_text(ui.widget("version"))) == "v3.6.1");
+      tap(ui, "settings");
       CHECK(app.workspace().firmware.confirmationFailed && update.confirms == 1);
       CHECK(findText(lv_screen_active(), "Confirm failed · tap to retry"));
       CHECK(lv_color_eq(lv_obj_get_style_text_color(ui.widget("firmware-status"), LV_PART_MAIN), lv_color_hex(design::Warning)));
