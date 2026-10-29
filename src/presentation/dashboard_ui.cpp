@@ -243,7 +243,10 @@ void DashboardUi::dashboard() {
       widgets_["panel-light-" + std::to_string(i) + "-" + std::to_string(lightIndex)] = light;
     }
   }
-  label(root_, "A little more aware.", 16, 463, 448, &lv_font_montserrat_12, Muted);
+  label(root_, "A little more aware.", 16, 463, 300, &lv_font_montserrat_12, Muted);
+  auto* version = label(root_, "v" + controller_.firmwareVersion(), 316, 463, 148, &lv_font_montserrat_12, Muted);
+  lv_obj_set_style_text_align(version, LV_TEXT_ALIGN_RIGHT, 0);
+  widgets_["version"] = version;
   updateCards(lv_tick_get());
   updateCardMotion(lv_tick_get());
 }
