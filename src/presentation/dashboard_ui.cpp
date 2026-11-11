@@ -77,8 +77,10 @@ std::uint32_t toneColor(MetricTone tone) {
 }
 
 constexpr int CardWidth = 216, CardHeight = 174, ContentWidth = CardWidth - 2 * PanelPadding;
-// Account labels are short words, so plan usage and its reset time get the wider value column.
-constexpr int ResourceValueWidth = 88, AccountValueWidth = 124;
+// Plan usage and its reset time get the wider value column. An account value takes
+// only its text's width plus ValueGap, so a long label such as the weekly usage of
+// one model family keeps more of its name.
+constexpr int ResourceValueWidth = 88, AccountValueWidth = 124, ValueGap = 8;
 // Lights travel on the card border, one pixel inside its outer edge.
 lv_point_t edgePoint(float phase) {
   constexpr float pi = 3.14159265f, corner = PanelRadius, radius = corner - 1;
@@ -304,19 +306,28 @@ void DashboardUi::updateCards(std::uint32_t now) {
       setText(card.footer, caption);
       if (card.accent != color) { lv_obj_set_style_text_color(card.footer, lv_color_hex(color), 0); card.accent = color; }
     }
+    // The first three metrics in the item's order; an account follows its metric order from Web.
     for (std::size_t m = 0; m < 3; ++m) {
       const bool available = item && m < item->metrics.size();
       visible(card.labels[m], available); visible(card.values[m], available);
       if (!available) { visible(card.bars[m], false); continue; }
       const auto& metric = item->metrics[m];
       const bool account = item->selection.kind == ItemKind::Account;
-      const int valueWidth = account ? AccountValueWidth : ResourceValueWidth, labelWidth = ContentWidth - valueWidth, valueX = CardWidth - PanelPadding - valueWidth;
+      // Plan usage reads like the companion bubble: "38% · 2h5m".
+      const auto reset = resetCountdown(metric, static_cast<std::uint64_t>(item->activityAgeMs) + elapsed);
+      const auto value = reset.empty() ? metricText(metric) : metricText(metric) + " · " + reset;
+      int valueWidth = ResourceValueWidth;
+      if (account) {
+        lv_point_t size;
+        lv_text_get_size(&size, value.c_str(), lv_obj_get_style_text_font(card.values[m], LV_PART_MAIN),
+            lv_obj_get_style_text_letter_space(card.values[m], LV_PART_MAIN), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        valueWidth = std::min(AccountValueWidth, size.x + ValueGap);
+      }
+      const int labelWidth = ContentWidth - valueWidth, valueX = CardWidth - PanelPadding - valueWidth;
       if (lv_obj_get_style_width(card.labels[m], LV_PART_MAIN) != labelWidth) lv_obj_set_width(card.labels[m], labelWidth);
       if (lv_obj_get_x(card.values[m]) != valueX) { lv_obj_set_x(card.values[m], valueX); lv_obj_set_width(card.values[m], valueWidth); }
       setText(card.labels[m], metric.label);
-      // Plan usage reads like the companion bubble: "38% · 2h5m".
-      const auto reset = resetCountdown(metric, static_cast<std::uint64_t>(item->activityAgeMs) + elapsed);
-      setText(card.values[m], reset.empty() ? metricText(metric) : metricText(metric) + " · " + reset);
+      setText(card.values[m], value);
       const bool bar = metric.display == MetricDisplay::Bar && metric.value && metric.maximum;
       visible(card.bars[m], bar);
       if (bar) {

@@ -19,7 +19,7 @@ The first successful non-empty response fills up to four cards, alternating agen
 - Custom resources, Kubernetes clusters, DGX Spark and other host metrics.
 - Multiple Codex, Claude, Kiro or other provider accounts, grouped by provider and account ID.
 - Session, weekly and model-specific weekly plan usage with the time until each limit resets, for example `38% · 2h5m` on a card and `Resets in 2h5m` in details. The countdown continues between polls.
-- Resource metric labels, units, ranges and order from VibeMon. Cards show the first three metrics; scrollable details show all readings, full names, units, status messages and reporting projects.
+- Resource metric labels, units, ranges and order from VibeMon, and each account's metric order set on VibeMon. Cards show the first three metrics; scrollable details show all readings, full names, units, status messages and reporting projects.
 - On-screen Wi-Fi scanning, password input and a large read-token keypad.
 - Korean and Latin names, without downloading fonts at runtime.
 - Optional USB setup for pasting a long key; secrets are prompted and never echoed.

@@ -18,7 +18,7 @@ flowchart LR
 
 Domain types have no Arduino or LVGL dependency. The controller owns connection verification, four stable selections, persistence and request generations. `DeviceSignIn` runs sign-in with a code: it holds the device code, follows the server's polling interval and hands the approved read token to the same verification as a typed token. An older in-flight reply cannot restore a previous account after a configuration change. JSON and hardware libraries remain outside the application boundary.
 
-`app-contract.json` pins public App policy, timing constants and behavioral fixtures by commit and SHA-256. `tools/generate_contract.py` verifies those bytes and emits a C++ state table and the measurement tone bounds in `build/generated`. The JSON adapter retains bounded per-project state and sorts it before the domain aggregates account status. Both App and ESP32 run the same contract cases, including exact freshness boundaries, offline aging, attention priority, account isolation, plan usage reset countdowns and plan usage tones. Web consumes the same App snapshot.
+`app-contract.json` pins public App policy, timing constants and behavioral fixtures by commit and SHA-256. `tools/generate_contract.py` verifies those bytes and emits a C++ state table and the measurement tone bounds in `build/generated`. The JSON adapter retains bounded per-project state and sorts it before the domain aggregates account status. Both App and ESP32 run the same contract cases, including exact freshness boundaries, offline aging, attention priority, account isolation, plan usage reset countdowns, plan usage tones and agent metric orders. Web consumes the same App snapshot.
 
 To update the contract, run `python tools/sync_contract.py --revision FULL_APP_COMMIT`. Add `--app-dir ../vibemon-app` to read that exact commit locally. Never edit files in `contracts/`; change their App source and sync. Native and firmware builds verify the pinned snapshot without requiring App or Web access.
 
@@ -55,7 +55,7 @@ TLS to GitHub authenticates the release files; the firmware images are not signe
 Run `build/venv/bin/python tools/check.py` after the pinned setup. It runs address/undefined-behavior sanitizers, then renders the actual LVGL screens and exercises pointer events. Tests cover:
 
 - Credential and HTTPS-origin validation, Unicode, timestamps and malformed JSON.
-- Custom metric order, missing values, multiple accounts and standby reports.
+- Custom and account metric orders, missing values, multiple accounts and standby reports.
 - Verified saves, rejected keys, delayed replies, account changes, offline retention and timer rollover.
 - Conditional polling: 304 reuse and clock re-anchoring, query and generation changes, and 304 replies without a cached reply or `X-Server-Time`.
 - Four touch cards, category selection, setup forms, actual keyboard input and masking.
