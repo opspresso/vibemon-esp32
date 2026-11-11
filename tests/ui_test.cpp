@@ -1,4 +1,5 @@
 #include "presentation/dashboard_ui.h"
+#include "adapters/catalog_json.h"
 #include "fakes.h"
 
 #include <filesystem>
@@ -255,6 +256,44 @@ int main() {
       CHECK(!findText(ui.widget("panel-0"), "Context"));
       tap(ui, "panel-0"); CHECK(ui.page() == Page::Details); screenshot("connected-only-details");
       CHECK(!findText(lv_screen_active(), "Reporting projects") && findText(lv_screen_active(), "Weekly"));
+    }
+    {
+      // An account order from Web that puts the weekly model usage first, with the longest model label.
+      Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");
+      app.begin(timeMs); wifi.connected(); app.tick(timeMs);
+      const std::string model = "Fable 5.2 Extended Reasoning Research Preview for Long Contexts";
+      Catalog decoded;
+      CHECK(decodeCatalog(R"({"serverTime":"2026-10-11T10:00:00.000Z","sources":[
+        {"sourceId":"coding","kind":"agent","displayName":"Editor","observedAt":"2026-10-11T09:59:59.000Z","receivedAt":"2026-10-11T09:59:59.000Z","health":"ok","stale":false,
+         "metrics":{"contextPercent":42,"usageSessionPercent":18,"usageWeekPercent":55},"metricOrder":["usageWeekModel","usageWeekPercent","contextPercent","usageSessionPercent"],
+         "account":{"id":"work","provider":"claude","displayName":"Work account"},
+         "agent":{"state":"working","project":"web-console","model":"fable","tool":"Editing","usageWeekResetsIn":1439,"usageWeekModel":64,"usageWeekModelLabel":")" + model + R"(","usageWeekModelResetsIn":2880}}]})", decoded).ok);
+      auto catalog = demo();
+      catalog.items.back() = decoded.items.front();
+      cloud.complete(catalog); app.tick(++timeMs);
+      DashboardUi ui(app); CHECK(ui.begin()); advance(ui); screenshot("model-first-dashboard");
+      // The card shows the first three metrics of the account order.
+      CHECK(lv_bar_get_value(ui.widget("panel-bar-0-0")) == 640 && lv_bar_get_value(ui.widget("panel-bar-0-1")) == 550 && lv_bar_get_value(ui.widget("panel-bar-0-2")) == 420);
+      CHECK(!findText(ui.widget("panel-0"), "Session"));
+      // The first row keeps the model name readable: its reading takes only the width that it needs.
+      std::vector<lv_obj_t*> text; labels(ui.widget("panel-0"), text);
+      const auto first = std::find_if(text.begin(), text.end(), [](lv_obj_t* value) { return std::string(lv_label_get_text(value)).rfind("Weekly Fable", 0) == 0; });
+      CHECK(first != text.end() && lv_obj_get_y(*first) == 70);
+      lv_area_t card, bounds; lv_obj_get_coords(ui.widget("panel-0"), &card); lv_obj_get_coords(*first, &bounds);
+      // The long label is shortened with dots inside the card.
+      CHECK(bounds.x1 >= card.x1 && bounds.x2 <= card.x2 && std::string(lv_label_get_text(*first)).size() < 7 + model.size());
+      tap(ui, "panel-0"); CHECK(ui.page() == Page::Details);
+      auto* list = ui.widget("detail-list");
+      lv_obj_update_layout(lv_screen_active());
+      // Details show every metric in the account order, the full model label wrapped.
+      int previous = -1;
+      for (const auto& name : {"Weekly " + model, std::string("Weekly"), std::string("Context"), std::string("Session")}) {
+        auto* row = findText(list, name); CHECK(row);
+        lv_area_t area; lv_obj_get_coords(row, &area);
+        CHECK(area.y1 > previous && area.x2 <= 447); previous = area.y1;
+      }
+      CHECK(findText(list, "64% · Resets in 2d"));
+      screenshot("model-first-details");
     }
     {
       Store store; configured(store); Wifi wifi; Cloud cloud; Update update; Controller app(store, wifi, cloud, update, "3.4.0");

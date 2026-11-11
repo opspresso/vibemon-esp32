@@ -79,8 +79,35 @@ bool resetMinutes(JsonVariantConst raw, std::optional<std::uint64_t>& out) {
   return true;
 }
 
-// Weekly usage of one model family, such as Opus. App and Web show it after the
-// account's weekly limit when the newest project reports it.
+// The metrics that a coding account shows, in their default order (App AGENT_DISPLAY_METRICS).
+// `usageWeekModel` is not a reported metric; modelUsage() reads it from the agent details.
+constexpr const char* AgentMetrics[] = {"contextPercent", "usageSessionPercent", "usageWeekPercent", "usageWeekModel"};
+constexpr std::size_t MaxAgentMetricOrder = 16;
+
+// App agentMetricOrder(): the first occurrence of each agent metric in the account's
+// `metricOrder` from Web, then the agent metrics that it leaves out in their default
+// order. Unknown keys are ignored so that a newer Web can add a metric. An absent
+// order is the default order; a value that is not a list of at most 16 strings is invalid.
+bool agentMetricOrder(JsonVariantConst raw, std::vector<std::string>& order) {
+  const auto known = [&order](const std::string& key) {
+    return std::find(std::begin(AgentMetrics), std::end(AgentMetrics), key) != std::end(AgentMetrics) &&
+        std::find(order.begin(), order.end(), key) == order.end();
+  };
+  if (!raw.isUnbound()) {
+    const auto keys = raw.as<JsonArrayConst>();
+    if (keys.isNull() || keys.size() > MaxAgentMetricOrder) return false;
+    for (JsonVariantConst key : keys) {
+      if (!key.is<const char*>()) return false;
+      const JsonString value = key.as<JsonString>();
+      std::string candidate(value.c_str(), value.size());
+      if (known(candidate)) order.push_back(std::move(candidate));
+    }
+  }
+  for (const char* key : AgentMetrics) if (known(key)) order.emplace_back(key);
+  return true;
+}
+
+// Weekly usage of one model family, such as Fable, while the newest project reports it.
 bool modelUsage(JsonVariantConst agent, Monitor& monitor) {
   Metric metric;
   std::string model;
@@ -124,7 +151,17 @@ bool presetMetrics(JsonObjectConst source, const std::string& kind, Monitor& mon
     if (preset.reset && !resetMinutes(source["agent"][preset.reset], metric.resetMinutes)) return false;
     monitor.metrics.push_back(std::move(metric));
   }
-  return kind != "agent" || modelUsage(source["agent"], monitor);
+  if (kind != "agent") return true;
+  // Cards show the first metrics of this order, and details show all of them.
+  std::vector<std::string> order;
+  if (!agentMetricOrder(source["metricOrder"], order) || !modelUsage(source["agent"], monitor)) return false;
+  std::vector<Metric> ordered;
+  for (const auto& key : order) {
+    const auto metric = std::find_if(monitor.metrics.begin(), monitor.metrics.end(), [&key](const Metric& m) { return m.key == key; });
+    if (metric != monitor.metrics.end()) ordered.push_back(std::move(*metric));
+  }
+  monitor.metrics = std::move(ordered);
+  return true;
 }
 
 std::uint32_t age(std::int64_t now, std::int64_t then) {

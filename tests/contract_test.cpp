@@ -122,6 +122,34 @@ int main(int argc, char** argv) {
       ++count;
     }
     CHECK(fixtures["metricTones"].size() > 0);
+    for (JsonObjectConst fixture : fixtures["agentMetricOrders"].as<JsonArrayConst>()) {
+      JsonDocument response;
+      response["serverTime"] = timestamp(0);
+      auto source = response["sources"].to<JsonArray>().add<JsonObject>();
+      source["sourceId"] = "agent"; source["kind"] = "agent"; source["displayName"] = "Source";
+      source["receivedAt"] = timestamp(0); source["observedAt"] = timestamp(0);
+      source["health"] = "ok"; source["stale"] = false;
+      for (const char* key : {"contextPercent", "usageSessionPercent", "usageWeekPercent"}) source["metrics"][key] = 50;
+      if (!fixture["metricOrder"].isUnbound()) source["metricOrder"].set(fixture["metricOrder"]);
+      source["agent"]["state"] = "working"; source["agent"]["project"] = "Project";
+      source["agent"]["usageWeekModel"].set(fixture["usageWeekModel"]);
+      source["account"]["id"] = "work"; source["account"]["provider"] = "claude"; source["account"]["displayName"] = "Account";
+      std::string body; serializeJson(response, body);
+      Catalog catalog;
+      const auto result = decodeCatalog(body, catalog);
+      const auto name = fixture["name"].as<std::string>();
+      if (fixture["expected"].isNull()) {
+        if (result.ok || result.exceedsLimit) throw std::runtime_error("Agent metric order '" + name + "' was accepted");
+      } else {
+        if (!result.ok || catalog.items.size() != 1) throw std::runtime_error("Agent metric order '" + name + "' was rejected");
+        std::vector<std::string> expected, actual;
+        for (JsonVariantConst key : fixture["expected"].as<JsonArrayConst>()) expected.push_back(key.as<std::string>());
+        for (const auto& metric : catalog.items.front().metrics) actual.push_back(metric.key);
+        if (actual != expected) throw std::runtime_error("Agent metric order '" + name + "' differs from the shared case");
+      }
+      ++count;
+    }
+    CHECK(fixtures["agentMetricOrders"].size() > 0);
     std::cout << "PASS " << count << " shared App/Web/ESP32 monitoring cases through the actual JSON adapter\n";
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

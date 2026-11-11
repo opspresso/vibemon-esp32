@@ -143,6 +143,30 @@ int main() {
       CHECK(plan && plan->projects.empty() && plan->metrics.size() == 3);
       CHECK(plan->metrics[0].key == "usageSessionPercent" && plan->metrics[1].key == "usageWeekPercent" && plan->metrics[2].key == "usageWeekModel");
       CHECK(stateLabel(monitorState(*plan, 0)) == "Standby" && monitorTitle(*plan, 0) == "person@example.com");
+      // The account order applies to plan usage only; context stays hidden.
+      CHECK(decodeCatalog(R"({"serverTime":"2026-10-11T10:00:00.000Z","sources":[
+        {"sourceId":"usage:6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","kind":"agent","displayName":"person@example.com","observedAt":"2026-10-11T09:58:00.000Z","receivedAt":"2026-10-11T09:58:00.000Z","health":"ok","stale":false,
+         "metrics":{"usageSessionPercent":12.5,"usageWeekPercent":42},"metricOrder":["usageWeekModel","contextPercent","usageWeekPercent"],"account":{"id":"plan","provider":"claude","displayName":"person@example.com"},
+         "agent":{"state":"standby","project":"person@example.com","usageWeekModel":7,"usageWeekModelLabel":"Fable"}}]})", connected).ok);
+      plan = connected.find({ItemKind::Account, "claude:plan"});
+      CHECK(plan && plan->metrics.size() == 3 && plan->metrics[0].key == "usageWeekModel" && plan->metrics[0].label == "Weekly Fable");
+      CHECK(plan->metrics[1].key == "usageWeekPercent" && plan->metrics[2].key == "usageSessionPercent");
+    }
+    {
+      // The newest project's account order; an agent never uses custom metric definitions.
+      const std::string at = "\"metrics\":{\"contextPercent\":43";
+      auto ordered = sample();
+      ordered.replace(ordered.find(at), at.size(), R"("metricOrder":["usageWeekModel","usageWeekPercent"],)" + at);
+      Catalog decoded; CHECK(decodeCatalog(ordered, decoded).ok);
+      std::vector<std::string> keys;
+      for (const auto& metric : decoded.find({ItemKind::Account, "codex:work"})->metrics) keys.push_back(metric.key);
+      CHECK((keys == std::vector<std::string>{"usageWeekModel", "usageWeekPercent", "contextPercent", "usageSessionPercent"}));
+      CHECK(decoded.find({ItemKind::Account, "codex:work"})->metrics[0].value == 31.5);
+      // An explicit null is not a list, as in the App.
+      ordered = sample();
+      ordered.replace(ordered.find(at), at.size(), R"("metricOrder":null,)" + at);
+      const auto rejected = decodeCatalog(ordered, decoded);
+      CHECK(!rejected.ok && !rejected.exceedsLimit && rejected.message == "A coding account contains invalid measurements.");
     }
     CHECK(stateLabel(monitorState(*account, 0)) == "Working");
     CHECK(stateLabel(monitorState(*account, 180000)) == "Working");
