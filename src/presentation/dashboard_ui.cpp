@@ -321,7 +321,8 @@ void DashboardUi::updateCards(std::uint32_t now) {
         lv_point_t size;
         lv_text_get_size(&size, value.c_str(), lv_obj_get_style_text_font(card.values[m], LV_PART_MAIN),
             lv_obj_get_style_text_letter_space(card.values[m], LV_PART_MAIN), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        valueWidth = std::min(AccountValueWidth, size.x + ValueGap);
+        // lv_coord_t is int32_t, which is long on the ESP32 toolchain.
+        valueWidth = std::min(AccountValueWidth, static_cast<int>(size.x) + ValueGap);
       }
       const int labelWidth = ContentWidth - valueWidth, valueX = CardWidth - PanelPadding - valueWidth;
       if (lv_obj_get_style_width(card.labels[m], LV_PART_MAIN) != labelWidth) lv_obj_set_width(card.labels[m], labelWidth);
